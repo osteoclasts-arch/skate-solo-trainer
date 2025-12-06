@@ -4,8 +4,7 @@ import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { Trick, SessionSettings, Difficulty, TrickCategory, SessionResult, TrickTip, Language, AnalyticsInsight } from "../types";
 import { TRICK_TIPS_DB } from "../constants";
 
-const apiKey = process.env.API_KEY || '';
-
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
 // Safely initialize GenAI only if key exists (handled in calls)
 const getAI = () => new GoogleGenAI({ apiKey });
 
