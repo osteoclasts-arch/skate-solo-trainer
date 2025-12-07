@@ -1,6 +1,6 @@
 
 
-import { Difficulty, Trick, TrickCategory, TrickTip } from "./types";
+import { Difficulty, Stance, Trick, TrickCategory, TrickTip } from "./types";
 
 export const SKATE_LETTERS = ['S', 'K', 'A', 'T', 'E'];
 
@@ -205,7 +205,7 @@ export const BASE_TRICKS: Trick[] = [
     name: 'Pop Shuvit', 
     category: TrickCategory.FLATGROUND, 
     difficulty: Difficulty.EASY,
-    videoUrl: 'https://www.youtube.com/watch?v=Oq9Y3i7JfGs',
+    videoUrl: 'https://www.youtube.com/watch?v=vA1EPid4aiw', // Updated URL
     description: {
       EN: "Spinning the board 180 degrees under your feet without flipping it, while popping.",
       KR: "보드를 뒤집지 않고 발 아래에서 180도 회전시키는 기술입니다."
@@ -306,7 +306,7 @@ export const BASE_TRICKS: Trick[] = [
     name: 'Varial Kickflip', 
     category: TrickCategory.FLATGROUND, 
     difficulty: Difficulty.MEDIUM,
-    videoUrl: 'https://www.youtube.com/watch?v=N6s3t-Z7C0E',
+    videoUrl: 'https://www.youtube.com/watch?v=MfIkBXXZrEY', // Updated URL
     description: {
       EN: "A combination of a Pop Shuvit and a Kickflip.",
       KR: "팝 셔빗과 킥플립이 결합된 기술입니다."
@@ -317,7 +317,7 @@ export const BASE_TRICKS: Trick[] = [
     name: 'Frontside Pop Shuvit', 
     category: TrickCategory.FLATGROUND, 
     difficulty: Difficulty.MEDIUM,
-    videoUrl: 'https://www.youtube.com/watch?v=Lq1t_WG2t_s',
+    videoUrl: 'https://www.youtube.com/watch?v=nEcssJ5_xK4', // Updated URL
     description: {
       EN: "Popping the board and spinning it 180 degrees frontside (behind you).",
       KR: "보드를 팝하며 등 뒤쪽으로(프론트사이드) 180도 회전시키는 기술입니다."
@@ -348,7 +348,7 @@ export const BASE_TRICKS: Trick[] = [
   {
     id: '50_grind',
     name: '5-0 Grind',
-    category: TrickCategory.GRIND,
+    category: TrickCategory.GRIND, 
     difficulty: Difficulty.MEDIUM,
     videoUrl: 'https://www.youtube.com/watch?v=3RzXk2tB4_s',
     description: {
@@ -389,6 +389,26 @@ export const BASE_TRICKS: Trick[] = [
     description: {
       EN: "A Pop Shuvit combined with a Heelflip.",
       KR: "팝 셔빗과 힐플립이 결합된 기술입니다."
+    }
+  },
+  { 
+    id: 'fs_heelflip', 
+    name: 'Frontside Heelflip', 
+    category: TrickCategory.FLATGROUND, 
+    difficulty: Difficulty.HARD,
+    videoUrl: 'https://www.youtube.com/watch?v=6X_0X_1X_3o', // Placeholder standard FS Heel
+    description: {
+      EN: "A Frontside 180 combined with a Heelflip.",
+      KR: "프론트사이드 180와 힐플립이 결합된 기술입니다."
+    },
+    stanceDocs: {
+        [Stance.FAKIE]: {
+            videoUrl: 'https://www.youtube.com/watch?v=mYcViRQRoH4',
+            description: {
+                EN: "Fakie FS Heelflip: Use the momentum to rotate the board.",
+                KR: "페이키 프론트 힐: 주행 관성을 이용해 보드를 회전시키세요. 레귤러보다 회전이 자연스럽습니다."
+            }
+        }
     }
   },
   { 
@@ -453,10 +473,21 @@ export const BASE_TRICKS: Trick[] = [
     name: 'Impossible', 
     category: TrickCategory.FLATGROUND, 
     difficulty: Difficulty.PRO,
-    videoUrl: 'https://www.youtube.com/watch?v=7X_1X_2X_4o',
+    videoUrl: 'https://www.youtube.com/watch?v=WzzhO6fBqsc', // Updated URL
     description: {
       EN: "The board wraps vertically around the back foot in a 360 motion.",
       KR: "보드가 뒷발을 감싸며 수직으로 360도 회전하는 기술입니다."
+    }
+  },
+  { 
+    id: 'casper_flip', 
+    name: 'Casper Flip', 
+    category: TrickCategory.FLATGROUND, 
+    difficulty: Difficulty.PRO, 
+    videoUrl: 'https://www.youtube.com/watch?v=tm6wP-CFJxk',
+    description: {
+      EN: "Half kickflip caught upside down with back foot, then flipped back.",
+      KR: "킥플립을 반만 돌린 상태에서 뒷발로 캐치한 후 다시 뒤집는 기술입니다."
     }
   },
   { 
@@ -568,6 +599,26 @@ export const TRICK_TIPS_DB: Record<string, TrickTip[]> = {
         video: "Nollie Heel"
     }
   ],
+  'Frontside Heelflip': [
+    {
+        text: {
+            EN: "Focus on the heelflip first, let the rotation follow.",
+            KR: "힐플립에 먼저 집중하고 회전은 따라오게 하세요."
+        },
+        source: "Pro Tip",
+        video: "FS Heel Tips"
+    }
+  ],
+  'Fakie Frontside Heelflip': [
+    {
+        text: {
+            EN: "It rotates much easier than regular. Pop, flick, and turn your shoulders.",
+            KR: "레귤러보다 훨씬 쉽게 돌아갑니다. 팝, 플릭, 그리고 어깨를 돌리세요."
+        },
+        source: "SkateHacks",
+        video: "Fakie FS Heel"
+    }
+  ],
 
   // --- TRE FLIP ---
   '360 Flip': [
@@ -676,6 +727,16 @@ export const TRICK_TIPS_DB: Record<string, TrickTip[]> = {
         }, 
         source: "Rodney Mullen", 
         video: "Impossible How-To" 
+    }
+  ],
+  'Casper Flip': [
+    {
+        text: {
+            EN: "Keep your back foot hanging off the tail to catch it upside down.",
+            KR: "뒷발을 테일 밖으로 빼서 보드가 뒤집혔을 때 받을 준비를 하세요."
+        },
+        source: "Jonny Giger",
+        video: "Casper Flip Tutorial"
     }
   ]
 };

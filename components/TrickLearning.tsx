@@ -1,9 +1,9 @@
 
 
-import React, { useState } from 'react';
-import { Trick, Language } from '../types';
+import React, { useState, useEffect } from 'react';
+import { Trick, Language, Stance } from '../types';
 import { BASE_TRICKS, TRICK_TIPS_DB, TRANSLATIONS } from '../constants';
-import { Video, BookOpen, ChevronRight, X, Check, Info, Layers } from 'lucide-react';
+import { Video, BookOpen, ChevronRight, X, Check, Info, Layers, Zap } from 'lucide-react';
 
 interface Props {
   language: Language;
@@ -47,7 +47,14 @@ const YouTubePlayer = ({ videoUrl, trickName }: { videoUrl?: string, trickName: 
 const TrickLearning: React.FC<Props> = ({ language }) => {
   const t = TRANSLATIONS[language];
   const [selectedTrick, setSelectedTrick] = useState<Trick | null>(null);
+  const [selectedStance, setSelectedStance] = useState<Stance>(Stance.REGULAR);
   const [practiceStats, setPracticeStats] = useState({ landed: 0, failed: 0 });
+
+  useEffect(() => {
+    if (selectedTrick) {
+        setSelectedStance(Stance.REGULAR);
+    }
+  }, [selectedTrick]);
 
   const handleTrickSelect = (trick: Trick) => {
       setSelectedTrick(trick);
@@ -68,33 +75,46 @@ const TrickLearning: React.FC<Props> = ({ language }) => {
     return acc;
   }, {} as Record<string, Trick[]>);
 
-  const getTips = (trickName: string) => {
-    // 1. Get Base Tips
-    const baseTips = TRICK_TIPS_DB[trickName] || [];
-    
-    // 2. Get Variation Tips (Fakie, Nollie, Switch)
-    const variations = ['Fakie', 'Nollie', 'Switch'];
-    const variationTips: { type: string, tips: any[] }[] = [];
+  const getStanceContent = (trick: Trick, stance: Stance) => {
+      // 1. Check if specific stance doc exists in Trick object
+      if (trick.stanceDocs && trick.stanceDocs[stance]) {
+          return trick.stanceDocs[stance];
+      }
+      
+      // 2. Default to Base Trick info for Regular
+      if (stance === Stance.REGULAR) {
+          return {
+              videoUrl: trick.videoUrl,
+              description: trick.description
+          };
+      }
+      
+      // 3. Fallback: Use Base Video but Generic Description
+      return {
+          videoUrl: trick.videoUrl,
+          description: null
+      };
+  };
 
-    variations.forEach(prefix => {
-        const key = `${prefix} ${trickName}`;
-        if (TRICK_TIPS_DB[key]) {
-            variationTips.push({
-                type: prefix,
-                tips: TRICK_TIPS_DB[key]
-            });
-        }
-    });
-
-    return { baseTips, variationTips };
+  const getTipsForStance = (trickName: string, stance: Stance) => {
+      let key = trickName;
+      if (stance !== Stance.REGULAR) {
+          key = `${stance} ${trickName}`; // e.g., "Fakie Kickflip"
+      }
+      return TRICK_TIPS_DB[key] || [];
   };
 
   if (selectedTrick) {
-      const { baseTips, variationTips } = getTips(selectedTrick.name);
+      const activeContent = getStanceContent(selectedTrick, selectedStance);
+      const activeTips = getTipsForStance(selectedTrick.name, selectedStance);
+      
+      // Check which tabs should be enabled (if they have tips or videos)
+      const stanceTabs = Object.values(Stance);
 
       return (
         <div className="flex flex-col h-full p-6 pb-32 overflow-y-auto animate-fade-in relative z-20 bg-black">
-           <div className="flex justify-between items-start mb-6">
+           {/* Header */}
+           <div className="flex justify-between items-start mb-4">
                 <button 
                     onClick={() => setSelectedTrick(null)}
                     className="p-3 bg-white/10 rounded-full hover:bg-white/20 transition-colors"
@@ -113,31 +133,59 @@ const TrickLearning: React.FC<Props> = ({ language }) => {
                 </div>
            </div>
 
+           {/* Stance Selector Tabs */}
+           <div className="flex space-x-2 mb-6 overflow-x-auto pb-2 scrollbar-hide">
+               {stanceTabs.map(stance => {
+                   const hasTips = getTipsForStance(selectedTrick.name, stance).length > 0;
+                   const hasDoc = selectedTrick.stanceDocs?.[stance];
+                   const isRegular = stance === Stance.REGULAR;
+                   const isActive = selectedStance === stance;
+                   
+                   // Only show tab if there is content or it's Regular
+                   if (!isRegular && !hasTips && !hasDoc) return null;
+
+                   return (
+                       <button
+                           key={stance}
+                           onClick={() => setSelectedStance(stance)}
+                           className={`px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all whitespace-nowrap border ${
+                               isActive 
+                                 ? 'bg-skate-neon text-black border-skate-neon shadow-[0_0_10px_rgba(204,255,0,0.4)]' 
+                                 : 'bg-white/5 text-gray-400 border-white/5 hover:bg-white/10'
+                           }`}
+                       >
+                           {/* @ts-ignore */}
+                           {t[stance] || stance}
+                       </button>
+                   );
+               })}
+           </div>
+
+           {/* Description Card */}
            <div className="glass-card p-5 rounded-3xl mb-6">
                 <div className="flex items-center space-x-2 mb-2">
                     <Info className="w-4 h-4 text-skate-neon" />
                     <h3 className="text-gray-300 font-bold uppercase text-[10px] tracking-widest">{t.DESCRIPTION || "DESCRIPTION"}</h3>
                 </div>
                 <p className="text-gray-200 text-sm leading-relaxed font-medium">
-                    {selectedTrick.description 
-                        ? selectedTrick.description[language] 
-                        : (language === 'KR' ? "설명이 준비되지 않았습니다." : "Description coming soon.")
+                    {activeContent?.description 
+                        ? activeContent.description[language] 
+                        : (selectedTrick.description ? selectedTrick.description[language] : (language === 'KR' ? "설명이 준비되지 않았습니다." : "Description coming soon."))
                     }
                 </p>
            </div>
 
-           {/* TIPS SECTION */}
+           {/* Tips Section */}
            <div className="space-y-6 mb-8">
                 <div className="flex items-center space-x-2">
                     <BookOpen className="w-4 h-4 text-skate-neon" />
                     <h3 className="text-gray-400 font-bold uppercase text-xs tracking-widest">{t.PRO_TIP || "PRO TIPS"}</h3>
                 </div>
 
-                {/* Base Tips */}
-                {baseTips.length > 0 ? (
+                {activeTips.length > 0 ? (
                     <div className="space-y-3">
-                        {baseTips.map((tip, idx) => (
-                            <div key={idx} className="bg-white/5 p-5 rounded-2xl border border-white/5">
+                        {activeTips.map((tip, idx) => (
+                            <div key={idx} className="bg-white/5 p-5 rounded-2xl border border-white/5 animate-fade-in">
                                 <h4 className="text-white font-bold mb-2 flex items-center">
                                     <span className="w-5 h-5 rounded-full bg-skate-neon text-black flex items-center justify-center text-[10px] font-bold mr-3">
                                         {idx + 1}
@@ -151,49 +199,32 @@ const TrickLearning: React.FC<Props> = ({ language }) => {
                         ))}
                     </div>
                 ) : (
-                   variationTips.length === 0 && (
-                    <div className="p-4 bg-white/5 rounded-xl text-center text-gray-500 italic text-sm">
-                        No specific pro tips available for this trick yet.
+                    <div className="p-6 bg-white/5 rounded-2xl text-center border border-white/5 border-dashed">
+                        <p className="text-gray-500 text-sm italic mb-2">
+                            {language === 'KR' ? '아직 등록된 팁이 없습니다.' : 'No tips available for this stance yet.'}
+                        </p>
+                        {selectedStance !== Stance.REGULAR && (
+                            <p className="text-xs text-gray-600">
+                                {language === 'KR' ? '기본 스탠스 팁을 참고해보세요!' : 'Try checking the Regular stance tips!'}
+                            </p>
+                        )}
                     </div>
-                   )
                 )}
-
-                {/* Variation Tips */}
-                {variationTips.map((v, vIdx) => (
-                    <div key={vIdx} className="mt-6">
-                         <div className="flex items-center space-x-2 mb-3 pl-1">
-                            <Layers className="w-3 h-3 text-purple-400" />
-                            <h4 className="text-purple-400 font-bold uppercase text-[10px] tracking-widest">
-                                {v.type} Variation
-                            </h4>
-                        </div>
-                        <div className="space-y-3">
-                            {v.tips.map((tip, idx) => (
-                                <div key={idx} className="bg-purple-500/10 p-5 rounded-2xl border border-purple-500/20">
-                                    <h4 className="text-white font-bold mb-2 flex items-center text-xs">
-                                        <span className="w-4 h-4 rounded-full bg-purple-500 text-white flex items-center justify-center text-[8px] font-bold mr-3">
-                                            {v.type[0]}
-                                        </span>
-                                        {tip.source}
-                                    </h4>
-                                    <p className="text-gray-300 text-sm leading-relaxed pl-7">
-                                        {tip.text[language]}
-                                    </p>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                ))}
            </div>
 
+           {/* Video Section */}
            <div className="mb-8">
                 <div className="flex items-center space-x-2 mb-3">
                     <Video className="w-4 h-4 text-skate-neon" />
                     <h3 className="text-gray-400 font-bold uppercase text-xs tracking-widest">{t.VIDEO_TUTORIAL || "VIDEO TUTORIAL"}</h3>
                 </div>
-                <YouTubePlayer videoUrl={selectedTrick.videoUrl} trickName={selectedTrick.name} />
+                <YouTubePlayer 
+                    videoUrl={activeContent?.videoUrl || selectedTrick.videoUrl} 
+                    trickName={`${selectedStance === Stance.REGULAR ? '' : selectedStance} ${selectedTrick.name}`} 
+                />
            </div>
 
+           {/* Quick Practice Logger */}
            <div className="mt-auto glass-card rounded-3xl p-6 border border-white/10">
                <div className="flex items-center justify-between mb-4">
                    <h3 className="text-white font-bold uppercase text-sm">{t.PRACTICE_THIS || "Practice Session"}</h3>
@@ -246,7 +277,7 @@ const TrickLearning: React.FC<Props> = ({ language }) => {
                   >
                     <div className="flex items-center space-x-4">
                       <div className={`w-1.5 h-12 rounded-full ${
-                        getTips(trick.name).baseTips.length > 0 || getTips(trick.name).variationTips.length > 0 ? 'bg-skate-neon shadow-[0_0_10px_rgba(204,255,0,0.5)]' : 'bg-gray-700'
+                        getTipsForStance(trick.name, Stance.REGULAR).length > 0 ? 'bg-skate-neon shadow-[0_0_10px_rgba(204,255,0,0.5)]' : 'bg-gray-700'
                       }`} />
                       <div className="text-left">
                         <span className="block font-display text-2xl font-bold text-white group-hover:text-skate-neon transition-colors leading-none mb-1">

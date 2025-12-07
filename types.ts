@@ -28,16 +28,27 @@ export interface User {
   photoURL?: string;
 }
 
+export interface StanceContent {
+  videoUrl?: string;
+  description?: {
+    EN: string;
+    KR: string;
+  };
+}
+
 export interface Trick {
   id: string;
   name: string;
   category: TrickCategory;
   difficulty: Difficulty;
-  stance?: Stance; // Applied dynamically
-  videoUrl?: string;
+  stance?: Stance; // Applied dynamically in session
+  videoUrl?: string; // Default (Regular) video
   description?: {
     EN: string;
     KR: string;
+  };
+  stanceDocs?: {
+    [key in Stance]?: StanceContent;
   };
 }
 
