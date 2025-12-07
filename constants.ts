@@ -1,3 +1,4 @@
+
 import { Difficulty, Stance, Trick, TrickCategory, TrickTip } from "./types";
 
 export const SKATE_LETTERS = ['S', 'K', 'A', 'T', 'E'];
@@ -399,7 +400,7 @@ export const BASE_TRICKS: Trick[] = [
     name: 'Fakie Bigspin',
     category: TrickCategory.FLATGROUND,
     difficulty: Difficulty.MEDIUM,
-    videoUrl: 'https://www.youtube.com/watch?v=abc12345', 
+    videoUrl: 'https://www.youtube.com/watch?v=3X_6X_7X_8o', 
     description: {
       EN: "Fakie backside 360 shuvit with a 180 body varial.",
       KR: "페이키 상태에서 보드를 360도 돌리고 몸을 180도 돌리는 기술입니다."
@@ -414,6 +415,17 @@ export const BASE_TRICKS: Trick[] = [
     description: {
       EN: "Fakie Backside 180 Ollie.",
       KR: "페이키 상태에서 백사이드로 180도 회전하는 알리입니다."
+    }
+  },
+  {
+    id: 'half_cab_flip',
+    name: 'Half Cab Flip',
+    category: TrickCategory.FLATGROUND,
+    difficulty: Difficulty.MEDIUM,
+    videoUrl: 'https://www.youtube.com/watch?v=HalfCabFlipUrl',
+    description: {
+      EN: "Fakie Backside 180 Kickflip.",
+      KR: "페이키 상태에서 하프캡(백사이드 180)과 킥플립을 동시에 하는 기술입니다."
     }
   },
   {
@@ -491,6 +503,28 @@ export const BASE_TRICKS: Trick[] = [
     description: {
       EN: "A 360 Shuvit while your body does a backside 180 rotation.",
       KR: "보드가 360도 회전하는 동안 몸이 백사이드 180도 회전하는 기술입니다."
+    }
+  },
+  { 
+    id: 'bigspin_flip', 
+    name: 'Bigspin Flip', 
+    category: TrickCategory.FLATGROUND, 
+    difficulty: Difficulty.HARD,
+    videoUrl: 'https://www.youtube.com/watch?v=BigspinFlipUrl',
+    description: {
+      EN: "Bigspin combined with a Kickflip.",
+      KR: "빅스핀과 킥플립을 결합한 기술입니다."
+    }
+  },
+  { 
+    id: 'full_cab', 
+    name: 'Full Cab', 
+    category: TrickCategory.FLATGROUND, 
+    difficulty: Difficulty.HARD,
+    videoUrl: 'https://www.youtube.com/watch?v=FullCabUrl',
+    description: {
+      EN: "Fakie Backside 360 Ollie.",
+      KR: "페이키 상태에서 백사이드로 360도 회전하는 알리입니다. (Caballerial)"
     }
   },
   { 
@@ -810,7 +844,7 @@ export const TRICK_TIPS_DB: Record<string, TrickTip[]> = {
     {
         text: {
             EN: "Turn your shoulders 90 degrees and aim the middle of your board over the rail.",
-            KR: "어깨를 90도 돌리고 보드 중앙을 레일 위에 맞추세요."
+            KR: "어깨를 90도 돌리고 보드 중앙에 레일 위에 맞추세요."
         },
         source: "Braille",
         video: "Boardslide Basics"

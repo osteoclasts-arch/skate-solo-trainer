@@ -1,8 +1,9 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { SessionResult, Language, AnalyticsInsight, Difficulty } from '../types';
 import { TRANSLATIONS } from '../constants';
 import { ResponsiveContainer, AreaChart, Area, XAxis, Tooltip } from 'recharts';
-import { Trophy, TrendingUp, AlertTriangle, Target, BrainCircuit, Sparkles, RefreshCw, Star, Instagram, Crown } from 'lucide-react';
+import { Trophy, TrendingUp, AlertTriangle, Target, BrainCircuit, Sparkles, RefreshCw, Star, Instagram, Crown, Info, X } from 'lucide-react';
 import { getAnalyticsInsight } from '../services/geminiService';
 import html2canvas from 'html2canvas';
 
@@ -17,6 +18,7 @@ const Analytics: React.FC<Props> = ({ history, language, daysSkating = 1 }) => {
   const [insight, setInsight] = useState<AnalyticsInsight | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
+  const [showLevelGuide, setShowLevelGuide] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const totalSessions = history.length;
@@ -174,6 +176,42 @@ const Analytics: React.FC<Props> = ({ history, language, daysSkating = 1 }) => {
   return (
     <div className="flex flex-col h-full p-6 space-y-6 overflow-y-auto pb-32 animate-fade-in" ref={containerRef}>
         
+        {/* Level Guide Modal */}
+        {showLevelGuide && (
+             <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-6 animate-fade-in">
+                 <div className="glass-card p-6 rounded-3xl w-full max-w-sm shadow-2xl relative">
+                     <button onClick={() => setShowLevelGuide(false)} className="absolute top-4 right-4 text-gray-400 hover:text-white"><X className="w-5 h-5"/></button>
+                     <h3 className="text-2xl font-display font-bold text-white mb-4 flex items-center gap-2">
+                        <Star className="w-6 h-6 text-skate-neon" />
+                        {t.EXPERIENCE_LEVEL}
+                     </h3>
+                     <div className="space-y-4">
+                         <div className={`p-4 rounded-xl border ${daysSkating <= 30 ? 'bg-skate-neon/10 border-skate-neon' : 'bg-white/5 border-white/5'}`}>
+                             <div className="flex justify-between items-center mb-1">
+                                 <h4 className={`font-bold uppercase ${daysSkating <= 30 ? 'text-skate-neon' : 'text-gray-400'}`}>{t.LEVEL_BEGINNER}</h4>
+                                 <span className="text-xs font-mono text-gray-500">0 - 30 Days</span>
+                             </div>
+                             <p className="text-xs text-gray-300">스케이트보드에 입문한 루키 단계입니다. 기본기와 흥미 위주의 훈련을 추천합니다.</p>
+                         </div>
+                         <div className={`p-4 rounded-xl border ${daysSkating > 30 && daysSkating <= 180 ? 'bg-purple-500/10 border-purple-500' : 'bg-white/5 border-white/5'}`}>
+                             <div className="flex justify-between items-center mb-1">
+                                 <h4 className={`font-bold uppercase ${daysSkating > 30 && daysSkating <= 180 ? 'text-purple-400' : 'text-gray-400'}`}>{t.LEVEL_INTERMEDIATE}</h4>
+                                 <span className="text-xs font-mono text-gray-500">31 - 180 Days</span>
+                             </div>
+                             <p className="text-xs text-gray-300">기술의 일관성을 높이고 새로운 트릭에 도전하는 아마추어 단계입니다.</p>
+                         </div>
+                         <div className={`p-4 rounded-xl border ${daysSkating > 180 ? 'bg-blue-500/10 border-blue-500' : 'bg-white/5 border-white/5'}`}>
+                             <div className="flex justify-between items-center mb-1">
+                                 <h4 className={`font-bold uppercase ${daysSkating > 180 ? 'text-blue-400' : 'text-gray-400'}`}>{t.LEVEL_ADVANCED}</h4>
+                                 <span className="text-xs font-mono text-gray-500">180+ Days</span>
+                             </div>
+                             <p className="text-xs text-gray-300">자신만의 스타일을 완성하고 고난도 기술을 연마하는 프로 단계입니다.</p>
+                         </div>
+                     </div>
+                 </div>
+             </div>
+        )}
+
         {/* Header */}
         <div className="flex items-center justify-between mb-2">
             <div className="flex items-center space-x-2">
@@ -196,13 +234,17 @@ const Analytics: React.FC<Props> = ({ history, language, daysSkating = 1 }) => {
         
         {/* Level & Rank Badge */}
         <div className="flex justify-between items-center mb-2">
-             <div className="flex items-center space-x-2 bg-white/5 px-3 py-1 rounded-full border border-white/5">
+             <button 
+                onClick={() => setShowLevelGuide(true)}
+                className="flex items-center space-x-2 bg-white/5 px-3 py-1 rounded-full border border-white/5 hover:bg-white/10 transition-colors active:scale-95"
+             >
                 <Star className="w-3.5 h-3.5 text-gray-400" />
                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{t.EXPERIENCE_LEVEL}: <span className="text-white ml-1">{getExperienceLevel(daysSkating)}</span></span>
-            </div>
+                <Info className="w-3 h-3 text-gray-500 ml-1" />
+            </button>
         </div>
 
-        {/* Global Ranking Card (New Feature) */}
+        {/* Global Ranking Card */}
         <div className="glass-card rounded-3xl p-6 relative overflow-hidden group">
             <div className="absolute right-0 top-0 w-32 h-32 bg-gradient-to-br from-skate-neon/10 to-transparent rounded-full blur-2xl -mr-6 -mt-6"></div>
             <div className="relative z-10 flex items-center justify-between">

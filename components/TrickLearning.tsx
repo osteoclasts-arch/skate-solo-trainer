@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect } from 'react';
 import { Trick, Language, Stance } from '../types';
 import { BASE_TRICKS, TRICK_TIPS_DB, TRANSLATIONS } from '../constants';
-import { Video, BookOpen, ChevronRight, X, Check, Info, Layers, Zap } from 'lucide-react';
+import { Video, BookOpen, ChevronRight, X, Check, Info } from 'lucide-react';
 
 interface Props {
   language: Language;
@@ -102,10 +103,11 @@ const TrickLearning: React.FC<Props> = ({ language }) => {
       const activeTips = getTipsForStance(selectedTrick.name, selectedStance);
       const stanceTabs = Object.values(Stance);
 
+      // Detail View: No parent padding, apply padding to children for full-bleed scroll
       return (
-        <div className="flex flex-col h-full p-6 pb-32 overflow-y-auto animate-fade-in relative z-20 bg-black">
+        <div className="flex flex-col h-full pb-32 overflow-y-auto animate-fade-in relative z-20 bg-black">
            {/* Header */}
-           <div className="flex justify-between items-start mb-4">
+           <div className="flex justify-between items-start mb-4 px-6 pt-6">
                 <button 
                     onClick={() => setSelectedTrick(null)}
                     className="p-3 bg-white/10 rounded-full hover:bg-white/20 transition-colors"
@@ -124,14 +126,15 @@ const TrickLearning: React.FC<Props> = ({ language }) => {
                 </div>
            </div>
 
-           {/* Stance Selector Tabs - Fixed Clipping Issue */}
-           <div className="flex flex-nowrap space-x-2 mb-6 overflow-x-auto pb-4 -mx-6 px-6 scrollbar-hide w-[calc(100%+3rem)]">
+           {/* Stance Selector Tabs - Full Bleed */}
+           <div className="flex flex-nowrap space-x-2 mb-6 overflow-x-auto pb-4 px-6 scrollbar-hide w-full flex-shrink-0">
                {stanceTabs.map(stance => {
                    const hasTips = getTipsForStance(selectedTrick.name, stance).length > 0;
                    const hasDoc = selectedTrick.stanceDocs?.[stance];
                    const isRegular = stance === Stance.REGULAR;
                    const isActive = selectedStance === stance;
                    
+                   // Filter out stances that have no content (unless it's Regular)
                    if (!isRegular && !hasTips && !hasDoc) return null;
 
                    return (
@@ -152,21 +155,23 @@ const TrickLearning: React.FC<Props> = ({ language }) => {
            </div>
 
            {/* Description Card */}
-           <div className="glass-card p-5 rounded-3xl mb-6">
-                <div className="flex items-center space-x-2 mb-2">
-                    <Info className="w-4 h-4 text-skate-neon" />
-                    <h3 className="text-gray-300 font-bold uppercase text-[10px] tracking-widest">{t.DESCRIPTION || "DESCRIPTION"}</h3>
+           <div className="px-6 mb-6">
+                <div className="glass-card p-5 rounded-3xl">
+                    <div className="flex items-center space-x-2 mb-2">
+                        <Info className="w-4 h-4 text-skate-neon" />
+                        <h3 className="text-gray-300 font-bold uppercase text-[10px] tracking-widest">{t.DESCRIPTION || "DESCRIPTION"}</h3>
+                    </div>
+                    <p className="text-gray-200 text-sm leading-relaxed font-medium">
+                        {activeContent?.description 
+                            ? activeContent.description[language] 
+                            : (selectedTrick.description ? selectedTrick.description[language] : (language === 'KR' ? "설명이 준비되지 않았습니다." : "Description coming soon."))
+                        }
+                    </p>
                 </div>
-                <p className="text-gray-200 text-sm leading-relaxed font-medium">
-                    {activeContent?.description 
-                        ? activeContent.description[language] 
-                        : (selectedTrick.description ? selectedTrick.description[language] : (language === 'KR' ? "설명이 준비되지 않았습니다." : "Description coming soon."))
-                    }
-                </p>
            </div>
 
            {/* Tips Section */}
-           <div className="space-y-6 mb-8">
+           <div className="px-6 space-y-6 mb-8">
                 <div className="flex items-center space-x-2">
                     <BookOpen className="w-4 h-4 text-skate-neon" />
                     <h3 className="text-gray-400 font-bold uppercase text-xs tracking-widest">{t.PRO_TIP || "PRO TIPS"}</h3>
@@ -203,7 +208,7 @@ const TrickLearning: React.FC<Props> = ({ language }) => {
            </div>
 
            {/* Video Section */}
-           <div className="mb-8">
+           <div className="px-6 mb-8">
                 <div className="flex items-center space-x-2 mb-3">
                     <Video className="w-4 h-4 text-skate-neon" />
                     <h3 className="text-gray-400 font-bold uppercase text-xs tracking-widest">{t.VIDEO_TUTORIAL || "VIDEO TUTORIAL"}</h3>
@@ -215,33 +220,36 @@ const TrickLearning: React.FC<Props> = ({ language }) => {
            </div>
 
            {/* Quick Practice Logger */}
-           <div className="mt-auto glass-card rounded-3xl p-6 border border-white/10">
-               <div className="flex items-center justify-between mb-4">
-                   <h3 className="text-white font-bold uppercase text-sm">{t.PRACTICE_THIS || "Practice Session"}</h3>
-                   <div className="flex space-x-4 text-sm font-mono font-bold">
-                       <span className="text-skate-neon">L: {practiceStats.landed}</span>
-                       <span className="text-skate-alert">F: {practiceStats.failed}</span>
+           <div className="px-6 mt-auto">
+               <div className="glass-card rounded-3xl p-6 border border-white/10">
+                   <div className="flex items-center justify-between mb-4">
+                       <h3 className="text-white font-bold uppercase text-sm">{t.PRACTICE_THIS || "Practice Session"}</h3>
+                       <div className="flex space-x-4 text-sm font-mono font-bold">
+                           <span className="text-skate-neon">L: {practiceStats.landed}</span>
+                           <span className="text-skate-alert">F: {practiceStats.failed}</span>
+                       </div>
                    </div>
-               </div>
-               <div className="flex space-x-3">
-                   <button 
-                        onClick={() => recordAttempt(false)}
-                        className="flex-1 py-4 bg-white/5 text-skate-alert rounded-2xl font-bold uppercase hover:bg-white/10 active:scale-95 transition-all flex justify-center border border-white/5"
-                   >
-                       <X className="w-6 h-6" />
-                   </button>
-                   <button 
-                        onClick={() => recordAttempt(true)}
-                        className="flex-1 py-4 bg-skate-neon text-black rounded-2xl font-bold uppercase hover:bg-skate-neonHover active:scale-95 transition-all flex justify-center shadow-lg"
-                   >
-                       <Check className="w-6 h-6" />
-                   </button>
+                   <div className="flex space-x-3">
+                       <button 
+                            onClick={() => recordAttempt(false)}
+                            className="flex-1 py-4 bg-white/5 text-skate-alert rounded-2xl font-bold uppercase hover:bg-white/10 active:scale-95 transition-all flex justify-center border border-white/5"
+                       >
+                           <X className="w-6 h-6" />
+                       </button>
+                       <button 
+                            onClick={() => recordAttempt(true)}
+                            className="flex-1 py-4 bg-skate-neon text-black rounded-2xl font-bold uppercase hover:bg-skate-neonHover active:scale-95 transition-all flex justify-center shadow-lg"
+                       >
+                           <Check className="w-6 h-6" />
+                       </button>
+                   </div>
                </div>
            </div>
         </div>
       );
   }
 
+  // List View: Use padding container
   return (
     <div className="flex flex-col h-full p-6 pb-32 overflow-y-auto animate-fade-in">
         <div className="space-y-8">
