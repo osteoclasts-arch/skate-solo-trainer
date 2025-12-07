@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Trick, SessionResult, TrickAttempt, Language, TrickTip } from '../types';
-import { Check, X, Lightbulb, Video, User } from 'lucide-react';
+import { Check, X, Lightbulb, Video, User, AlertTriangle } from 'lucide-react';
 import { SKATE_LETTERS, TRANSLATIONS } from '../constants';
 import { getTrickTip } from '../services/geminiService';
 
@@ -19,6 +19,8 @@ const ActiveSession: React.FC<Props> = ({ tricks, onComplete, onAbort, language 
   const [failedCount, setFailedCount] = useState(0);
   const [tip, setTip] = useState<TrickTip | null>(null);
   const [isLoadingTip, setIsLoadingTip] = useState(false);
+  const [usedRebate, setUsedRebate] = useState(false);
+  const [showRebateWarning, setShowRebateWarning] = useState(false);
 
   const currentTrick = tricks[currentIndex];
   const isFinished = currentIndex >= tricks.length || failedCount >= SKATE_LETTERS.length;
@@ -28,6 +30,7 @@ const ActiveSession: React.FC<Props> = ({ tricks, onComplete, onAbort, language 
       finishSession();
     } else {
         setTip(null); // Reset tip for new trick
+        setShowRebateWarning(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentIndex, failedCount]);
@@ -56,12 +59,23 @@ const ActiveSession: React.FC<Props> = ({ tricks, onComplete, onAbort, language 
       timestamp: Date.now()
     };
 
-    setHistory([...history, attempt]);
+    if (landed) {
+        setHistory([...history, attempt]);
+        setCurrentIndex(prev => prev + 1);
+    } else {
+        // Check if we are on the verge of the last letter 'E' (4 fails)
+        if (failedCount === 4 && !usedRebate) {
+            // Activate Rebate: Do NOT record fail yet, give one more try on this same trick
+            setUsedRebate(true);
+            setShowRebateWarning(true);
+            return;
+        }
 
-    if (!landed) {
-      setFailedCount(prev => prev + 1);
+        // If we failed and it was a rebate, OR regular fail
+        setHistory([...history, attempt]);
+        setFailedCount(prev => prev + 1);
+        setCurrentIndex(prev => prev + 1);
     }
-    setCurrentIndex(prev => prev + 1);
   };
 
   const fetchTip = async () => {
@@ -81,7 +95,7 @@ const ActiveSession: React.FC<Props> = ({ tricks, onComplete, onAbort, language 
   if (isFinished) return <div className="flex items-center justify-center h-full"><div className="animate-spin h-8 w-8 border-4 border-skate-neon rounded-full border-t-transparent"></div></div>;
 
   return (
-    <div className="flex flex-col h-full bg-black relative">
+    <div className={`flex flex-col h-full bg-black relative transition-colors duration-500 ${showRebateWarning ? 'bg-red-900/20' : ''}`}>
         {/* Header - Progress & Abort */}
         <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-center z-10">
             <span className="text-gray-500 font-mono text-sm">
@@ -103,6 +117,16 @@ const ActiveSession: React.FC<Props> = ({ tricks, onComplete, onAbort, language 
                 </div>
             ))}
         </div>
+
+        {/* Rebate Warning Overlay */}
+        {showRebateWarning && (
+             <div className="absolute top-32 left-0 right-0 flex justify-center z-20 animate-pulse">
+                <div className="bg-skate-alert/90 px-6 py-2 rounded-full flex items-center space-x-2 shadow-[0_0_20px_rgba(255,59,48,0.5)]">
+                    <AlertTriangle className="w-5 h-5 text-white" />
+                    <span className="text-white font-bold uppercase tracking-widest text-sm">{t.LAST_CHANCE}</span>
+                </div>
+             </div>
+        )}
 
         {/* Main Card */}
         <div className="flex-1 flex flex-col items-center justify-center p-6 space-y-4">

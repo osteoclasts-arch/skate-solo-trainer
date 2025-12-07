@@ -68,7 +68,7 @@ export const TRANSLATIONS = {
     CONFIRM_ABORT: "End current session? Progress will be lost.",
     // Learning
     LEARNING: "Trick Guide",
-    PRACTICE_THIS: "Practice This",
+    PRACTICE_THIS: "Practice Trick",
     HOW_TO: "How To",
     ANALYZING: "Analyzing session data...",
     DESCRIPTION: "Description",
@@ -101,7 +101,9 @@ export const TRANSLATIONS = {
     TIP_VARIATION_STANDARD: "Standard",
     TIP_VARIATION_FAKIE: "Fakie Variation",
     TIP_VARIATION_NOLLIE: "Nollie Variation",
-    TIP_VARIATION_SWITCH: "Switch Variation"
+    TIP_VARIATION_SWITCH: "Switch Variation",
+    // Game
+    LAST_CHANCE: "Last Try! (Rebate)"
   },
   KR: {
     NEW_SESSION: "새로운 세션",
@@ -200,7 +202,9 @@ export const TRANSLATIONS = {
     TIP_VARIATION_STANDARD: "기본 팁",
     TIP_VARIATION_FAKIE: "페이키 팁",
     TIP_VARIATION_NOLLIE: "널리 팁",
-    TIP_VARIATION_SWITCH: "스위치 팁"
+    TIP_VARIATION_SWITCH: "스위치 팁",
+    // Game
+    LAST_CHANCE: "마지막 기회! (다시 시도)"
   }
 };
 
@@ -376,7 +380,7 @@ export const BASE_TRICKS: Trick[] = [
   {
     id: 'boardslide',
     name: 'Boardslide',
-    category: TrickCategory.GRIND,
+    category: TrickCategory.GRIND, 
     difficulty: Difficulty.MEDIUM,
     videoUrl: 'https://www.youtube.com/watch?v=jW9SggQ4wXo',
     description: {
@@ -901,12 +905,3 @@ export const TRICK_TIPS_DB: Record<string, TrickTip[]> = {
     }
   ]
 };
-
-export const MOCK_HISTORY = [
-  { date: '2023-10-01', successRate: 45 },
-  { date: '2023-10-05', successRate: 52 },
-  { date: '2023-10-12', successRate: 48 },
-  { date: '2023-10-15', successRate: 60 },
-  { date: '2023-10-20', successRate: 58 },
-  { date: '2023-10-25', successRate: 65 },
-];

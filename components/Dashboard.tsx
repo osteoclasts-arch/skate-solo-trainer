@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { MOCK_HISTORY, TRANSLATIONS } from '../constants';
+import { TRANSLATIONS } from '../constants';
 import { ResponsiveContainer, AreaChart, Area, Tooltip } from 'recharts';
 import { PlayCircle, Trophy, Activity, Globe, BookOpen, Calendar, Edit2, LogOut, Instagram, ArrowUpRight } from 'lucide-react';
 import { SessionResult, Language, User } from '../types';
@@ -36,11 +36,16 @@ const Dashboard: React.FC<Props> = ({
   const [isEditingDate, setIsEditingDate] = useState(false);
   const [tempDate, setTempDate] = useState(startDate);
 
-  // Combine mock data with real history for visualization
-  const chartData = [...MOCK_HISTORY, ...history.map((h, i) => ({
-      date: new Date(h.date).toISOString().split('T')[0],
-      successRate: Math.round((h.landedCount / h.totalTricks) * 100)
-  }))].slice(-10); 
+  // Generate chart data or use flat line for empty state
+  const chartData = history.length > 0 
+    ? history.map((h) => ({
+        date: new Date(h.date).toISOString().split('T')[0],
+        successRate: Math.round((h.landedCount / h.totalTricks) * 100)
+      })).reverse().slice(-10) // Reverse to show oldest to newest, take last 10
+    : [
+        { date: 'Start', successRate: 0 },
+        { date: 'Now', successRate: 0 }
+      ];
 
   const totalTricks = history.reduce((acc, curr) => acc + curr.totalTricks, 0);
   const totalLanded = history.reduce((acc, curr) => acc + curr.landedCount, 0);
