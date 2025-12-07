@@ -1,5 +1,5 @@
-importt React, { useState, useEffect } from 'react';
-import { signInWithGoogle, logOut, onAuthChange } from '../services/firebase';
+importt React, { useState, useEffect } from 'react';import { signInWithGoogle, logOut, onAuthChange } from '../services/firebase';
+
 import { User } from 'firebase/auth';
 import { LogIn, LogOut, UserCircle } from 'lucide-react';
 
