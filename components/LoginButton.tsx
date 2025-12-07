@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
 import { User } from 'firebase/auth';
-import { LogIn, LogOut, UserCircle } from 'lucide-react';
+import { LogIn, LogOut, User } from 'lucide-react';
 
 interface LoginButtonProps {
   onUserChange?: (user: User | null) => void;
@@ -63,7 +63,7 @@ export default function LoginButton({ onUserChange }: LoginButtonProps) {
               className="w-8 h-8 rounded-full"
             />
           ) : (
-            <UserCircle className="w-8 h-8 text-gray-600" />
+            <User className="w-8 h-8 text-gray-600" />
           )}
           <span className="text-sm font-medium text-gray-700">
             {user.displayName || user.email}
