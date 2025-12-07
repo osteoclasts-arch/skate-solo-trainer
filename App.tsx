@@ -8,6 +8,7 @@ import ActiveSession from './components/ActiveSession';
 import SessionSummary from './components/SessionSummary';
 import Analytics from './components/Analytics';
 import TrickLearning from './components/TrickLearning';
+import LoginButton from './components/LoginButton';
 import { BASE_TRICKS, TRANSLATIONS } from './constants';
 import { generateAISession } from './services/geminiService';
 import { Home, BarChart2, BookOpen } from 'lucide-react';
@@ -268,7 +269,8 @@ const App: React.FC = () => {
 
   return (
     <div className="h-screen w-full bg-black text-white font-sans overflow-hidden flex flex-col">
-      
+
+              <LoginButton />
       <div className="flex-1 overflow-hidden relative">
         {renderContent()}
       </div>
