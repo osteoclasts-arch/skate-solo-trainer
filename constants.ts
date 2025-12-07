@@ -104,7 +104,7 @@ export const TRANSLATIONS = {
     TIP_VARIATION_SWITCH: "Switch Variation"
   },
   KR: {
-    NEW_SESSION: "새로운 훈련",
+    NEW_SESSION: "새로운 세션",
     CUSTOMIZED_TRAINING: "맞춤형 훈련 설정",
     TOTAL_LANDED: "성공 횟수",
     AVG_SUCCESS: "평균 성공률",
@@ -116,7 +116,7 @@ export const TRANSLATIONS = {
     CATEGORIES: "카테고리",
     STANCES: "스탠스",
     STANCE_MIX: "스탠스 믹스",
-    START_SKATING: "훈련 시작",
+    START_SKATING: "세션 시작",
     GENERATING: "루틴 짜는 중...",
     TRICK_COUNTER: "트릭",
     ABORT: "그만하기",
@@ -125,7 +125,7 @@ export const TRANSLATIONS = {
     PRO_TIP: "프로 팁",
     FAILED: "실패",
     LANDED: "성공",
-    SESSION_COMPLETE: "훈련 종료",
+    SESSION_COMPLETE: "세션 종료",
     COMPLETED: "완료",
     CLEAN_SHEET: "퍼펙트 게임",
     AI_FEEDBACK: "AI 코치 피드백",
@@ -136,7 +136,7 @@ export const TRANSLATIONS = {
     SOURCE: "출처",
     VIDEO: "영상",
     // Analytics
-    TOTAL_SESSIONS: "총 훈련 횟수",
+    TOTAL_SESSIONS: "총 세션 횟수",
     BEST_STREAK: "최고 연승",
     WEAKNESS_ANALYSIS: "집중 공략 포인트",
     RECOMMENDED_PRACTICE: "추천 연습 메뉴",
@@ -164,10 +164,10 @@ export const TRANSLATIONS = {
     Switch: "스위치",
     Nollie: "널리",
     AI_PLACEHOLDER: "예: '팝을 뒷방향으로 차는 연습' 또는 '알리 높이 높이기'",
-    CONFIRM_ABORT: "훈련을 종료하시겠어요? 기록이 저장되지 않습니다.",
+    CONFIRM_ABORT: "세션을 종료하시겠어요? 기록이 저장되지 않습니다.",
     // Learning
     LEARNING: "트릭 가이드",
-    PRACTICE_THIS: "이 기술 연습하기",
+    PRACTICE_THIS: "트릭 연습하기",
     HOW_TO: "배우는 법",
     ANALYZING: "데이터 분석 중...",
     DESCRIPTION: "기술 설명",
