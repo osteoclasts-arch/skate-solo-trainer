@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { MOCK_HISTORY, TRANSLATIONS } from '../constants';
 import { ResponsiveContainer, AreaChart, Area, XAxis, Tooltip } from 'recharts';
-import { PlayCircle, Trophy, Activity, Globe, BookOpen, Calendar, Edit2, LogOut } from 'lucide-react';
+import { PlayCircle, Trophy, Activity, Globe, BookOpen, Calendar, Edit2, LogOut, Instagram } from 'lucide-react';
 import { SessionResult, Language } from '../types';
 
 interface Props {
@@ -230,8 +230,24 @@ const Dashboard: React.FC<Props> = ({
             </ResponsiveContainer>
         </div>
       </div>
+
+      {/* Creator Credit */}
+      <div className="flex justify-center mt-4">
+        <a 
+          href="https://instagram.com/osteoclasts_" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="group flex items-center gap-2 px-4 py-2 bg-gray-900/50 rounded-full border border-gray-800 hover:border-skate-neon hover:bg-gray-900 transition-all duration-300"
+        >
+          <Instagram className="w-4 h-4 text-gray-500 group-hover:text-skate-neon transition-colors" />
+          <span className="text-gray-500 text-xs font-mono group-hover:text-white transition-colors">
+            Created by <span className="font-bold text-gray-300 group-hover:text-skate-neon">@osteoclasts_</span>
+          </span>
+        </a>
+      </div>
     </div>
   );
 };
 
 export default Dashboard;
+    
