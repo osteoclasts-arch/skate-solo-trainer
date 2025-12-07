@@ -75,6 +75,7 @@ const Analytics: React.FC<Props> = ({ history, language, daysSkating = 1 }) => {
       if (history.length === 0) return;
       
       setIsGenerating(true);
+        try {
       const recentHistory = sortedHistory.slice(-5).map(h => ({
           date: new Date(h.date).toISOString().split('T')[0],
           rate: Math.round((h.landedCount / h.totalTricks) * 100)
@@ -87,8 +88,11 @@ const Analytics: React.FC<Props> = ({ history, language, daysSkating = 1 }) => {
           recentHistory
       }, language, daysSkating);
       
-      setInsight(data);
+    } catch (error) {
+      console.error('Error generating insight:', error);
+    } finally {
       setIsGenerating(false);
+    }
   };
 
   // Auto-generate insight on mount if we have history and no insight yet
