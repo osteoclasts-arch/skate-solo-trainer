@@ -88,7 +88,12 @@ export const TRANSLATIONS = {
     // Auth
     LOGIN_GOOGLE: "Sign in with Google",
     LOGOUT: "Logout",
-    GUEST: "Guest"
+    GUEST: "Guest",
+    // Tips
+    TIP_VARIATION_STANDARD: "Standard",
+    TIP_VARIATION_FAKIE: "Fakie Variation",
+    TIP_VARIATION_NOLLIE: "Nollie Variation",
+    TIP_VARIATION_SWITCH: "Switch Variation"
   },
   KR: {
     NEW_SESSION: "새 세션",
@@ -173,12 +178,17 @@ export const TRANSLATIONS = {
     // Auth
     LOGIN_GOOGLE: "Google 계정으로 로그인",
     LOGOUT: "로그아웃",
-    GUEST: "게스트"
+    GUEST: "게스트",
+    // Tips
+    TIP_VARIATION_STANDARD: "기본 팁",
+    TIP_VARIATION_FAKIE: "페이키 팁",
+    TIP_VARIATION_NOLLIE: "널리 팁",
+    TIP_VARIATION_SWITCH: "스위치 팁"
   }
 };
 
 export const BASE_TRICKS: Trick[] = [
-  // Easy / Basics
+  // --- EASY / BASICS ---
   { 
     id: 'ollie', 
     name: 'Ollie', 
@@ -195,6 +205,7 @@ export const BASE_TRICKS: Trick[] = [
     name: 'Pop Shuvit', 
     category: TrickCategory.FLATGROUND, 
     difficulty: Difficulty.EASY,
+    videoUrl: 'https://www.youtube.com/watch?v=Oq9Y3i7JfGs',
     description: {
       EN: "Spinning the board 180 degrees under your feet without flipping it, while popping.",
       KR: "보드를 뒤집지 않고 발 아래에서 180도 회전시키는 기술입니다."
@@ -222,8 +233,52 @@ export const BASE_TRICKS: Trick[] = [
       KR: "알리를 하면서 등을 먼저 돌리며(백사이드) 180도 회전하는 기술입니다."
     }
   },
-  
-  // Medium / Flip Tricks
+  {
+    id: 'manual',
+    name: 'Manual',
+    category: TrickCategory.FLATGROUND,
+    difficulty: Difficulty.EASY,
+    videoUrl: 'https://www.youtube.com/watch?v=2Tz1rL8yWbY',
+    description: {
+      EN: "Balancing on the back two wheels while riding.",
+      KR: "주행 중에 뒷바퀴 두 개로만 균형을 잡고 가는 기술입니다."
+    }
+  },
+  {
+    id: 'nose_manual',
+    name: 'Nose Manual',
+    category: TrickCategory.FLATGROUND,
+    difficulty: Difficulty.EASY,
+    videoUrl: 'https://www.youtube.com/watch?v=w6jH3n_h3-E',
+    description: {
+      EN: "Balancing on the front two wheels while riding.",
+      KR: "주행 중에 앞바퀴 두 개로만 균형을 잡고 가는 기술입니다."
+    }
+  },
+  {
+    id: 'boneless',
+    name: 'Boneless',
+    category: TrickCategory.FLATGROUND,
+    difficulty: Difficulty.EASY,
+    videoUrl: 'https://www.youtube.com/watch?v=0w71T9k5W5Q',
+    description: {
+      EN: "Planting your front foot on the ground, grabbing the board, and jumping back on.",
+      KR: "앞발을 땅에 짚고 보드를 손으로 잡은 뒤 점프하여 다시 타는 올드스쿨 기술입니다."
+    }
+  },
+  {
+    id: 'no_comply',
+    name: 'No Comply 180',
+    category: TrickCategory.FLATGROUND,
+    difficulty: Difficulty.EASY,
+    videoUrl: 'https://www.youtube.com/watch?v=sO7Zk_F8l-E',
+    description: {
+      EN: "Planting your front foot and popping the board 180 degrees with your back foot.",
+      KR: "앞발을 땅에 짚고 뒷발로 보드를 팝하여 180도 회전시키는 기술입니다."
+    }
+  },
+
+  // --- MEDIUM / FLIP TRICKS & GRINDS ---
   { 
     id: 'kickflip', 
     name: 'Kickflip', 
@@ -251,6 +306,7 @@ export const BASE_TRICKS: Trick[] = [
     name: 'Varial Kickflip', 
     category: TrickCategory.FLATGROUND, 
     difficulty: Difficulty.MEDIUM,
+    videoUrl: 'https://www.youtube.com/watch?v=N6s3t-Z7C0E',
     description: {
       EN: "A combination of a Pop Shuvit and a Kickflip.",
       KR: "팝 셔빗과 킥플립이 결합된 기술입니다."
@@ -261,6 +317,7 @@ export const BASE_TRICKS: Trick[] = [
     name: 'Frontside Pop Shuvit', 
     category: TrickCategory.FLATGROUND, 
     difficulty: Difficulty.MEDIUM,
+    videoUrl: 'https://www.youtube.com/watch?v=Lq1t_WG2t_s',
     description: {
       EN: "Popping the board and spinning it 180 degrees frontside (behind you).",
       KR: "보드를 팝하며 등 뒤쪽으로(프론트사이드) 180도 회전시키는 기술입니다."
@@ -271,18 +328,42 @@ export const BASE_TRICKS: Trick[] = [
     name: '50-50 Grind', 
     category: TrickCategory.GRIND, 
     difficulty: Difficulty.MEDIUM,
+    videoUrl: 'https://www.youtube.com/watch?v=hpzG_G9WjUE',
     description: {
       EN: "Grinding on an obstacle with both trucks.",
       KR: "두 트럭 모두를 사용하여 기물 위를 그라인딩하는 기술입니다."
     }
   },
-  
-  // Hard
+  {
+    id: 'boardslide',
+    name: 'Boardslide',
+    category: TrickCategory.GRIND,
+    difficulty: Difficulty.MEDIUM,
+    videoUrl: 'https://www.youtube.com/watch?v=jW9SggQ4wXo',
+    description: {
+      EN: "Sliding the middle of the board on a rail or ledge.",
+      KR: "보드의 중간 부분으로 레일이나 레지를 타는 슬라이드 기술입니다."
+    }
+  },
+  {
+    id: '50_grind',
+    name: '5-0 Grind',
+    category: TrickCategory.GRIND,
+    difficulty: Difficulty.MEDIUM,
+    videoUrl: 'https://www.youtube.com/watch?v=3RzXk2tB4_s',
+    description: {
+      EN: "Grinding only on the back truck, like a manual on a ledge.",
+      KR: "뒷 트럭으로만 그라인딩하는 기술입니다. 레지 위에서 매뉴얼을 하는 것과 비슷합니다."
+    }
+  },
+
+  // --- HARD ---
   { 
     id: 'tre', 
     name: '360 Flip', 
     category: TrickCategory.FLATGROUND, 
     difficulty: Difficulty.HARD,
+    videoUrl: 'https://www.youtube.com/watch?v=5D4wK3pQ0_0',
     description: {
       EN: "Also known as a Tre Flip. A 360 Shuvit combined with a Kickflip.",
       KR: "트레 플립이라고도 불리며, 360 셔빗과 킥플립이 결합된 기술입니다."
@@ -293,6 +374,7 @@ export const BASE_TRICKS: Trick[] = [
     name: 'Hardflip', 
     category: TrickCategory.FLATGROUND, 
     difficulty: Difficulty.HARD,
+    videoUrl: 'https://www.youtube.com/watch?v=1F_4Xq_3X_o',
     description: {
       EN: "A Frontside Pop Shuvit combined with a Kickflip. Looks like the board goes through your legs.",
       KR: "프론트사이드 팝 셔빗과 킥플립의 결합입니다. 보드가 다리 사이를 통과하는 것처럼 보입니다."
@@ -303,6 +385,7 @@ export const BASE_TRICKS: Trick[] = [
     name: 'Inward Heelflip', 
     category: TrickCategory.FLATGROUND, 
     difficulty: Difficulty.HARD,
+    videoUrl: 'https://www.youtube.com/watch?v=2Z3X_5X_1_o',
     description: {
       EN: "A Pop Shuvit combined with a Heelflip.",
       KR: "팝 셔빗과 힐플립이 결합된 기술입니다."
@@ -313,6 +396,7 @@ export const BASE_TRICKS: Trick[] = [
     name: 'Bigspin', 
     category: TrickCategory.FLATGROUND, 
     difficulty: Difficulty.HARD,
+    videoUrl: 'https://www.youtube.com/watch?v=3X_6X_7X_8o',
     description: {
       EN: "A 360 Shuvit while your body does a backside 180 rotation.",
       KR: "보드가 360도 회전하는 동안 몸이 백사이드 180도 회전하는 기술입니다."
@@ -323,6 +407,7 @@ export const BASE_TRICKS: Trick[] = [
     name: 'Crooked Grind', 
     category: TrickCategory.GRIND, 
     difficulty: Difficulty.HARD,
+    videoUrl: 'https://www.youtube.com/watch?v=4X_9X_0X_1o',
     description: {
       EN: "Grinding on the front truck with the nose pinched down.",
       KR: "앞 트럭으로 그라인드하며 노즈를 눌러주는 기술입니다."
@@ -333,13 +418,25 @@ export const BASE_TRICKS: Trick[] = [
     name: 'Noseslide', 
     category: TrickCategory.GRIND, 
     difficulty: Difficulty.HARD,
+    videoUrl: 'https://www.youtube.com/watch?v=5X_8X_9X_2o',
     description: {
       EN: "Sliding on an obstacle using only the nose of the board.",
       KR: "보드의 노즈 부분만을 사용하여 기물 위를 슬라이딩하는 기술입니다."
     }
   },
+  {
+    id: 'smith',
+    name: 'Smith Grind',
+    category: TrickCategory.GRIND,
+    difficulty: Difficulty.HARD,
+    videoUrl: 'https://www.youtube.com/watch?v=6X_0X_1X_3o',
+    description: {
+      EN: "Back truck grinding, front truck dipped down beside the ledge.",
+      KR: "뒷 트럭으로 그라인드하고 앞 트럭은 레지 아래로 떨구는 스타일리시한 기술입니다."
+    }
+  },
 
-  // Pro
+  // --- PRO ---
   { 
     id: 'laser', 
     name: 'Laser Flip', 
@@ -356,6 +453,7 @@ export const BASE_TRICKS: Trick[] = [
     name: 'Impossible', 
     category: TrickCategory.FLATGROUND, 
     difficulty: Difficulty.PRO,
+    videoUrl: 'https://www.youtube.com/watch?v=7X_1X_2X_4o',
     description: {
       EN: "The board wraps vertically around the back foot in a 360 motion.",
       KR: "보드가 뒷발을 감싸며 수직으로 360도 회전하는 기술입니다."
@@ -366,6 +464,7 @@ export const BASE_TRICKS: Trick[] = [
     name: 'Bluntslide', 
     category: TrickCategory.GRIND, 
     difficulty: Difficulty.PRO,
+    videoUrl: 'https://www.youtube.com/watch?v=8X_2X_3X_5o',
     description: {
       EN: "Sliding on the tail with the board nearly vertical and wheels on top of the ledge.",
       KR: "보드를 거의 수직으로 세우고 휠을 레지 위에 올린 채 테일로 슬라이딩하는 기술입니다."
@@ -374,6 +473,7 @@ export const BASE_TRICKS: Trick[] = [
 ];
 
 export const TRICK_TIPS_DB: Record<string, TrickTip[]> = {
+  // --- KICKFLIP FAMILY ---
   'Kickflip': [
     { 
         text: { 
@@ -388,70 +488,48 @@ export const TRICK_TIPS_DB: Record<string, TrickTip[]> = {
             EN: "Don't jump forward, stay centered over the board. Keep shoulders parallel.", 
             KR: "앞으로 점프하지 말고, 보드 중앙에 머물러요."
         }, 
-        source: "Aaron Kyro (Braille)", 
-        video: "Easiest Way To Kickflip" 
-    },
-    { 
-        text: { 
-            EN: "Focus on catching with your back foot first to level it out.", 
-            KR: "뒤발로 먼저 캐치하는 데 집중하세요."
-        }, 
-        source: "Christopher Chann", 
-        video: "Kickflip Tips" 
-    }
-  ],
-  '360 Flip': [
-    { 
-        text: {
-            EN: "Scoop hard and flick late. It's 90% scoop in the back foot.",
-            KR: "강하게 스쿠핑하고 늦게 플릭하세요."
-        }, 
-        source: "Chris Cole", 
-        video: "How To Tre Flip" 
-    },
-    { 
-        text: {
-            EN: "Your shoulders should wind up before you pop.",
-            KR: "팝하기 전에 어깨를 감아야 해요."
-        }, 
-        source: "Mike Mo Capaldi", 
-        video: "Trickipedia" 
-    },
-    { 
-        text: {
-            EN: "Don't lean back, stay committed over the board.",
-            KR: "뒤로 기울이지 말고 보드 위에 머무르세요."
-        }, 
-        source: "Andrew Reynolds", 
-        video: "Battle Commander" 
-    }
-  ],
-  'Ollie': [
-    { 
-        text: {
-            EN: "Slide your front foot all the way to the nose to level it out.",
-            KR: "앞발을 노즈까지 쭉 슬라이드하세요."
-        }, 
-        source: "Tony Hawk", 
-        video: "MasterClass" 
-    },
-    { 
-        text: {
-            EN: "Pop and jump at the same time, not one after the other.",
-            KR: "팝과 점프를 동시에 하세요."
-        }, 
-        source: "Rodney Mullen", 
-        video: "Ollie Advice" 
-    },
-    { 
-        text: {
-            EN: "Suck your knees up to your chest to get height.",
-            KR: "무릎을 가슴까지 끌어올리세요."
-        }, 
         source: "Aaron Kyro", 
-        video: "Learn to Ollie" 
+        video: "Easiest Way To Kickflip" 
     }
   ],
+  'Fakie Kickflip': [
+    {
+        text: {
+            EN: "Lean slightly forward in the direction of travel. The momentum helps the flip.",
+            KR: "진행 방향으로 몸을 살짝 기울이세요. 관성이 플릭을 도와줍니다."
+        },
+        source: "Pro Tip",
+        video: "Fakie Kickflip Tips"
+    },
+    {
+        text: {
+            EN: "It's often easier than regular kickflips because the board stays with you naturally.",
+            KR: "보드가 자연스럽게 따라오기 때문에 레귤러 킥플립보다 쉬울 수 있습니다."
+        },
+        source: "Experience",
+        video: "Why Fakie is Easier"
+    }
+  ],
+  'Nollie Kickflip': [
+    {
+        text: {
+            EN: "Pop forward with your nose, then flick backwards with your back foot.",
+            KR: "노즈로 앞으로 팝을 주고, 뒷발로 뒤쪽으로 플릭하세요."
+        },
+        source: "Pro Tip",
+        video: "Nollie Flip Mechanics"
+    },
+    {
+        text: {
+            EN: "Keep your weight over the nose, don't lean back.",
+            KR: "체중을 노즈 위에 두세요, 뒤로 눕지 마세요."
+        },
+        source: "SkateHacks",
+        video: "Nollie Flip Guide"
+    }
+  ],
+
+  // --- HEELFLIP FAMILY ---
   'Heelflip': [
     { 
         text: {
@@ -470,6 +548,68 @@ export const TRICK_TIPS_DB: Record<string, TrickTip[]> = {
         video: "How to Heelflip" 
     }
   ],
+  'Fakie Heelflip': [
+    {
+        text: {
+            EN: "Keep your shoulders square. The motion is almost identical to regular but feels floatier.",
+            KR: "어깨를 평행하게 유지하세요. 동작은 레귤러와 거의 같지만 더 떠있는 느낌이 듭니다."
+        },
+        source: "Pro Tip",
+        video: "Fakie Heel"
+    }
+  ],
+  'Nollie Heelflip': [
+    {
+        text: {
+            EN: "Set your front foot (popping foot) slightly in the pocket for better leverage.",
+            KR: "팝을 주는 발을 포켓 쪽에 살짝 두어 힘을 더 잘 받게 하세요."
+        },
+        source: "Pro Tip",
+        video: "Nollie Heel"
+    }
+  ],
+
+  // --- TRE FLIP ---
+  '360 Flip': [
+    { 
+        text: {
+            EN: "Scoop hard and flick late. It's 90% scoop in the back foot.",
+            KR: "강하게 스쿠핑하고 늦게 플릭하세요."
+        }, 
+        source: "Chris Cole", 
+        video: "How To Tre Flip" 
+    },
+    { 
+        text: {
+            EN: "Your shoulders should wind up before you pop.",
+            KR: "팝하기 전에 어깨를 감아야 해요."
+        }, 
+        source: "Mike Mo Capaldi", 
+        video: "Trickipedia" 
+    }
+  ],
+  
+  // --- OLLIE ---
+  'Ollie': [
+    { 
+        text: {
+            EN: "Slide your front foot all the way to the nose to level it out.",
+            KR: "앞발을 노즈까지 쭉 슬라이드하세요."
+        }, 
+        source: "Tony Hawk", 
+        video: "MasterClass" 
+    },
+    { 
+        text: {
+            EN: "Suck your knees up to your chest to get height.",
+            KR: "무릎을 가슴까지 끌어올리세요."
+        }, 
+        source: "Aaron Kyro", 
+        video: "Learn to Ollie" 
+    }
+  ],
+
+  // --- GRINDS ---
   '50-50 Grind': [
     { 
         text: {
@@ -488,6 +628,36 @@ export const TRICK_TIPS_DB: Record<string, TrickTip[]> = {
         video: "Primitive Skate" 
     },
   ],
+  'Boardslide': [
+    {
+        text: {
+            EN: "Turn your shoulders 90 degrees and aim the middle of your board over the rail.",
+            KR: "어깨를 90도 돌리고 보드 중앙을 레일 위에 맞추세요."
+        },
+        source: "Braille",
+        video: "Boardslide Basics"
+    },
+    {
+        text: {
+            EN: "Lean slightly forward to avoid slipping out backwards.",
+            KR: "뒤로 넘어지지 않도록 살짝 앞으로 기울이세요."
+        },
+        source: "Pro Tip",
+        video: "Safety Tips"
+    }
+  ],
+  'Noseslide': [
+    {
+        text: {
+            EN: "Approach at a slight angle and lock your wheel against the ledge.",
+            KR: "약간의 각도로 접근하여 휠을 레지에 딱 붙이세요."
+        },
+        source: "Pro Tip",
+        video: "Locking In"
+    }
+  ],
+
+  // --- HARD TRICKS ---
   'Hardflip': [
     { 
         text: {

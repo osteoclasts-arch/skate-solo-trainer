@@ -1,7 +1,9 @@
+
+
 import React, { useState } from 'react';
 import { Trick, Language } from '../types';
 import { BASE_TRICKS, TRICK_TIPS_DB, TRANSLATIONS } from '../constants';
-import { Video, BookOpen, ChevronRight, X, Check, Info } from 'lucide-react';
+import { Video, BookOpen, ChevronRight, X, Check, Info, Layers } from 'lucide-react';
 
 interface Props {
   language: Language;
@@ -66,9 +68,30 @@ const TrickLearning: React.FC<Props> = ({ language }) => {
     return acc;
   }, {} as Record<string, Trick[]>);
 
-  const getTips = (trickName: string) => TRICK_TIPS_DB[trickName] || [];
+  const getTips = (trickName: string) => {
+    // 1. Get Base Tips
+    const baseTips = TRICK_TIPS_DB[trickName] || [];
+    
+    // 2. Get Variation Tips (Fakie, Nollie, Switch)
+    const variations = ['Fakie', 'Nollie', 'Switch'];
+    const variationTips: { type: string, tips: any[] }[] = [];
+
+    variations.forEach(prefix => {
+        const key = `${prefix} ${trickName}`;
+        if (TRICK_TIPS_DB[key]) {
+            variationTips.push({
+                type: prefix,
+                tips: TRICK_TIPS_DB[key]
+            });
+        }
+    });
+
+    return { baseTips, variationTips };
+  };
 
   if (selectedTrick) {
+      const { baseTips, variationTips } = getTips(selectedTrick.name);
+
       return (
         <div className="flex flex-col h-full p-6 pb-32 overflow-y-auto animate-fade-in relative z-20 bg-black">
            <div className="flex justify-between items-start mb-6">
@@ -103,15 +126,17 @@ const TrickLearning: React.FC<Props> = ({ language }) => {
                 </p>
            </div>
 
+           {/* TIPS SECTION */}
            <div className="space-y-6 mb-8">
                 <div className="flex items-center space-x-2">
                     <BookOpen className="w-4 h-4 text-skate-neon" />
                     <h3 className="text-gray-400 font-bold uppercase text-xs tracking-widest">{t.PRO_TIP || "PRO TIPS"}</h3>
                 </div>
 
-                {getTips(selectedTrick.name).length > 0 ? (
+                {/* Base Tips */}
+                {baseTips.length > 0 ? (
                     <div className="space-y-3">
-                        {getTips(selectedTrick.name).map((tip, idx) => (
+                        {baseTips.map((tip, idx) => (
                             <div key={idx} className="bg-white/5 p-5 rounded-2xl border border-white/5">
                                 <h4 className="text-white font-bold mb-2 flex items-center">
                                     <span className="w-5 h-5 rounded-full bg-skate-neon text-black flex items-center justify-center text-[10px] font-bold mr-3">
@@ -126,10 +151,39 @@ const TrickLearning: React.FC<Props> = ({ language }) => {
                         ))}
                     </div>
                 ) : (
+                   variationTips.length === 0 && (
                     <div className="p-4 bg-white/5 rounded-xl text-center text-gray-500 italic text-sm">
                         No specific pro tips available for this trick yet.
                     </div>
+                   )
                 )}
+
+                {/* Variation Tips */}
+                {variationTips.map((v, vIdx) => (
+                    <div key={vIdx} className="mt-6">
+                         <div className="flex items-center space-x-2 mb-3 pl-1">
+                            <Layers className="w-3 h-3 text-purple-400" />
+                            <h4 className="text-purple-400 font-bold uppercase text-[10px] tracking-widest">
+                                {v.type} Variation
+                            </h4>
+                        </div>
+                        <div className="space-y-3">
+                            {v.tips.map((tip, idx) => (
+                                <div key={idx} className="bg-purple-500/10 p-5 rounded-2xl border border-purple-500/20">
+                                    <h4 className="text-white font-bold mb-2 flex items-center text-xs">
+                                        <span className="w-4 h-4 rounded-full bg-purple-500 text-white flex items-center justify-center text-[8px] font-bold mr-3">
+                                            {v.type[0]}
+                                        </span>
+                                        {tip.source}
+                                    </h4>
+                                    <p className="text-gray-300 text-sm leading-relaxed pl-7">
+                                        {tip.text[language]}
+                                    </p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                ))}
            </div>
 
            <div className="mb-8">
@@ -192,7 +246,7 @@ const TrickLearning: React.FC<Props> = ({ language }) => {
                   >
                     <div className="flex items-center space-x-4">
                       <div className={`w-1.5 h-12 rounded-full ${
-                        getTips(trick.name).length > 0 ? 'bg-skate-neon shadow-[0_0_10px_rgba(204,255,0,0.5)]' : 'bg-gray-700'
+                        getTips(trick.name).baseTips.length > 0 || getTips(trick.name).variationTips.length > 0 ? 'bg-skate-neon shadow-[0_0_10px_rgba(204,255,0,0.5)]' : 'bg-gray-700'
                       }`} />
                       <div className="text-left">
                         <span className="block font-display text-2xl font-bold text-white group-hover:text-skate-neon transition-colors leading-none mb-1">
