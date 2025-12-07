@@ -11,7 +11,7 @@ declare var process: {
 };
 
 import { initializeApp, getApps, FirebaseApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut as firebaseSignOut, Auth, User as FirebaseUser } from "firebase/auth";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut as firebaseSignOut, Auth, User as FirebaseUser, setPersistence, browserLocalPersistence } from "firebase/auth";
 import { User } from "../types";
 
 // Configuration from environment variables or hardcoded fallback
@@ -50,6 +50,9 @@ export const signInWithGoogle = async (): Promise<User | null> => {
   }
 
   try {
+    // Set persistence to LOCAL (survives browser restart)
+    await setPersistence(auth, browserLocalPersistence);
+
     const provider = new GoogleAuthProvider();
     const result = await signInWithPopup(auth, provider);
     const user = result.user;

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { ViewState, SessionSettings, Trick, SessionResult, Difficulty, Language, Stance, User } from './types';
 import Dashboard from './components/Dashboard';
@@ -20,6 +21,7 @@ const App: React.FC = () => {
   // User Authentication State
   const [user, setUser] = useState<User | null>(null);
   const [isLoadingData, setIsLoadingData] = useState(false);
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
 
   // Initialize session history from localStorage (Default for Guest)
   const [sessionHistory, setSessionHistory] = useState<SessionResult[]>(() => {
@@ -83,8 +85,11 @@ const App: React.FC = () => {
         } else {
           setUser(null);
         }
+        setIsAuthChecking(false);
       });
       return () => unsubscribe();
+    } else {
+        setIsAuthChecking(false);
     }
   }, []);
 
@@ -280,8 +285,16 @@ const App: React.FC = () => {
   };
 
   const renderContent = () => {
+    if (isAuthChecking) {
+        return (
+            <div className="flex flex-col items-center justify-center h-full space-y-4">
+                <div className="w-12 h-12 border-4 border-skate-neon rounded-full border-t-transparent animate-spin"></div>
+            </div>
+        );
+    }
+
     if (isLoadingData && view === 'DASHBOARD') {
-        return <div className="flex items-center justify-center h-full text-skate-neon animate-pulse font-display text-xl tracking-widest">LOADING...</div>;
+        return <div className="flex items-center justify-center h-full text-skate-neon animate-pulse font-display text-xl tracking-widest">SYNCING DATA...</div>;
     }
 
     switch (view) {
