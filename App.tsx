@@ -12,7 +12,7 @@ import LoginButton from './components/LoginButton';
 import { BASE_TRICKS, TRANSLATIONS } from './constants';
 import { generateAISession } from './services/geminiService';
 import { Home, BarChart2, BookOpen } from 'lucide-react';
-import LoginButton from '../components/LoginButton';
+import LoginButton from './components/LoginButton';
 
 const App: React.FC = () => {
   const [view, setView] = useState<ViewState>('DASHBOARD');
