@@ -1,6 +1,7 @@
 
+
 import React, { useState, useEffect } from 'react';
-import { ViewState, SessionSettings, Trick, SessionResult, Difficulty, Language, Stance } from './types';
+import { ViewState, SessionSettings, Trick, SessionResult, Difficulty, Language, Stance, User } from './types';
 import Dashboard from './components/Dashboard';
 import SessionSetup from './components/SessionSetup';
 import ActiveSession from './components/ActiveSession';
@@ -9,12 +10,17 @@ import Analytics from './components/Analytics';
 import TrickLearning from './components/TrickLearning';
 import { BASE_TRICKS, TRANSLATIONS } from './constants';
 import { generateAISession } from './services/geminiService';
+import { signInWithGoogle, logout, getFirebaseAuth } from './services/authService';
+import { onAuthStateChanged } from 'firebase/auth';
 import { Home, BarChart2, BookOpen } from 'lucide-react';
 
 const App: React.FC = () => {
   const [view, setView] = useState<ViewState>('DASHBOARD');
   const [activeTricks, setActiveTricks] = useState<Trick[]>([]);
   
+  // User Authentication State
+  const [user, setUser] = useState<User | null>(null);
+
   // Initialize session history from localStorage
   const [sessionHistory, setSessionHistory] = useState<SessionResult[]>(() => {
     try {
@@ -36,6 +42,41 @@ const App: React.FC = () => {
   const [startDate, setStartDate] = useState<string>(() => {
       return localStorage.getItem('skate_start_date') || new Date().toISOString().split('T')[0];
   });
+
+  // Handle Authentication Persistence
+  useEffect(() => {
+    const auth = getFirebaseAuth();
+    if (auth) {
+      const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+        if (firebaseUser) {
+          setUser({
+            uid: firebaseUser.uid,
+            name: firebaseUser.displayName || 'Skater',
+            email: firebaseUser.email || '',
+            photoURL: firebaseUser.photoURL || undefined
+          });
+        } else {
+          setUser(null);
+        }
+      });
+      return () => unsubscribe();
+    } else {
+      // Fallback: Check local storage for mock user persistence if needed
+      // For now, we assume mock session is per-reload unless we impl local storage for it
+    }
+  }, []);
+
+  const handleLogin = async () => {
+    const loggedInUser = await signInWithGoogle();
+    if (loggedInUser) {
+      setUser(loggedInUser);
+    }
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    setUser(null);
+  };
 
   const updateStartDate = (date: string) => {
       setStartDate(date);
@@ -237,6 +278,9 @@ const App: React.FC = () => {
                     daysSkating={daysSkating}
                     startDate={startDate}
                     onUpdateStartDate={updateStartDate}
+                    user={user}
+                    onLogin={handleLogin}
+                    onLogout={handleLogout}
                 />
              );
         case 'ANALYTICS':

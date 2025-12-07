@@ -1,4 +1,5 @@
 
+
 export enum Stance {
   REGULAR = 'Regular',
   FAKIE = 'Fakie',
@@ -18,6 +19,13 @@ export enum TrickCategory {
   GRIND = 'Grind',
   // MANUAL removed
   TRANSITION = 'Transition'
+}
+
+export interface User {
+  uid: string;
+  name: string;
+  email?: string;
+  photoURL?: string;
 }
 
 export interface Trick {

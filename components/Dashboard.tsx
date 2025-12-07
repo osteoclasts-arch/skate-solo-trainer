@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { MOCK_HISTORY, TRANSLATIONS } from '../constants';
 import { ResponsiveContainer, AreaChart, Area, XAxis, Tooltip } from 'recharts';
 import { PlayCircle, Trophy, Activity, Globe, BookOpen, Calendar, Edit2, LogOut, Instagram } from 'lucide-react';
-import { SessionResult, Language } from '../types';
+import { SessionResult, Language, User } from '../types';
 
 interface Props {
   onStart: () => void;
@@ -15,6 +15,9 @@ interface Props {
   daysSkating: number;
   startDate: string;
   onUpdateStartDate: (date: string) => void;
+  user: User | null;
+  onLogin: () => void;
+  onLogout: () => void;
 }
 
 const Dashboard: React.FC<Props> = ({ 
@@ -25,14 +28,14 @@ const Dashboard: React.FC<Props> = ({
     onLanguageToggle,
     daysSkating,
     startDate,
-    onUpdateStartDate
+    onUpdateStartDate,
+    user,
+    onLogin,
+    onLogout
 }) => {
   const t = TRANSLATIONS[language];
   const [isEditingDate, setIsEditingDate] = useState(false);
   const [tempDate, setTempDate] = useState(startDate);
-  
-  // Simulated Auth State
-  const [user, setUser] = useState<{name: string, image?: string} | null>(null);
 
   // Combine mock data with real history for visualization
   const chartData = [...MOCK_HISTORY, ...history.map((h, i) => ({
@@ -47,18 +50,6 @@ const Dashboard: React.FC<Props> = ({
   const handleSaveDate = () => {
       onUpdateStartDate(tempDate);
       setIsEditingDate(false);
-  };
-
-  const handleLogin = () => {
-      // Simulating Google Login
-      setUser({
-          name: "Skater",
-          image: "https://lh3.googleusercontent.com/a/default-user=s96-c" 
-      });
-  };
-
-  const handleLogout = () => {
-      setUser(null);
   };
 
   const GoogleIcon = () => (
@@ -129,7 +120,7 @@ const Dashboard: React.FC<Props> = ({
                 <div className="flex items-center space-x-2 bg-gray-900 p-1 pl-3 rounded-full border border-gray-800">
                     <span className="text-xs font-bold text-white">{user.name}</span>
                     <button 
-                        onClick={handleLogout}
+                        onClick={onLogout}
                         className="bg-gray-800 hover:bg-gray-700 p-1 rounded-full transition-colors"
                         title={t.LOGOUT}
                     >
@@ -138,7 +129,7 @@ const Dashboard: React.FC<Props> = ({
                 </div>
             ) : (
                 <button 
-                    onClick={handleLogin}
+                    onClick={onLogin}
                     className="flex items-center px-3 py-1.5 bg-white text-black rounded-full font-bold text-xs hover:bg-gray-200 transition-colors shadow-lg"
                 >
                     <GoogleIcon />
@@ -250,4 +241,3 @@ const Dashboard: React.FC<Props> = ({
 };
 
 export default Dashboard;
-    
