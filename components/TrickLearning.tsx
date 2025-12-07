@@ -1,47 +1,47 @@
 
-import React, { useState, useRef } from 'react';
-import { Trick, Language, TrickTip } from '../types';
+
+import React, { useState } from 'react';
+import { Trick, Language } from '../types';
 import { BASE_TRICKS, TRICK_TIPS_DB, TRANSLATIONS } from '../constants';
-import { Video, BookOpen, ChevronRight, X, Check } from 'lucide-react';
+import { Video, BookOpen, ChevronRight, X, Check, Info } from 'lucide-react';
 
 interface Props {
   language: Language;
 }
 
-const VideoPlayer = ({ tip }: { tip: TrickTip }) => {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const [speed, setSpeed] = useState(1);
-
-  const handleSpeed = (s: number) => {
-    if (videoRef.current) {
-      videoRef.current.playbackRate = s;
-      setSpeed(s);
-    }
+const YouTubePlayer = ({ videoUrl, trickName }: { videoUrl?: string, trickName: string }) => {
+  // Extract Video ID if it's a standard URL
+  const getVideoId = (url: string) => {
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[2].length === 11) ? match[2] : null;
   };
 
+  let src = "";
+  if (videoUrl) {
+    const videoId = getVideoId(videoUrl);
+    if (videoId) {
+      src = `https://www.youtube.com/embed/${videoId}`;
+    }
+  }
+
+  // Fallback to search query if no specific URL is provided
+  if (!src) {
+    src = `https://www.youtube.com/embed?listType=search&list=How+to+${encodeURIComponent(trickName)}+skateboard`;
+  }
+
   return (
-    <div className="mt-4 bg-black rounded-lg overflow-hidden ml-9 border border-gray-800">
-      <video 
-        ref={videoRef}
-        className="w-full aspect-video bg-black"
-        controls
-        controlsList="nodownload"
-        poster="/placeholder-thumbnail.jpg"
-      >
-        <source src={tip.videoUrl || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4'} type="video/mp4" />
-        {tip.subtitleUrl && <track kind="subtitles" src={tip.subtitleUrl} srcLang="ko" label="한국어" />}
-      </video>
-      <div className="flex gap-2 p-2 bg-gray-900 border-t border-gray-800">
-        {[0.25, 0.5, 1].map(s => (
-            <button 
-                key={s}
-                onClick={() => handleSpeed(s)}
-                className={`px-3 py-1 rounded text-xs font-bold transition-colors ${speed === s ? 'bg-skate-neon text-black' : 'bg-gray-700 text-white hover:bg-gray-600'}`}
-            >
-                {s}x
-            </button>
-        ))}
-      </div>
+    <div className="mt-4 bg-black rounded-lg overflow-hidden border border-gray-800 aspect-video relative">
+      <iframe
+        width="100%"
+        height="100%"
+        src={src}
+        title={`YouTube video player for ${trickName}`}
+        frameBorder="0"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allowFullScreen
+        className="absolute inset-0"
+      ></iframe>
     </div>
   );
 };
@@ -95,17 +95,31 @@ const TrickLearning: React.FC<Props> = ({ language }) => {
                 </div>
            </div>
 
-           {/* Tips Content */}
+           {/* 1. Description Section */}
+           <div className="bg-gray-900/50 p-4 rounded-xl border border-gray-800 mb-6">
+                <div className="flex items-center space-x-2 mb-2">
+                    <Info className="w-4 h-4 text-skate-neon" />
+                    <h3 className="text-gray-300 font-bold uppercase text-xs tracking-wider">{t.DESCRIPTION || "DESCRIPTION"}</h3>
+                </div>
+                <p className="text-gray-200 text-sm leading-relaxed">
+                    {selectedTrick.description 
+                        ? selectedTrick.description[language] 
+                        : (language === 'KR' ? "설명이 준비되지 않았습니다." : "Description coming soon.")
+                    }
+                </p>
+           </div>
+
+           {/* 2. Pro Tips Section */}
            <div className="space-y-6 mb-8">
                 <div className="flex items-center space-x-2">
-                    <Video className="w-5 h-5 text-skate-neon" />
-                    <h3 className="text-gray-300 font-bold uppercase text-sm tracking-wider">{t.HOW_TO || "HOW TO"}</h3>
+                    <BookOpen className="w-5 h-5 text-skate-neon" />
+                    <h3 className="text-gray-300 font-bold uppercase text-sm tracking-wider">{t.PRO_TIP || "PRO TIPS"}</h3>
                 </div>
 
                 {getTips(selectedTrick.name).length > 0 ? (
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                         {getTips(selectedTrick.name).map((tip, idx) => (
-                            <div key={idx} className="bg-gray-900 p-5 rounded-xl border border-gray-800">
+                            <div key={idx} className="bg-gray-900 p-4 rounded-xl border border-gray-800">
                                 <h4 className="text-white font-bold mb-2 flex items-center">
                                     <span className="w-6 h-6 rounded-full bg-skate-neon text-black flex items-center justify-center text-xs font-bold mr-3">
                                         {idx + 1}
@@ -115,18 +129,26 @@ const TrickLearning: React.FC<Props> = ({ language }) => {
                                 <p className="text-gray-300 text-sm leading-relaxed pl-9">
                                     {tip.text[language]}
                                 </p>
-                                <VideoPlayer tip={{
-                                    ...tip,
-                                    videoUrl: tip.videoUrl || selectedTrick.videoUrl
-                                }} />
                             </div>
                         ))}
                     </div>
                 ) : (
-                    <div className="p-8 bg-gray-900 rounded-xl border border-gray-800 text-center text-gray-500 italic">
-                        No specific tutorial data available for this trick yet.
+                    <div className="p-4 bg-gray-900 rounded-xl border border-gray-800 text-center text-gray-500 italic text-sm">
+                        No specific pro tips available for this trick yet.
                     </div>
                 )}
+           </div>
+
+           {/* 3. Video Tutorial Section */}
+           <div className="mb-8">
+                <div className="flex items-center space-x-2 mb-3">
+                    <Video className="w-5 h-5 text-skate-neon" />
+                    <h3 className="text-gray-300 font-bold uppercase text-sm tracking-wider">{t.VIDEO_TUTORIAL || "VIDEO TUTORIAL"}</h3>
+                </div>
+                <YouTubePlayer 
+                    videoUrl={selectedTrick.videoUrl} 
+                    trickName={selectedTrick.name} 
+                />
            </div>
 
            {/* Quick Practice Logger */}

@@ -70,6 +70,8 @@ export const TRANSLATIONS = {
     PRACTICE_THIS: "Practice This",
     HOW_TO: "How To",
     ANALYZING: "Analyzing session data...",
+    DESCRIPTION: "Description",
+    VIDEO_TUTORIAL: "Video Tutorial",
     // Profile & Experience
     DAYS_SKATING: "Days Skating",
     START_DATE: "Start Date",
@@ -80,7 +82,11 @@ export const TRANSLATIONS = {
     EXPERIENCE_LEVEL: "Experience Level",
     LEVEL_BEGINNER: "Beginner",
     LEVEL_INTERMEDIATE: "Intermediate",
-    LEVEL_ADVANCED: "Advanced"
+    LEVEL_ADVANCED: "Advanced",
+    // Auth
+    LOGIN_GOOGLE: "Sign in with Google",
+    LOGOUT: "Logout",
+    GUEST: "Guest"
   },
   KR: {
     NEW_SESSION: "새 세션",
@@ -147,6 +153,8 @@ export const TRANSLATIONS = {
     PRACTICE_THIS: "이 기술 연습하기",
     HOW_TO: "배우는 법",
     ANALYZING: "세션 데이터 분석 중...",
+    DESCRIPTION: "설명",
+    VIDEO_TUTORIAL: "영상 강의",
     // Profile & Experience
     DAYS_SKATING: "보드 경력",
     START_DATE: "시작일",
@@ -157,36 +165,208 @@ export const TRANSLATIONS = {
     EXPERIENCE_LEVEL: "경력 레벨",
     LEVEL_BEGINNER: "입문",
     LEVEL_INTERMEDIATE: "중급",
-    LEVEL_ADVANCED: "고급"
+    LEVEL_ADVANCED: "고급",
+    // Auth
+    LOGIN_GOOGLE: "Google 계정으로 로그인",
+    LOGOUT: "로그아웃",
+    GUEST: "게스트"
   }
 };
 
 export const BASE_TRICKS: Trick[] = [
   // Easy / Basics
-  { id: 'ollie', name: 'Ollie', category: TrickCategory.FLATGROUND, difficulty: Difficulty.EASY, videoUrl: 'https://www.youtube.com/watch?v=qRv71FiM7JQ' },
-  { id: 'shuv', name: 'Pop Shuvit', category: TrickCategory.FLATGROUND, difficulty: Difficulty.EASY },
-  { id: 'fs180', name: 'Frontside 180', category: TrickCategory.FLATGROUND, difficulty: Difficulty.EASY, videoUrl: 'https://www.youtube.com/watch?v=C_yCly3NYUo' },
-  { id: 'bs180', name: 'Backside 180', category: TrickCategory.FLATGROUND, difficulty: Difficulty.EASY, videoUrl: 'https://www.youtube.com/watch?v=dJMp-xtb_Hk' },
+  { 
+    id: 'ollie', 
+    name: 'Ollie', 
+    category: TrickCategory.FLATGROUND, 
+    difficulty: Difficulty.EASY, 
+    videoUrl: 'https://www.youtube.com/watch?v=qRv71FiM7JQ',
+    description: {
+      EN: "The foundation of street skateboarding. A jump where you pop the tail and slide your front foot up.",
+      KR: "스트릿 스케이트보딩의 기초입니다. 테일을 팝하고 앞발을 끌어올려 점프하는 기술입니다."
+    }
+  },
+  { 
+    id: 'shuv', 
+    name: 'Pop Shuvit', 
+    category: TrickCategory.FLATGROUND, 
+    difficulty: Difficulty.EASY,
+    description: {
+      EN: "Spinning the board 180 degrees under your feet without flipping it, while popping.",
+      KR: "보드를 뒤집지 않고 발 아래에서 180도 회전시키는 기술입니다."
+    }
+  },
+  { 
+    id: 'fs180', 
+    name: 'Frontside 180', 
+    category: TrickCategory.FLATGROUND, 
+    difficulty: Difficulty.EASY, 
+    videoUrl: 'https://www.youtube.com/watch?v=C_yCly3NYUo',
+    description: {
+      EN: "An ollie where you and the board rotate 180 degrees facing forward (frontside).",
+      KR: "알리를 하면서 몸과 보드가 앞쪽(프론트사이드)으로 180도 회전하는 기술입니다."
+    }
+  },
+  { 
+    id: 'bs180', 
+    name: 'Backside 180', 
+    category: TrickCategory.FLATGROUND, 
+    difficulty: Difficulty.EASY, 
+    videoUrl: 'https://www.youtube.com/watch?v=dJMp-xtb_Hk',
+    description: {
+      EN: "An ollie where you and the board rotate 180 degrees with your back turning first.",
+      KR: "알리를 하면서 등을 먼저 돌리며(백사이드) 180도 회전하는 기술입니다."
+    }
+  },
   
   // Medium / Flip Tricks
-  { id: 'kickflip', name: 'Kickflip', category: TrickCategory.FLATGROUND, difficulty: Difficulty.MEDIUM, videoUrl: 'https://www.youtube.com/watch?v=G8yy5v9IBso' },
-  { id: 'heelflip', name: 'Heelflip', category: TrickCategory.FLATGROUND, difficulty: Difficulty.MEDIUM, videoUrl: 'https://www.youtube.com/watch?v=a61ycoK_bWM' },
-  { id: 'varial', name: 'Varial Kickflip', category: TrickCategory.FLATGROUND, difficulty: Difficulty.MEDIUM },
-  { id: 'fs_shuv', name: 'Frontside Pop Shuvit', category: TrickCategory.FLATGROUND, difficulty: Difficulty.MEDIUM },
-  { id: '5050', name: '50-50 Grind', category: TrickCategory.GRIND, difficulty: Difficulty.MEDIUM },
+  { 
+    id: 'kickflip', 
+    name: 'Kickflip', 
+    category: TrickCategory.FLATGROUND, 
+    difficulty: Difficulty.MEDIUM, 
+    videoUrl: 'https://www.youtube.com/watch?v=G8yy5v9IBso',
+    description: {
+      EN: "Flicking the board with your toe to make it flip 360 degrees along its axis.",
+      KR: "발가락으로 보드를 플릭하여 축을 따라 360도 회전시키는 기술입니다."
+    }
+  },
+  { 
+    id: 'heelflip', 
+    name: 'Heelflip', 
+    category: TrickCategory.FLATGROUND, 
+    difficulty: Difficulty.MEDIUM, 
+    videoUrl: 'https://www.youtube.com/watch?v=a61ycoK_bWM',
+    description: {
+      EN: "Flicking the board with your heel to make it flip in the opposite direction of a kickflip.",
+      KR: "발뒤꿈치로 보드를 차서 킥플립과 반대 방향으로 회전시키는 기술입니다."
+    }
+  },
+  { 
+    id: 'varial', 
+    name: 'Varial Kickflip', 
+    category: TrickCategory.FLATGROUND, 
+    difficulty: Difficulty.MEDIUM,
+    description: {
+      EN: "A combination of a Pop Shuvit and a Kickflip.",
+      KR: "팝 셔빗과 킥플립이 결합된 기술입니다."
+    }
+  },
+  { 
+    id: 'fs_shuv', 
+    name: 'Frontside Pop Shuvit', 
+    category: TrickCategory.FLATGROUND, 
+    difficulty: Difficulty.MEDIUM,
+    description: {
+      EN: "Popping the board and spinning it 180 degrees frontside (behind you).",
+      KR: "보드를 팝하며 등 뒤쪽으로(프론트사이드) 180도 회전시키는 기술입니다."
+    }
+  },
+  { 
+    id: '5050', 
+    name: '50-50 Grind', 
+    category: TrickCategory.GRIND, 
+    difficulty: Difficulty.MEDIUM,
+    description: {
+      EN: "Grinding on an obstacle with both trucks.",
+      KR: "두 트럭 모두를 사용하여 기물 위를 그라인딩하는 기술입니다."
+    }
+  },
   
   // Hard
-  { id: 'tre', name: '360 Flip', category: TrickCategory.FLATGROUND, difficulty: Difficulty.HARD },
-  { id: 'hardflip', name: 'Hardflip', category: TrickCategory.FLATGROUND, difficulty: Difficulty.HARD },
-  { id: 'inward', name: 'Inward Heelflip', category: TrickCategory.FLATGROUND, difficulty: Difficulty.HARD },
-  { id: 'bigspin', name: 'Bigspin', category: TrickCategory.FLATGROUND, difficulty: Difficulty.HARD },
-  { id: 'crook', name: 'Crooked Grind', category: TrickCategory.GRIND, difficulty: Difficulty.HARD },
-  { id: 'nose_slide', name: 'Noseslide', category: TrickCategory.GRIND, difficulty: Difficulty.HARD },
+  { 
+    id: 'tre', 
+    name: '360 Flip', 
+    category: TrickCategory.FLATGROUND, 
+    difficulty: Difficulty.HARD,
+    description: {
+      EN: "Also known as a Tre Flip. A 360 Shuvit combined with a Kickflip.",
+      KR: "트레 플립이라고도 불리며, 360 셔빗과 킥플립이 결합된 기술입니다."
+    }
+  },
+  { 
+    id: 'hardflip', 
+    name: 'Hardflip', 
+    category: TrickCategory.FLATGROUND, 
+    difficulty: Difficulty.HARD,
+    description: {
+      EN: "A Frontside Pop Shuvit combined with a Kickflip. Looks like the board goes through your legs.",
+      KR: "프론트사이드 팝 셔빗과 킥플립의 결합입니다. 보드가 다리 사이를 통과하는 것처럼 보입니다."
+    }
+  },
+  { 
+    id: 'inward', 
+    name: 'Inward Heelflip', 
+    category: TrickCategory.FLATGROUND, 
+    difficulty: Difficulty.HARD,
+    description: {
+      EN: "A Pop Shuvit combined with a Heelflip.",
+      KR: "팝 셔빗과 힐플립이 결합된 기술입니다."
+    }
+  },
+  { 
+    id: 'bigspin', 
+    name: 'Bigspin', 
+    category: TrickCategory.FLATGROUND, 
+    difficulty: Difficulty.HARD,
+    description: {
+      EN: "A 360 Shuvit while your body does a backside 180 rotation.",
+      KR: "보드가 360도 회전하는 동안 몸이 백사이드 180도 회전하는 기술입니다."
+    }
+  },
+  { 
+    id: 'crook', 
+    name: 'Crooked Grind', 
+    category: TrickCategory.GRIND, 
+    difficulty: Difficulty.HARD,
+    description: {
+      EN: "Grinding on the front truck with the nose pinched down.",
+      KR: "앞 트럭으로 그라인드하며 노즈를 눌러주는 기술입니다."
+    }
+  },
+  { 
+    id: 'nose_slide', 
+    name: 'Noseslide', 
+    category: TrickCategory.GRIND, 
+    difficulty: Difficulty.HARD,
+    description: {
+      EN: "Sliding on an obstacle using only the nose of the board.",
+      KR: "보드의 노즈 부분만을 사용하여 기물 위를 슬라이딩하는 기술입니다."
+    }
+  },
 
   // Pro
-  { id: 'laser', name: 'Laser Flip', category: TrickCategory.FLATGROUND, difficulty: Difficulty.PRO, videoUrl: 'https://www.youtube.com/watch?v=0U4OmfatAgo' },
-  { id: 'impossible', name: 'Impossible', category: TrickCategory.FLATGROUND, difficulty: Difficulty.PRO },
-  { id: 'blunt', name: 'Bluntslide', category: TrickCategory.GRIND, difficulty: Difficulty.PRO },
+  { 
+    id: 'laser', 
+    name: 'Laser Flip', 
+    category: TrickCategory.FLATGROUND, 
+    difficulty: Difficulty.PRO, 
+    videoUrl: 'https://www.youtube.com/watch?v=0U4OmfatAgo',
+    description: {
+      EN: "A Frontside 360 Shuvit combined with a Heelflip. Opposite of a 360 Flip.",
+      KR: "프론트사이드 360 셔빗과 힐플립의 결합입니다. 360 플립의 반대 버전입니다."
+    }
+  },
+  { 
+    id: 'impossible', 
+    name: 'Impossible', 
+    category: TrickCategory.FLATGROUND, 
+    difficulty: Difficulty.PRO,
+    description: {
+      EN: "The board wraps vertically around the back foot in a 360 motion.",
+      KR: "보드가 뒷발을 감싸며 수직으로 360도 회전하는 기술입니다."
+    }
+  },
+  { 
+    id: 'blunt', 
+    name: 'Bluntslide', 
+    category: TrickCategory.GRIND, 
+    difficulty: Difficulty.PRO,
+    description: {
+      EN: "Sliding on the tail with the board nearly vertical and wheels on top of the ledge.",
+      KR: "보드를 거의 수직으로 세우고 휠을 레지 위에 올린 채 테일로 슬라이딩하는 기술입니다."
+    }
+  },
 ];
 
 export const TRICK_TIPS_DB: Record<string, TrickTip[]> = {

@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect } from 'react';
 import { SessionResult, Language, AnalyticsInsight } from '../types';
 import { TRANSLATIONS } from '../constants';
@@ -69,13 +68,9 @@ const Analytics: React.FC<Props> = ({ history, language, daysSkating = 1 }) => {
   }));
 
   const handleGenerateInsight = async () => {
-      // Allow insight generation even with empty history if we have profile data, 
-      // but ideally we want some history. 
-      // Modified to handle empty history gracefully by service, but here we check > 0 usually
       if (history.length === 0) return;
       
       setIsGenerating(true);
-        try {
       const recentHistory = sortedHistory.slice(-5).map(h => ({
           date: new Date(h.date).toISOString().split('T')[0],
           rate: Math.round((h.landedCount / h.totalTricks) * 100)
@@ -88,11 +83,8 @@ const Analytics: React.FC<Props> = ({ history, language, daysSkating = 1 }) => {
           recentHistory
       }, language, daysSkating);
       
-    } catch (error) {
-      console.error('Error generating insight:', error);
-    } finally {
+      setInsight(data);
       setIsGenerating(false);
-    }
   };
 
   // Auto-generate insight on mount if we have history and no insight yet
@@ -101,7 +93,7 @@ const Analytics: React.FC<Props> = ({ history, language, daysSkating = 1 }) => {
           handleGenerateInsight();
       }
       // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [history.length]); // Retry if history length changes (e.g., loaded from storage)
 
   const getExperienceLevel = (days: number) => {
       if (days <= 30) return t.LEVEL_BEGINNER;
@@ -124,16 +116,34 @@ const Analytics: React.FC<Props> = ({ history, language, daysSkating = 1 }) => {
         </div>
 
         {/* AI Diagnostic Summary Section */}
-        <div className="w-full bg-gradient-to-br from-gray-900 to-black border border-gray-800 rounded-2xl p-6 shadow-xl relative overflow-hidden group min-h-[300px] flex flex-col justify-center">
+        <div className="w-full bg-gradient-to-br from-gray-900 to-black border border-gray-800 rounded-2xl p-6 shadow-xl relative overflow-hidden group min-h-[300px] flex flex-col justify-center transition-all">
             {/* Background decoration */}
             <div className="absolute top-0 right-0 w-32 h-32 bg-skate-neon/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
 
             {!insight ? (
-                <div className="flex flex-col items-center justify-center py-8 text-center space-y-4">
-                    <BrainCircuit className="w-12 h-12 text-gray-700 animate-pulse" />
-                    <p className="text-gray-400 text-sm max-w-xs uppercase tracking-wider font-bold">{isGenerating ? t.GENERATING_INSIGHT : t.ANALYZING}</p>
-                    {!isGenerating && history.length === 0 && (
-                         <p className="text-gray-600 text-xs mt-2">Log your first session to see insights.</p>
+                <div className="flex flex-col items-center justify-center py-8 text-center space-y-6 z-10">
+                    <BrainCircuit className={`w-12 h-12 text-gray-700 ${isGenerating ? 'animate-pulse text-skate-neon' : ''}`} />
+                    
+                    {isGenerating ? (
+                         <p className="text-skate-neon text-sm max-w-xs uppercase tracking-wider font-bold animate-pulse">{t.GENERATING_INSIGHT}</p>
+                    ) : (
+                        <div className="flex flex-col items-center space-y-4">
+                            <p className="text-gray-400 text-sm max-w-xs font-medium">
+                                {history.length > 0 
+                                    ? t.COMPREHENSIVE_DIAGNOSIS 
+                                    : "Complete a session to unlock AI analysis."}
+                            </p>
+                            
+                            {history.length > 0 && (
+                                <button 
+                                    onClick={handleGenerateInsight}
+                                    className="bg-skate-neon text-black px-6 py-3 rounded-xl font-bold uppercase hover:bg-skate-neonHover transition-all shadow-[0_0_15px_rgba(204,255,0,0.3)] hover:shadow-[0_0_25px_rgba(204,255,0,0.5)] active:scale-95 flex items-center space-x-2"
+                                >
+                                    <Sparkles className="w-4 h-4" />
+                                    <span>{t.GENERATE_INSIGHT}</span>
+                                </button>
+                            )}
+                        </div>
                     )}
                 </div>
             ) : (

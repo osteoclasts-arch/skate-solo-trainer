@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect } from 'react';
 import { ViewState, SessionSettings, Trick, SessionResult, Difficulty, Language, Stance } from './types';
 import Dashboard from './components/Dashboard';
@@ -8,16 +7,25 @@ import ActiveSession from './components/ActiveSession';
 import SessionSummary from './components/SessionSummary';
 import Analytics from './components/Analytics';
 import TrickLearning from './components/TrickLearning';
-import LoginButton from './components/LoginButton';
 import { BASE_TRICKS, TRANSLATIONS } from './constants';
 import { generateAISession } from './services/geminiService';
 import { Home, BarChart2, BookOpen } from 'lucide-react';
-import LoginButton from './components/LoginButton';
 
 const App: React.FC = () => {
   const [view, setView] = useState<ViewState>('DASHBOARD');
   const [activeTricks, setActiveTricks] = useState<Trick[]>([]);
-  const [sessionHistory, setSessionHistory] = useState<SessionResult[]>([]);
+  
+  // Initialize session history from localStorage
+  const [sessionHistory, setSessionHistory] = useState<SessionResult[]>(() => {
+    try {
+        const saved = localStorage.getItem('skate_session_history');
+        return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+        console.error("Failed to load history", e);
+        return [];
+    }
+  });
+
   const [lastResult, setLastResult] = useState<SessionResult | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [language, setLanguage] = useState<Language>(() => {
@@ -201,7 +209,12 @@ const App: React.FC = () => {
 
   const handleSessionComplete = (result: SessionResult) => {
     setLastResult(result);
-    setSessionHistory(prev => [result, ...prev]);
+    setSessionHistory(prev => {
+        const newHistory = [result, ...prev];
+        // Persist to localStorage
+        localStorage.setItem('skate_session_history', JSON.stringify(newHistory));
+        return newHistory;
+    });
     setView('SUMMARY');
   };
 
@@ -270,13 +283,11 @@ const App: React.FC = () => {
 
   return (
     <div className="h-screen w-full bg-black text-white font-sans overflow-hidden flex flex-col">
-
-              <LoginButton />
+      
       <div className="flex-1 overflow-hidden relative">
         {renderContent()}
       </div>
 
-      <LoginButton />
       {showNav && (
         <div className="bg-black border-t border-gray-800 p-2 safe-area-pb">
             <div className="flex justify-around items-center">

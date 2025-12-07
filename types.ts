@@ -27,6 +27,10 @@ export interface Trick {
   difficulty: Difficulty;
   stance?: Stance; // Applied dynamically
   videoUrl?: string;
+  description?: {
+    EN: string;
+    KR: string;
+  };
 }
 
 export interface SessionSettings {
