@@ -12,6 +12,7 @@ import LoginButton from './components/LoginButton';
 import { BASE_TRICKS, TRANSLATIONS } from './constants';
 import { generateAISession } from './services/geminiService';
 import { Home, BarChart2, BookOpen } from 'lucide-react';
+import LoginButton from '../components/LoginButton';
 
 const App: React.FC = () => {
   const [view, setView] = useState<ViewState>('DASHBOARD');
@@ -275,6 +276,7 @@ const App: React.FC = () => {
         {renderContent()}
       </div>
 
+      <LoginButton />
       {showNav && (
         <div className="bg-black border-t border-gray-800 p-2 safe-area-pb">
             <div className="flex justify-around items-center">
