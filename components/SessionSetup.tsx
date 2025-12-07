@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
 import { Difficulty, SessionSettings, TrickCategory, Language, Stance } from '../types';
-import { Settings, Play, BrainCircuit, Shuffle } from 'lucide-react';
+import { Settings, Play, BrainCircuit, Shuffle, ChevronLeft } from 'lucide-react';
 import { TRANSLATIONS } from '../constants';
 
 interface Props {
   onStart: (settings: SessionSettings) => void;
+  onBack: () => void;
   isGenerating: boolean;
   language: Language;
 }
 
-const SessionSetup: React.FC<Props> = ({ onStart, isGenerating, language }) => {
+const SessionSetup: React.FC<Props> = ({ onStart, onBack, isGenerating, language }) => {
   const t = TRANSLATIONS[language];
   const [trickCount, setTrickCount] = useState(10);
   const [difficulty, setDifficulty] = useState<Difficulty>(Difficulty.MEDIUM);
@@ -53,6 +54,12 @@ const SessionSetup: React.FC<Props> = ({ onStart, isGenerating, language }) => {
   return (
     <div className="flex flex-col h-full p-6 space-y-6 overflow-y-auto pb-24">
       <div className="flex items-center space-x-2 mb-2">
+        <button 
+            onClick={onBack}
+            className="p-2 -ml-2 mr-1 rounded-full hover:bg-gray-800 text-gray-300 hover:text-white transition-colors"
+        >
+            <ChevronLeft className="w-8 h-8" />
+        </button>
         <Settings className="text-skate-neon w-6 h-6" />
         <h2 className="text-3xl font-display font-bold uppercase tracking-wide">{t.SETUP_SESSION}</h2>
       </div>

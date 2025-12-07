@@ -1,10 +1,12 @@
 
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useRef } from 'react';
 import { SessionResult, Language, AnalyticsInsight } from '../types';
 import { TRANSLATIONS } from '../constants';
 import { ResponsiveContainer, AreaChart, Area, XAxis, Tooltip } from 'recharts';
-import { Trophy, TrendingUp, AlertTriangle, Target, BrainCircuit, Sparkles, RefreshCw, Calendar, Star } from 'lucide-react';
+import { Trophy, TrendingUp, AlertTriangle, Target, BrainCircuit, Sparkles, RefreshCw, Calendar, Star, Share2, Instagram } from 'lucide-react';
 import { getAnalyticsInsight } from '../services/geminiService';
+import html2canvas from 'html2canvas';
 
 interface Props {
   history: SessionResult[];
@@ -16,6 +18,8 @@ const Analytics: React.FC<Props> = ({ history, language, daysSkating = 1 }) => {
   const t = TRANSLATIONS[language];
   const [insight, setInsight] = useState<AnalyticsInsight | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Stats Logic
   const totalSessions = history.length;
@@ -87,6 +91,53 @@ const Analytics: React.FC<Props> = ({ history, language, daysSkating = 1 }) => {
       setIsGenerating(false);
   };
 
+  const handleShare = async () => {
+    if (!containerRef.current) return;
+    setIsSharing(true);
+
+    try {
+        // Use html2canvas to capture the element
+        const canvas = await html2canvas(containerRef.current, {
+            backgroundColor: '#000000', // Ensure black background
+            scale: 2, // Higher resolution
+            logging: false,
+            useCORS: true
+        });
+
+        canvas.toBlob(async (blob) => {
+            if (!blob) {
+                setIsSharing(false);
+                return;
+            }
+
+            const file = new File([blob], 'skate-solo-analytics.png', { type: 'image/png' });
+
+            // Try using Web Share API Level 2 (files support)
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                try {
+                    await navigator.share({
+                        files: [file],
+                        title: 'Skate Solo Trainer Stats',
+                        text: 'Check out my skate progression! 🛹🔥'
+                    });
+                } catch (shareError) {
+                    console.log('Share cancelled or failed', shareError);
+                }
+            } else {
+                // Fallback for desktop: download the image
+                const link = document.createElement('a');
+                link.href = canvas.toDataURL('image/png');
+                link.download = 'skate-solo-analytics.png';
+                link.click();
+            }
+            setIsSharing(false);
+        }, 'image/png');
+    } catch (error) {
+        console.error("Failed to capture screenshot:", error);
+        setIsSharing(false);
+    }
+  };
+
   // Auto-generate insight on mount if we have history and no insight yet
   useEffect(() => {
       if (history.length > 0 && !insight && !isGenerating) {
@@ -102,13 +153,30 @@ const Analytics: React.FC<Props> = ({ history, language, daysSkating = 1 }) => {
   };
 
   return (
-    <div className="flex flex-col h-full bg-black text-white p-6 space-y-6 overflow-y-auto pb-24">
+    <div className="flex flex-col h-full bg-black text-white p-6 space-y-6 overflow-y-auto pb-24" ref={containerRef}>
         
         <div className="flex items-center justify-between mb-2">
             <div className="flex items-center space-x-2">
                 <Target className="text-skate-neon w-6 h-6" />
                 <h2 className="text-3xl font-display font-bold uppercase tracking-wide">{t.ANALYTICS}</h2>
             </div>
+            <div className="flex items-center space-x-2">
+                <button
+                    onClick={handleShare}
+                    disabled={isSharing}
+                    className="flex items-center space-x-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 px-3 py-1.5 rounded-full text-white font-bold text-xs transition-all shadow-lg active:scale-95 disabled:opacity-50"
+                >
+                    {isSharing ? (
+                        <RefreshCw className="w-3 h-3 animate-spin" />
+                    ) : (
+                        <Instagram className="w-3 h-3" />
+                    )}
+                    <span>{isSharing ? t.SHARING : t.SHARE_STORY}</span>
+                </button>
+            </div>
+        </div>
+        
+        <div className="flex justify-end mb-2">
             <div className="flex items-center space-x-2 bg-gray-900 px-3 py-1 rounded-full border border-gray-800">
                 <Star className="w-4 h-4 text-skate-neon" />
                 <span className="text-xs font-bold text-gray-400 uppercase">{t.EXPERIENCE_LEVEL}: <span className="text-white">{getExperienceLevel(daysSkating)}</span></span>
@@ -206,6 +274,7 @@ const Analytics: React.FC<Props> = ({ history, language, daysSkating = 1 }) => {
                         onClick={handleGenerateInsight} 
                         className="absolute top-0 right-0 p-2 text-gray-600 hover:text-white transition-colors"
                         title="Regenerate"
+                        data-html2canvas-ignore="true"
                     >
                         <RefreshCw className="w-4 h-4" />
                     </button>

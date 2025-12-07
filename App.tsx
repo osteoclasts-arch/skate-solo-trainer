@@ -146,15 +146,29 @@ const App: React.FC = () => {
     let selectedTricks: Trick[] = [];
     const targetCount = settings.trickCount;
 
-    // Helper to select N random items from a pool
-    const selectRandom = (pool: Trick[], count: number) => {
+    // Helper to select N random unique items from a pool
+    const selectRandomUnique = (pool: Trick[], count: number) => {
         if (pool.length === 0) return [];
-        const result = [];
-        for (let i = 0; i < count; i++) {
-            const randomTrick = pool[Math.floor(Math.random() * pool.length)];
-            result.push({ ...randomTrick });
+        
+        // Shuffle the pool first to ensure randomness without replacement
+        const shuffled = [...pool].sort(() => Math.random() - 0.5);
+
+        let selected: Trick[] = [];
+
+        if (count <= shuffled.length) {
+            // If we have enough unique tricks, take them
+            selected = shuffled.slice(0, count);
+        } else {
+            // If we need more than available, take all unique ones first
+            selected = [...shuffled];
+            // Then fill the remainder with random duplicates (unavoidable)
+            while (selected.length < count) {
+                selected.push(shuffled[Math.floor(Math.random() * shuffled.length)]);
+            }
         }
-        return result;
+        
+        // Return clones to prevent mutation
+        return selected.map(t => ({ ...t }));
     };
 
     // 3. Apply Weighted Logic
@@ -165,7 +179,7 @@ const App: React.FC = () => {
     switch (settings.difficulty) {
       case Difficulty.EASY:
         // Easy: 100% Easy
-        selectedTricks = selectRandom(easyPool, targetCount);
+        selectedTricks = selectRandomUnique(easyPool, targetCount);
         break;
 
       case Difficulty.MEDIUM:
@@ -174,8 +188,8 @@ const App: React.FC = () => {
         countMedium = targetCount - countEasy;
         
         selectedTricks = [
-            ...selectRandom(easyPool, countEasy),
-            ...selectRandom(mediumPool, countMedium)
+            ...selectRandomUnique(easyPool, countEasy),
+            ...selectRandomUnique(mediumPool, countMedium)
         ];
         break;
 
@@ -186,9 +200,9 @@ const App: React.FC = () => {
         countAdvanced = targetCount - countEasy - countMedium;
 
         selectedTricks = [
-            ...selectRandom(easyPool, countEasy),
-            ...selectRandom(mediumPool, countMedium),
-            ...selectRandom(hardPool, countAdvanced) // Using specific Hard pool
+            ...selectRandomUnique(easyPool, countEasy),
+            ...selectRandomUnique(mediumPool, countMedium),
+            ...selectRandomUnique(hardPool, countAdvanced) // Using specific Hard pool
         ];
         break;
 
@@ -199,9 +213,9 @@ const App: React.FC = () => {
         countAdvanced = targetCount - countEasy - countMedium;
 
         selectedTricks = [
-            ...selectRandom(easyPool, countEasy),
-            ...selectRandom(mediumPool, countMedium),
-            ...selectRandom(advancedPool, countAdvanced) // Using Hard+Pro
+            ...selectRandomUnique(easyPool, countEasy),
+            ...selectRandomUnique(mediumPool, countMedium),
+            ...selectRandomUnique(advancedPool, countAdvanced) // Using Hard+Pro
         ];
         break;
     }
@@ -209,7 +223,8 @@ const App: React.FC = () => {
     // Fallback if pools empty
     if (selectedTricks.length < targetCount) {
         const remaining = targetCount - selectedTricks.length;
-        const filler = selectRandom(categoryTricks, remaining);
+        // Try to fill from entire valid category pool uniquely if possible
+        const filler = selectRandomUnique(categoryTricks, remaining);
         selectedTricks = [...selectedTricks, ...filler];
     }
 
@@ -297,6 +312,7 @@ const App: React.FC = () => {
              return (
                 <SessionSetup 
                   onStart={handleStartSession} 
+                  onBack={() => setView('DASHBOARD')}
                   isGenerating={isGenerating} 
                   language={language}
                 />

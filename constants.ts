@@ -51,6 +51,8 @@ export const TRANSLATIONS = {
     AI_COACH_FEEDBACK_TITLE: "AI Coach Feedback",
     GENERATE_INSIGHT: "Generate AI Diagnosis",
     GENERATING_INSIGHT: "Analyzing Data...",
+    SHARE_STORY: "Share to Instagram",
+    SHARING: "Capturing...",
     // Values
     Easy: "Easy",
     Medium: "Medium",
@@ -134,6 +136,8 @@ export const TRANSLATIONS = {
     AI_COACH_FEEDBACK_TITLE: "AI 코치 피드백",
     GENERATE_INSIGHT: "AI 진단 생성",
     GENERATING_INSIGHT: "데이터 분석 중...",
+    SHARE_STORY: "인스타 스토리 공유",
+    SHARING: "이미지 생성 중...",
     // Values
     Easy: "쉬움",
     Medium: "중간",
@@ -498,7 +502,7 @@ export const TRICK_TIPS_DB: Record<string, TrickTip[]> = {
     { 
         text: {
             EN: "Wrap the board around your back foot, don't just scoop.",
-            KR: "단순히 스쿠핑하지 말고 뒷발로 보드를 감으세요."
+            KR: "단순히 스쿠핑하고 뒷발로 보드를 감으세요."
         }, 
         source: "Rodney Mullen", 
         video: "Impossible How-To" 
