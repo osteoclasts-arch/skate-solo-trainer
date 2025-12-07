@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect } from 'react';
 import { ViewState, SessionSettings, Trick, SessionResult, Difficulty, Language, Stance, User } from './types';
 import Dashboard from './components/Dashboard';
@@ -11,8 +9,9 @@ import TrickLearning from './components/TrickLearning';
 import { BASE_TRICKS, TRANSLATIONS } from './constants';
 import { generateAISession } from './services/geminiService';
 import { signInWithGoogle, logout, getFirebaseAuth } from './services/authService';
+import { dbService } from './services/dbService';
 import { onAuthStateChanged } from 'firebase/auth';
-import { Home, BarChart2, BookOpen } from 'lucide-react';
+import { Home, BarChart2, BookOpen, Layers } from 'lucide-react';
 
 const App: React.FC = () => {
   const [view, setView] = useState<ViewState>('DASHBOARD');
@@ -20,8 +19,9 @@ const App: React.FC = () => {
   
   // User Authentication State
   const [user, setUser] = useState<User | null>(null);
+  const [isLoadingData, setIsLoadingData] = useState(false);
 
-  // Initialize session history from localStorage
+  // Initialize session history from localStorage (Default for Guest)
   const [sessionHistory, setSessionHistory] = useState<SessionResult[]>(() => {
     try {
         const saved = localStorage.getItem('skate_session_history');
@@ -43,26 +43,48 @@ const App: React.FC = () => {
       return localStorage.getItem('skate_start_date') || new Date().toISOString().split('T')[0];
   });
 
-  // Handle Authentication Persistence
+  // Handle Authentication Persistence & Data Sync
   useEffect(() => {
     const auth = getFirebaseAuth();
     if (auth) {
-      const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
         if (firebaseUser) {
+          // 1. Set User
           setUser({
             uid: firebaseUser.uid,
             name: firebaseUser.displayName || 'Skater',
             email: firebaseUser.email || '',
             photoURL: firebaseUser.photoURL || undefined
           });
+
+          // 2. Fetch Cloud Data
+          setIsLoadingData(true);
+          try {
+             // Load Profile (Start Date)
+             const profile = await dbService.getUserProfile(firebaseUser.uid);
+             if (profile && profile.startDate) {
+                setStartDate(profile.startDate);
+                // Also update local storage to keep in sync
+                localStorage.setItem('skate_start_date', profile.startDate);
+             }
+
+             // Load History
+             const cloudSessions = await dbService.getUserSessions(firebaseUser.uid);
+             if (cloudSessions.length > 0) {
+                 setSessionHistory(cloudSessions);
+                 localStorage.setItem('skate_session_history', JSON.stringify(cloudSessions));
+             }
+          } catch (e) {
+             console.error("Error syncing data", e);
+          } finally {
+             setIsLoadingData(false);
+          }
+
         } else {
           setUser(null);
         }
       });
       return () => unsubscribe();
-    } else {
-      // Fallback: Check local storage for mock user persistence if needed
-      // For now, we assume mock session is per-reload unless we impl local storage for it
     }
   }, []);
 
@@ -76,11 +98,16 @@ const App: React.FC = () => {
   const handleLogout = async () => {
     await logout();
     setUser(null);
+    window.location.reload(); 
   };
 
-  const updateStartDate = (date: string) => {
+  const updateStartDate = async (date: string) => {
       setStartDate(date);
       localStorage.setItem('skate_start_date', date);
+      
+      if (user) {
+          await dbService.updateUserProfile(user.uid, { startDate: date });
+      }
   };
 
   const calculateDaysSkating = () => {
@@ -88,7 +115,7 @@ const App: React.FC = () => {
       const now = new Date();
       const diffTime = Math.abs(now.getTime() - start.getTime());
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-      return diffDays || 1; // Minimum 1 day
+      return diffDays || 1; 
   };
 
   const daysSkating = calculateDaysSkating();
@@ -101,12 +128,11 @@ const App: React.FC = () => {
 
   const t = TRANSLATIONS[language];
 
-  // Weighted Random Stance Generator based on selected stances
+  // Weighted Random Stance Generator
   const getRandomStance = (allowed: Stance[]): Stance => {
     if (allowed.length === 0) return Stance.REGULAR;
     if (allowed.length === 1) return allowed[0];
 
-    // Base weights from requirement
     const weights: Record<Stance, number> = {
         [Stance.REGULAR]: 0.40,
         [Stance.FAKIE]: 0.25,
@@ -114,11 +140,9 @@ const App: React.FC = () => {
         [Stance.NOLLIE]: 0.15
     };
 
-    // Calculate total weight of selected stances
     let totalWeight = 0;
     allowed.forEach(s => totalWeight += weights[s]);
 
-    // Random value between 0 and totalWeight
     const r = Math.random() * totalWeight;
 
     let cumulative = 0;
@@ -129,109 +153,81 @@ const App: React.FC = () => {
     return allowed[0];
   };
 
-  // Logic: Weighted Trick Generation based on Difficulty
   const generateLocalTricks = (settings: SessionSettings): Trick[] => {
-    // 1. Filter by Category first
     const categoryTricks = BASE_TRICKS.filter(t => settings.categories.includes(t.category));
     
-    // 2. Separate into Pools
     const easyPool = categoryTricks.filter(t => t.difficulty === Difficulty.EASY);
     const mediumPool = categoryTricks.filter(t => t.difficulty === Difficulty.MEDIUM);
     const hardPool = categoryTricks.filter(t => t.difficulty === Difficulty.HARD);
     const proPool = categoryTricks.filter(t => t.difficulty === Difficulty.PRO);
     
-    // Combine Hard and Pro for "Advanced" logic
     const advancedPool = [...hardPool, ...proPool];
 
     let selectedTricks: Trick[] = [];
     const targetCount = settings.trickCount;
 
-    // Helper to select N random unique items from a pool
     const selectRandomUnique = (pool: Trick[], count: number) => {
         if (pool.length === 0) return [];
-        
-        // Shuffle the pool first to ensure randomness without replacement
         const shuffled = [...pool].sort(() => Math.random() - 0.5);
-
         let selected: Trick[] = [];
 
         if (count <= shuffled.length) {
-            // If we have enough unique tricks, take them
             selected = shuffled.slice(0, count);
         } else {
-            // If we need more than available, take all unique ones first
             selected = [...shuffled];
-            // Then fill the remainder with random duplicates (unavoidable)
             while (selected.length < count) {
                 selected.push(shuffled[Math.floor(Math.random() * shuffled.length)]);
             }
         }
-        
-        // Return clones to prevent mutation
         return selected.map(t => ({ ...t }));
     };
 
-    // 3. Apply Weighted Logic
     let countEasy = 0;
     let countMedium = 0;
     let countAdvanced = 0;
 
     switch (settings.difficulty) {
       case Difficulty.EASY:
-        // Easy: 100% Easy
         selectedTricks = selectRandomUnique(easyPool, targetCount);
         break;
-
       case Difficulty.MEDIUM:
-        // Medium: 30% Easy, 70% Medium
         countEasy = Math.round(targetCount * 0.30);
         countMedium = targetCount - countEasy;
-        
         selectedTricks = [
             ...selectRandomUnique(easyPool, countEasy),
             ...selectRandomUnique(mediumPool, countMedium)
         ];
         break;
-
       case Difficulty.HARD:
-        // Hard: 10% Easy, 30% Medium, 60% Advanced (Hard)
         countEasy = Math.round(targetCount * 0.10);
         countMedium = Math.round(targetCount * 0.30);
         countAdvanced = targetCount - countEasy - countMedium;
-
         selectedTricks = [
             ...selectRandomUnique(easyPool, countEasy),
             ...selectRandomUnique(mediumPool, countMedium),
-            ...selectRandomUnique(hardPool, countAdvanced) // Using specific Hard pool
+            ...selectRandomUnique(hardPool, countAdvanced)
         ];
         break;
-
       case Difficulty.PRO:
-        // Pro: 5% Easy, 20% Medium, 75% Advanced (Pro/Hard mix)
         countEasy = Math.round(targetCount * 0.05);
         countMedium = Math.round(targetCount * 0.20);
         countAdvanced = targetCount - countEasy - countMedium;
-
         selectedTricks = [
             ...selectRandomUnique(easyPool, countEasy),
             ...selectRandomUnique(mediumPool, countMedium),
-            ...selectRandomUnique(advancedPool, countAdvanced) // Using Hard+Pro
+            ...selectRandomUnique(advancedPool, countAdvanced)
         ];
         break;
     }
 
-    // Fallback if pools empty
     if (selectedTricks.length < targetCount) {
         const remaining = targetCount - selectedTricks.length;
-        // Try to fill from entire valid category pool uniquely if possible
         const filler = selectRandomUnique(categoryTricks, remaining);
         selectedTricks = [...selectedTricks, ...filler];
     }
 
-    // 4. Shuffle Final List
     selectedTricks = selectedTricks.sort(() => 0.5 - Math.random());
     
-    // 5. Apply Random Stances & Unique IDs
     return selectedTricks.map((trick, index) => ({
       ...trick,
       id: `${trick.id}-${Date.now()}-${index}`,
@@ -263,14 +259,17 @@ const App: React.FC = () => {
     }
   };
 
-  const handleSessionComplete = (result: SessionResult) => {
+  const handleSessionComplete = async (result: SessionResult) => {
     setLastResult(result);
     setSessionHistory(prev => {
         const newHistory = [result, ...prev];
-        // Persist to localStorage
         localStorage.setItem('skate_session_history', JSON.stringify(newHistory));
         return newHistory;
     });
+
+    if (user) {
+        await dbService.saveSession(user.uid, result);
+    }
     setView('SUMMARY');
   };
 
@@ -281,6 +280,10 @@ const App: React.FC = () => {
   };
 
   const renderContent = () => {
+    if (isLoadingData && view === 'DASHBOARD') {
+        return <div className="flex items-center justify-center h-full text-skate-neon animate-pulse font-display text-xl tracking-widest">LOADING...</div>;
+    }
+
     switch (view) {
         case 'DASHBOARD':
              return (
@@ -342,35 +345,31 @@ const App: React.FC = () => {
   const showNav = ['DASHBOARD', 'ANALYTICS', 'LEARNING'].includes(view);
 
   return (
-    <div className="h-screen w-full bg-black text-white font-sans overflow-hidden flex flex-col">
-      
+    <div className="h-[100dvh] w-full text-white font-sans overflow-hidden flex flex-col">
       <div className="flex-1 overflow-hidden relative">
         {renderContent()}
       </div>
 
       {showNav && (
-        <div className="bg-black border-t border-gray-800 p-2 safe-area-pb">
-            <div className="flex justify-around items-center">
+        <div className="absolute bottom-6 left-0 right-0 px-6 z-50 pointer-events-none">
+            <div className="glass-nav rounded-full px-2 py-2 flex justify-between items-center shadow-2xl pointer-events-auto max-w-sm mx-auto">
                 <button 
                     onClick={() => setView('DASHBOARD')}
-                    className={`flex flex-col items-center p-2 rounded-xl w-1/3 transition-colors ${view === 'DASHBOARD' ? 'text-skate-neon' : 'text-gray-500'}`}
+                    className={`flex flex-col items-center justify-center w-14 h-14 rounded-full transition-all duration-300 ${view === 'DASHBOARD' ? 'bg-skate-neon text-black shadow-[0_0_15px_rgba(204,255,0,0.5)] transform -translate-y-2' : 'text-gray-400 hover:text-white'}`}
                 >
-                    <Home className="w-6 h-6 mb-1" />
-                    <span className="text-xs font-bold uppercase">{t.DASHBOARD}</span>
+                    <Home className={`w-6 h-6 ${view === 'DASHBOARD' ? 'stroke-[2.5px]' : 'stroke-2'}`} />
                 </button>
                 <button 
                     onClick={() => setView('LEARNING')}
-                    className={`flex flex-col items-center p-2 rounded-xl w-1/3 transition-colors ${view === 'LEARNING' ? 'text-skate-neon' : 'text-gray-500'}`}
+                    className={`flex flex-col items-center justify-center w-14 h-14 rounded-full transition-all duration-300 ${view === 'LEARNING' ? 'bg-skate-neon text-black shadow-[0_0_15px_rgba(204,255,0,0.5)] transform -translate-y-2' : 'text-gray-400 hover:text-white'}`}
                 >
-                    <BookOpen className="w-6 h-6 mb-1" />
-                    <span className="text-xs font-bold uppercase">{t.LEARNING}</span>
+                    <BookOpen className={`w-6 h-6 ${view === 'LEARNING' ? 'stroke-[2.5px]' : 'stroke-2'}`} />
                 </button>
                 <button 
                     onClick={() => setView('ANALYTICS')}
-                    className={`flex flex-col items-center p-2 rounded-xl w-1/3 transition-colors ${view === 'ANALYTICS' ? 'text-skate-neon' : 'text-gray-500'}`}
+                    className={`flex flex-col items-center justify-center w-14 h-14 rounded-full transition-all duration-300 ${view === 'ANALYTICS' ? 'bg-skate-neon text-black shadow-[0_0_15px_rgba(204,255,0,0.5)] transform -translate-y-2' : 'text-gray-400 hover:text-white'}`}
                 >
-                    <BarChart2 className="w-6 h-6 mb-1" />
-                    <span className="text-xs font-bold uppercase">{t.ANALYTICS}</span>
+                    <BarChart2 className={`w-6 h-6 ${view === 'ANALYTICS' ? 'stroke-[2.5px]' : 'stroke-2'}`} />
                 </button>
             </div>
         </div>

@@ -1,9 +1,7 @@
-
-
 import React, { useState } from 'react';
 import { MOCK_HISTORY, TRANSLATIONS } from '../constants';
-import { ResponsiveContainer, AreaChart, Area, XAxis, Tooltip } from 'recharts';
-import { PlayCircle, Trophy, Activity, Globe, BookOpen, Calendar, Edit2, LogOut, Instagram } from 'lucide-react';
+import { ResponsiveContainer, AreaChart, Area, Tooltip } from 'recharts';
+import { PlayCircle, Trophy, Activity, Globe, BookOpen, Calendar, Edit2, LogOut, Instagram, ArrowUpRight } from 'lucide-react';
 import { SessionResult, Language, User } from '../types';
 
 interface Props {
@@ -41,7 +39,7 @@ const Dashboard: React.FC<Props> = ({
   const chartData = [...MOCK_HISTORY, ...history.map((h, i) => ({
       date: new Date(h.date).toISOString().split('T')[0],
       successRate: Math.round((h.landedCount / h.totalTricks) * 100)
-  }))].slice(-10); // Last 10 sessions
+  }))].slice(-10); 
 
   const totalTricks = history.reduce((acc, curr) => acc + curr.totalTricks, 0);
   const totalLanded = history.reduce((acc, curr) => acc + curr.landedCount, 0);
@@ -62,29 +60,30 @@ const Dashboard: React.FC<Props> = ({
   );
 
   return (
-    <div className="flex flex-col h-full p-6 space-y-6 bg-black overflow-y-auto pb-24 relative">
+    <div className="flex flex-col h-full p-6 space-y-6 overflow-y-auto pb-32 relative animate-fade-in">
       
       {/* Date Edit Modal */}
       {isEditingDate && (
-          <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-6">
-              <div className="bg-gray-900 border border-gray-700 p-6 rounded-2xl w-full max-w-sm shadow-2xl">
-                  <h3 className="text-xl font-display font-bold text-white mb-4">{t.SET_START_DATE}</h3>
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-6 animate-fade-in">
+              <div className="glass-card p-6 rounded-3xl w-full max-w-sm shadow-2xl transform transition-all scale-100">
+                  <h3 className="text-2xl font-display font-bold text-white mb-2">{t.SET_START_DATE}</h3>
+                  <p className="text-gray-400 text-sm mb-6">When did you start your journey?</p>
                   <input 
                       type="date" 
                       value={tempDate}
                       onChange={(e) => setTempDate(e.target.value)}
-                      className="w-full bg-black border border-gray-700 rounded-lg p-3 text-white mb-6 focus:border-skate-neon outline-none"
+                      className="w-full bg-black/50 border border-white/10 rounded-xl p-4 text-white mb-6 focus:border-skate-neon outline-none font-mono"
                   />
                   <div className="flex gap-3">
                       <button 
                           onClick={() => setIsEditingDate(false)}
-                          className="flex-1 py-3 bg-gray-800 text-gray-300 font-bold rounded-lg hover:bg-gray-700"
+                          className="flex-1 py-4 bg-gray-800 text-gray-300 font-bold rounded-xl hover:bg-gray-700 transition-all active:scale-95"
                       >
                           {t.CANCEL}
                       </button>
                       <button 
                           onClick={handleSaveDate}
-                          className="flex-1 py-3 bg-skate-neon text-black font-bold rounded-lg hover:bg-skate-neonHover"
+                          className="flex-1 py-4 bg-white text-black font-bold rounded-xl hover:bg-gray-200 transition-all active:scale-95 shadow-[0_0_15px_rgba(255,255,255,0.3)]"
                       >
                           {t.SAVE}
                       </button>
@@ -94,145 +93,163 @@ const Dashboard: React.FC<Props> = ({
       )}
 
       {/* Header */}
-      <header className="flex justify-between items-start">
-        <div>
-            <h1 className="text-6xl font-display font-bold text-white leading-none">
+      <header className="flex justify-between items-start pt-2">
+        <div className="flex flex-col">
+            <h1 className="text-[3.5rem] font-display font-bold text-white leading-[0.85] tracking-tight">
                 SKATE<br/>
-                <span className="text-skate-neon">SOLO</span>
+                <span className="text-skate-neon text-glow">SOLO</span>
             </h1>
-            <div className="flex items-center space-x-2 mt-2">
+            <div className="flex items-center mt-3">
                  <button 
                     onClick={() => setIsEditingDate(true)}
-                    className="flex items-center space-x-2 bg-gray-900/50 hover:bg-gray-800 px-3 py-1 rounded-full border border-gray-800 transition-colors group"
+                    className="group flex items-center space-x-2 bg-white/5 hover:bg-white/10 px-4 py-1.5 rounded-full border border-white/5 transition-all active:scale-95"
                  >
-                    <Calendar className="w-3 h-3 text-skate-neon" />
-                    <span className="text-sm font-bold text-gray-300">
-                        {t.DAY} <span className="text-white text-lg">{daysSkating}</span>
+                    <Calendar className="w-3.5 h-3.5 text-skate-neon" />
+                    <span className="text-sm font-bold text-gray-300 group-hover:text-white transition-colors">
+                        DAY <span className="text-white text-lg ml-1 font-display tracking-wider">{daysSkating}</span>
                     </span>
-                    <Edit2 className="w-3 h-3 text-gray-600 group-hover:text-white" />
+                    <Edit2 className="w-3 h-3 text-gray-600 group-hover:text-white ml-1 opacity-0 group-hover:opacity-100 transition-all" />
                  </button>
             </div>
         </div>
         
-        {/* Right Actions: Login & Language */}
-        <div className="flex flex-col items-end space-y-2">
+        {/* Right Actions */}
+        <div className="flex flex-col items-end gap-3">
+            <button 
+                onClick={onLanguageToggle}
+                className="flex items-center space-x-1 px-3 py-1.5 rounded-full border border-white/10 bg-black/20 backdrop-blur text-gray-400 hover:text-white transition-colors"
+            >
+                <Globe className="w-3.5 h-3.5" />
+                <span className="text-[10px] font-bold tracking-wider">{language}</span>
+            </button>
+
             {user ? (
-                <div className="flex items-center space-x-2 bg-gray-900 p-1 pl-3 rounded-full border border-gray-800">
-                    <span className="text-xs font-bold text-white">{user.name}</span>
+                <div className="flex items-center gap-2 bg-white/5 p-1 pl-3 rounded-full border border-white/5 backdrop-blur-sm">
+                    <span className="text-xs font-bold text-white max-w-[60px] truncate">{user.name}</span>
                     <button 
                         onClick={onLogout}
-                        className="bg-gray-800 hover:bg-gray-700 p-1 rounded-full transition-colors"
-                        title={t.LOGOUT}
+                        className="bg-white/10 hover:bg-white/20 p-1.5 rounded-full transition-colors"
                     >
-                        <LogOut className="w-4 h-4 text-gray-400" />
+                        <LogOut className="w-3.5 h-3.5 text-gray-300" />
                     </button>
                 </div>
             ) : (
                 <button 
                     onClick={onLogin}
-                    className="flex items-center px-3 py-1.5 bg-white text-black rounded-full font-bold text-xs hover:bg-gray-200 transition-colors shadow-lg"
+                    className="flex items-center px-3 py-1.5 bg-white text-black rounded-full font-bold text-[10px] hover:bg-gray-200 transition-colors shadow-lg"
                 >
                     <GoogleIcon />
                     {t.LOGIN_GOOGLE}
                 </button>
             )}
-
-            <button 
-            onClick={onLanguageToggle}
-            className="flex items-center space-x-1 px-3 py-1.5 rounded-full border border-gray-700 bg-gray-900 text-gray-400 hover:text-white hover:border-gray-500 transition-colors"
-            >
-            <Globe className="w-4 h-4" />
-            <span className="text-xs font-bold">{language}</span>
-            </button>
         </div>
       </header>
 
+      {/* Main Stats (Bento Grid) */}
+      <div className="grid grid-cols-2 gap-3">
+        {/* Total Landed */}
+        <div className="glass-card p-5 rounded-3xl flex flex-col justify-between h-32 relative overflow-hidden group">
+             <div className="absolute right-[-20px] top-[-20px] w-24 h-24 bg-skate-neon/5 rounded-full blur-2xl group-hover:bg-skate-neon/10 transition-all"></div>
+             <div className="flex items-center space-x-2 text-gray-400 mb-1 z-10">
+                <Trophy className="w-4 h-4 text-skate-neon" />
+                <span className="text-[10px] uppercase font-bold tracking-widest">{t.TOTAL_LANDED}</span>
+             </div>
+             <span className="text-5xl font-display font-bold text-white z-10">{totalLanded}</span>
+        </div>
+
+        {/* Avg Success */}
+        <div className="glass-card p-5 rounded-3xl flex flex-col justify-between h-32 relative overflow-hidden group">
+             <div className="absolute left-[-20px] bottom-[-20px] w-24 h-24 bg-purple-500/10 rounded-full blur-2xl group-hover:bg-purple-500/20 transition-all"></div>
+             <div className="flex items-center space-x-2 text-gray-400 mb-1 z-10">
+                <Activity className="w-4 h-4 text-purple-400" />
+                <span className="text-[10px] uppercase font-bold tracking-widest">{t.AVG_SUCCESS}</span>
+             </div>
+             <div className="flex items-baseline z-10">
+                <span className="text-5xl font-display font-bold text-white">{avgSuccess}</span>
+                <span className="text-lg font-display text-gray-500 ml-1">%</span>
+             </div>
+        </div>
+
+        {/* Graph Card (Full Width) */}
+        <div className="col-span-2 glass-card rounded-3xl p-5 h-48 flex flex-col relative overflow-hidden">
+            <div className="flex justify-between items-center mb-2 z-10">
+                <span className="text-[10px] uppercase font-bold tracking-widest text-gray-400">{t.PROGRESSION}</span>
+                <div className="flex items-center text-skate-neon text-xs font-bold bg-skate-neon/10 px-2 py-0.5 rounded-full">
+                    <ArrowUpRight className="w-3 h-3 mr-1" />
+                    <span>Recent</span>
+                </div>
+            </div>
+            <div className="absolute inset-0 bottom-0 left-0 right-0 h-full w-full opacity-50">
+                <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={chartData} margin={{ top: 50, right: 0, left: 0, bottom: 0 }}>
+                    <defs>
+                        <linearGradient id="colorSuccess" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#ccff00" stopOpacity={0.5}/>
+                            <stop offset="95%" stopColor="#ccff00" stopOpacity={0}/>
+                        </linearGradient>
+                    </defs>
+                    <Tooltip 
+                        contentStyle={{ backgroundColor: 'rgba(0,0,0,0.8)', border: 'none', borderRadius: '8px', fontSize: '12px' }}
+                        itemStyle={{ color: '#ccff00' }}
+                        cursor={{ stroke: '#ffffff30', strokeWidth: 1, strokeDasharray: '4 4' }}
+                    />
+                    <Area 
+                        type="monotone" 
+                        dataKey="successRate" 
+                        stroke="#ccff00" 
+                        strokeWidth={3}
+                        fillOpacity={1} 
+                        fill="url(#colorSuccess)" 
+                    />
+                </AreaChart>
+                </ResponsiveContainer>
+            </div>
+        </div>
+      </div>
+
+      {/* Main Actions */}
       <div className="space-y-4">
-          {/* New Session Action */}
+          {/* New Session Action - Hero Button */}
           <button 
             onClick={onStart}
-            className="w-full bg-skate-neon hover:bg-skate-neonHover active:scale-95 transition-all text-black p-6 rounded-2xl flex items-center justify-between group shadow-[0_0_20px_rgba(204,255,0,0.15)]"
+            className="w-full relative overflow-hidden bg-skate-neon text-black p-1 rounded-[2.5rem] group shadow-[0_0_30px_rgba(204,255,0,0.15)] hover:shadow-[0_0_50px_rgba(204,255,0,0.3)] transition-all duration-500 active:scale-[0.98]"
           >
-            <div className="flex flex-col items-start">
-                <span className="font-display text-4xl font-bold uppercase">{t.NEW_SESSION}</span>
-                <span className="text-sm font-semibold opacity-70">{t.CUSTOMIZED_TRAINING}</span>
+            <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-500 rounded-[2.5rem]"></div>
+            <div className="relative bg-skate-neon h-full rounded-[2.2rem] p-6 flex items-center justify-between border border-black/5">
+                <div className="flex flex-col items-start z-10">
+                    <span className="font-display text-4xl font-bold uppercase tracking-tight">{t.NEW_SESSION}</span>
+                    <span className="text-xs font-bold uppercase tracking-widest opacity-60 mt-1">{t.CUSTOMIZED_TRAINING}</span>
+                </div>
+                <div className="w-14 h-14 bg-black/10 rounded-full flex items-center justify-center group-hover:bg-black/20 transition-colors">
+                    <PlayCircle className="w-8 h-8 text-black" />
+                </div>
             </div>
-            <PlayCircle className="w-12 h-12 stroke-1 group-hover:rotate-90 transition-transform duration-500" />
           </button>
 
-          {/* Skill Learning Action */}
+          {/* Learning Action - Secondary */}
           <button 
             onClick={onLearning}
-            className="w-full bg-gray-900 hover:bg-gray-800 border border-gray-800 active:scale-95 transition-all text-white p-6 rounded-2xl flex items-center justify-between group"
+            className="w-full glass-card p-6 rounded-[2.5rem] flex items-center justify-between group active:scale-[0.98] transition-all hover:bg-white/5 border border-white/5"
           >
             <div className="flex flex-col items-start">
-                <span className="font-display text-4xl font-bold uppercase">{t.LEARNING}</span>
-                <span className="text-sm font-semibold opacity-70 text-gray-400">{t.PRACTICE_THIS}</span>
+                <span className="font-display text-3xl font-bold uppercase text-gray-200 group-hover:text-white transition-colors">{t.LEARNING}</span>
+                <span className="text-xs font-bold uppercase tracking-widest text-gray-500">{t.PRACTICE_THIS}</span>
             </div>
-            <BookOpen className="w-12 h-12 stroke-1 text-skate-neon group-hover:scale-110 transition-transform duration-500" />
+            <BookOpen className="w-8 h-8 text-gray-500 group-hover:text-white transition-colors" />
           </button>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="bg-gray-900 p-4 rounded-2xl border border-gray-800">
-             <div className="flex items-center space-x-2 text-gray-400 mb-1">
-                <Trophy className="w-4 h-4" />
-                <span className="text-xs uppercase font-bold">{t.TOTAL_LANDED}</span>
-             </div>
-             <span className="text-4xl font-display font-bold text-white">{totalLanded}</span>
-        </div>
-        <div className="bg-gray-900 p-4 rounded-2xl border border-gray-800">
-             <div className="flex items-center space-x-2 text-gray-400 mb-1">
-                <Activity className="w-4 h-4" />
-                <span className="text-xs uppercase font-bold">{t.AVG_SUCCESS}</span>
-             </div>
-             <span className="text-4xl font-display font-bold text-white">{avgSuccess}%</span>
-        </div>
-      </div>
-
-      {/* Chart */}
-      <div className="flex-1 min-h-[200px] bg-gray-900 rounded-2xl p-4 border border-gray-800 flex flex-col">
-        <h3 className="text-gray-400 text-xs font-bold uppercase mb-4">{t.PROGRESSION}</h3>
-        <div className="flex-1 w-full min-h-0">
-            <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData}>
-                <defs>
-                    <linearGradient id="colorSuccess" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#ccff00" stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor="#ccff00" stopOpacity={0}/>
-                    </linearGradient>
-                </defs>
-                <XAxis dataKey="date" hide />
-                <Tooltip 
-                    contentStyle={{ backgroundColor: '#1e1e1e', border: 'none', borderRadius: '8px' }}
-                    itemStyle={{ color: '#ccff00' }}
-                    cursor={{ stroke: '#444', strokeWidth: 1 }}
-                />
-                <Area 
-                    type="monotone" 
-                    dataKey="successRate" 
-                    stroke="#ccff00" 
-                    strokeWidth={2}
-                    fillOpacity={1} 
-                    fill="url(#colorSuccess)" 
-                />
-            </AreaChart>
-            </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* Creator Credit */}
-      <div className="flex justify-center mt-4">
+      {/* Footer / Credits */}
+      <div className="flex justify-center mt-4 pb-4">
         <a 
           href="https://instagram.com/osteoclasts_" 
           target="_blank" 
           rel="noopener noreferrer"
-          className="group flex items-center gap-2 px-4 py-2 bg-gray-900/50 rounded-full border border-gray-800 hover:border-skate-neon hover:bg-gray-900 transition-all duration-300"
+          className="flex items-center gap-2 px-5 py-2 rounded-full bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/20 transition-all duration-300"
         >
-          <Instagram className="w-4 h-4 text-gray-500 group-hover:text-skate-neon transition-colors" />
-          <span className="text-gray-500 text-xs font-mono group-hover:text-white transition-colors">
-            Created by <span className="font-bold text-gray-300 group-hover:text-skate-neon">@osteoclasts_</span>
+          <Instagram className="w-3.5 h-3.5 text-gray-400" />
+          <span className="text-gray-500 text-[10px] font-mono tracking-wide">
+            DESIGNED BY <span className="font-bold text-gray-300">@OSTEOCLASTS_</span>
           </span>
         </a>
       </div>

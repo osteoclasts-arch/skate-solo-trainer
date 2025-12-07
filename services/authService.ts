@@ -24,7 +24,8 @@ const firebaseConfig = {
   appId: process.env.FIREBASE_APP_ID || "1:1020843311660:web:7be66ce53a75a0f1328789"
 };
 
-let app: FirebaseApp | undefined;
+// Export app so dbService can use it
+export let app: FirebaseApp | undefined;
 let auth: Auth | undefined;
 
 // Initialize Firebase only if config is present
@@ -61,8 +62,9 @@ export const signInWithGoogle = async (): Promise<User | null> => {
     };
   } catch (error: any) {
     console.error("Login Failed", error);
-    // Common error handling
-    if (error.code === 'auth/popup-closed-by-user') {
+    if (error.code === 'auth/unauthorized-domain') {
+        alert(`도메인 권한 오류: Firebase 콘솔 > Authentication > Settings > Authorized domains 에 현재 도메인을 추가해주세요.\n(현재 도메인: ${window.location.hostname})`);
+    } else if (error.code === 'auth/popup-closed-by-user') {
       // User closed the popup, no need to alert
     } else if (error.code === 'auth/configuration-not-found') {
         alert("Firebase 콘솔에서 Google 로그인을 활성화해야 합니다.");
@@ -85,6 +87,8 @@ export const logout = async () => {
   }
 };
 
+export const getFirebaseAuth = () => auth;
+
 // Fallback for when Firebase isn't configured
 const mockLogin = (): User => {
   return {
@@ -94,5 +98,3 @@ const mockLogin = (): User => {
     photoURL: 'https://lh3.googleusercontent.com/a/default-user=s96-c'
   };
 };
-
-export const getFirebaseAuth = () => auth;

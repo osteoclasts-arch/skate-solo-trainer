@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Difficulty, SessionSettings, TrickCategory, Language, Stance } from '../types';
-import { Settings, Play, BrainCircuit, Shuffle, ChevronLeft } from 'lucide-react';
+import { Settings, Play, BrainCircuit, Shuffle, ChevronLeft, Minus, Plus } from 'lucide-react';
 import { TRANSLATIONS } from '../constants';
 
 interface Props {
@@ -25,77 +25,59 @@ const SessionSetup: React.FC<Props> = ({ onStart, onBack, isGenerating, language
 
   const toggleStance = (s: Stance) => {
     setSelectedStances(prev => {
-        // Prevent unchecking the last stance
         if (prev.includes(s) && prev.length === 1) return prev;
         return prev.includes(s) ? prev.filter(i => i !== s) : [...prev, s];
     });
   };
 
+  const adjustCount = (amount: number) => {
+    setTrickCount(prev => Math.max(1, Math.min(50, prev + amount)));
+  };
+
   const handleStart = () => {
-    if (categories.length === 0) {
-      alert("Select at least one category.");
-      return;
-    }
-    if (selectedStances.length === 0) {
-        alert("Select at least one stance.");
-        return;
-    }
-    onStart({
-      trickCount,
-      difficulty,
-      categories,
-      selectedStances,
-      isProgressive: false,
-      useAI,
-      customFocus
-    });
+    if (categories.length === 0) return alert("Select at least one category.");
+    if (selectedStances.length === 0) return alert("Select at least one stance.");
+    onStart({ trickCount, difficulty, categories, selectedStances, isProgressive: false, useAI, customFocus });
   };
 
   return (
-    <div className="flex flex-col h-full p-6 space-y-6 overflow-y-auto pb-24">
-      <div className="flex items-center space-x-2 mb-2">
-        <button 
-            onClick={onBack}
-            className="p-2 -ml-2 mr-1 rounded-full hover:bg-gray-800 text-gray-300 hover:text-white transition-colors"
-        >
-            <ChevronLeft className="w-8 h-8" />
+    <div className="flex flex-col h-full p-6 space-y-8 overflow-y-auto pb-32 animate-fade-in relative">
+      <div className="flex items-center space-x-2">
+        <button onClick={onBack} className="p-3 -ml-2 rounded-full hover:bg-white/10 transition-colors">
+            <ChevronLeft className="w-6 h-6 text-white" />
         </button>
-        <Settings className="text-skate-neon w-6 h-6" />
         <h2 className="text-3xl font-display font-bold uppercase tracking-wide">{t.SETUP_SESSION}</h2>
       </div>
 
-      {/* Length */}
-      <div className="space-y-2">
-        <label className="text-sm text-gray-400 uppercase font-semibold tracking-wider">{t.SESSION_LENGTH}</label>
-        <div className="grid grid-cols-4 gap-2">
-          {[5, 10, 20, 50].map(count => (
-            <button
-              key={count}
-              onClick={() => setTrickCount(count)}
-              className={`py-3 font-bold rounded-lg border-2 transition-all ${
-                trickCount === count 
-                  ? 'border-skate-neon bg-skate-neon text-black' 
-                  : 'border-gray-700 bg-gray-800 text-gray-400'
-              }`}
-            >
-              {count}
-            </button>
-          ))}
+      {/* Count Slider */}
+      <div className="glass-card p-6 rounded-3xl space-y-4">
+        <label className="text-[10px] text-gray-400 uppercase font-bold tracking-widest">{t.SESSION_LENGTH}</label>
+        <div className="flex items-center justify-between">
+            <button onClick={() => adjustCount(-1)} className="w-12 h-12 rounded-2xl bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors active:scale-90"><Minus className="w-5 h-5" /></button>
+            <div className="flex flex-col items-center">
+                <span className="text-5xl font-display font-bold text-white">{trickCount}</span>
+                <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">TRICKS</span>
+            </div>
+            <button onClick={() => adjustCount(1)} className="w-12 h-12 rounded-2xl bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors active:scale-90"><Plus className="w-5 h-5" /></button>
         </div>
+        <input 
+            type="range" min="1" max="50" value={trickCount} onChange={(e) => setTrickCount(parseInt(e.target.value))}
+            className="w-full h-2 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-skate-neon"
+        />
       </div>
 
       {/* Difficulty */}
-      <div className="space-y-2">
-        <label className="text-sm text-gray-400 uppercase font-semibold tracking-wider">{t.DIFFICULTY}</label>
-        <div className="grid grid-cols-2 gap-2">
+      <div className="space-y-3">
+        <label className="text-[10px] text-gray-400 uppercase font-bold tracking-widest pl-2">{t.DIFFICULTY}</label>
+        <div className="grid grid-cols-2 gap-3">
           {Object.values(Difficulty).map(d => (
             <button
               key={d}
               onClick={() => setDifficulty(d)}
-              className={`py-3 font-bold rounded-lg border-2 transition-all ${
+              className={`py-4 rounded-2xl font-bold transition-all text-sm uppercase tracking-wide border ${
                 difficulty === d
-                  ? 'border-skate-neon text-skate-neon bg-gray-900' 
-                  : 'border-gray-700 bg-gray-800 text-gray-400'
+                  ? 'bg-skate-neon text-black border-skate-neon shadow-[0_0_15px_rgba(204,255,0,0.3)]' 
+                  : 'bg-white/5 border-white/5 text-gray-500 hover:bg-white/10'
               }`}
             >
               {/* @ts-ignore */}
@@ -106,17 +88,17 @@ const SessionSetup: React.FC<Props> = ({ onStart, onBack, isGenerating, language
       </div>
 
       {/* Categories */}
-      <div className="space-y-2">
-        <label className="text-sm text-gray-400 uppercase font-semibold tracking-wider">{t.CATEGORIES}</label>
+      <div className="space-y-3">
+        <label className="text-[10px] text-gray-400 uppercase font-bold tracking-widest pl-2">{t.CATEGORIES}</label>
         <div className="flex flex-wrap gap-2">
           {Object.values(TrickCategory).map(c => (
             <button
               key={c}
               onClick={() => toggleCategory(c)}
-              className={`px-4 py-2 rounded-full text-sm font-bold border transition-all ${
+              className={`px-5 py-2.5 rounded-full text-xs font-bold border transition-all ${
                 categories.includes(c)
-                  ? 'bg-white text-black border-white'
-                  : 'bg-transparent text-gray-500 border-gray-700'
+                  ? 'bg-white text-black border-white shadow-lg'
+                  : 'bg-transparent text-gray-500 border-white/10 hover:border-white/30'
               }`}
             >
               {/* @ts-ignore */}
@@ -126,10 +108,10 @@ const SessionSetup: React.FC<Props> = ({ onStart, onBack, isGenerating, language
         </div>
       </div>
 
-      {/* Stance Mix Settings (Updated to match Categories style) */}
-      <div className="space-y-2">
-         <div className="flex items-center space-x-2 text-gray-400 uppercase font-semibold tracking-wider text-sm mb-1">
-            <Shuffle className="w-4 h-4" />
+      {/* Stance Mix */}
+      <div className="space-y-3">
+         <div className="flex items-center space-x-2 text-[10px] text-gray-400 uppercase font-bold tracking-widest pl-2">
+            <Shuffle className="w-3 h-3" />
             <span>{t.STANCE_MIX}</span>
          </div>
          <div className="flex flex-wrap gap-2">
@@ -137,10 +119,10 @@ const SessionSetup: React.FC<Props> = ({ onStart, onBack, isGenerating, language
                 <button 
                     key={s} 
                     onClick={() => toggleStance(s)}
-                    className={`px-4 py-2 rounded-full text-sm font-bold border transition-all ${
+                    className={`px-5 py-2.5 rounded-full text-xs font-bold border transition-all ${
                         selectedStances.includes(s)
-                          ? 'bg-skate-neon text-black border-skate-neon'
-                          : 'bg-transparent text-gray-500 border-gray-700'
+                          ? 'bg-gray-800 text-skate-neon border-skate-neon/50'
+                          : 'bg-transparent text-gray-600 border-white/10'
                       }`}
                 >
                      {/* @ts-ignore */}
@@ -150,16 +132,18 @@ const SessionSetup: React.FC<Props> = ({ onStart, onBack, isGenerating, language
          </div>
       </div>
 
-      {/* AI Mode Toggle */}
-      <div className="p-4 bg-gray-900 border border-gray-700 rounded-xl space-y-4">
-        <div className="flex items-center justify-between">
-           <div className="flex items-center space-x-2">
-             <BrainCircuit className={useAI ? "text-skate-neon" : "text-gray-500"} />
+      {/* AI Mode */}
+      <div className="glass-card p-5 rounded-3xl border border-white/10">
+        <div className="flex items-center justify-between mb-4">
+           <div className="flex items-center space-x-3">
+             <div className={`p-2 rounded-xl ${useAI ? 'bg-skate-neon/20' : 'bg-gray-800'}`}>
+                <BrainCircuit className={useAI ? "text-skate-neon" : "text-gray-500"} />
+             </div>
              <span className={`font-bold ${useAI ? "text-white" : "text-gray-400"}`}>{t.AI_COACH_MODE}</span>
            </div>
            <label className="relative inline-flex items-center cursor-pointer">
               <input type="checkbox" checked={useAI} onChange={() => setUseAI(!useAI)} className="sr-only peer" />
-              <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-skate-neon"></div>
+              <div className="w-12 h-7 bg-gray-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-skate-neon"></div>
             </label>
         </div>
         {useAI && (
@@ -168,7 +152,7 @@ const SessionSetup: React.FC<Props> = ({ onStart, onBack, isGenerating, language
                 placeholder={t.AI_PLACEHOLDER}
                 value={customFocus}
                 onChange={(e) => setCustomFocus(e.target.value)}
-                className="w-full bg-black border border-gray-600 rounded p-3 text-white placeholder-gray-600 focus:border-skate-neon focus:outline-none"
+                className="w-full bg-black/50 border border-white/10 rounded-xl p-4 text-white text-sm placeholder-gray-600 focus:border-skate-neon focus:outline-none transition-colors"
             />
         )}
       </div>
@@ -176,7 +160,7 @@ const SessionSetup: React.FC<Props> = ({ onStart, onBack, isGenerating, language
       <button
         onClick={handleStart}
         disabled={isGenerating}
-        className="w-full py-5 bg-skate-neon hover:bg-skate-neonHover text-black font-display text-3xl font-bold uppercase rounded-xl shadow-lg transform active:scale-95 transition-all flex items-center justify-center space-x-2 mt-auto"
+        className="w-full py-5 bg-skate-neon hover:bg-skate-neonHover text-black font-display text-3xl font-bold uppercase rounded-[2rem] shadow-[0_0_20px_rgba(204,255,0,0.3)] transform active:scale-95 transition-all flex items-center justify-center space-x-3"
       >
         {isGenerating ? (
           <span className="animate-pulse">{t.GENERATING}</span>
