@@ -1,5 +1,11 @@
 
 
+declare var process: {
+  env: {
+    API_KEY: string;
+  };
+};
+
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { Trick, SessionSettings, Difficulty, TrickCategory, SessionResult, TrickTip, Language, AnalyticsInsight } from "../types";
 import { TRICK_TIPS_DB } from "../constants";
