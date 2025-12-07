@@ -35,7 +35,7 @@ const App: React.FC = () => {
   const [lastResult, setLastResult] = useState<SessionResult | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [language, setLanguage] = useState<Language>(() => {
-    return (localStorage.getItem('skate_app_language') as Language) || 'EN';
+    return (localStorage.getItem('skate_app_language') as Language) || 'KR';
   });
 
   // Profile State

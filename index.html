@@ -20,8 +20,8 @@
                 black: '#09090b', // Zinc 950
                 dark: '#18181b',  // Zinc 900
                 card: 'rgba(24, 24, 27, 0.6)',
-                neon: '#ccff00',
-                neonHover: '#b3e600',
+                neon: '#E3FF37', // Acid Lime
+                neonHover: '#c1d92e',
                 alert: '#ff3b30',
                 gray: '#71717a'
               }
@@ -60,13 +60,20 @@
         font-family: "Pretendard", -apple-system, BlinkMacSystemFont, system-ui, Roboto, "Helvetica Neue", "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
-        selection-background-color: #ccff00;
+        selection-background-color: #E3FF37;
         selection-color: black;
       }
       /* Hide scrollbar for clean UI */
       ::-webkit-scrollbar {
         width: 0px;
         background: transparent;
+      }
+      .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+      }
+      .scrollbar-hide {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
       }
       
       .glass-card {
@@ -84,14 +91,14 @@
       }
 
       .text-glow {
-        text-shadow: 0 0 20px rgba(204, 255, 0, 0.3);
+        text-shadow: 0 0 20px rgba(227, 255, 55, 0.3);
       }
       
       .safe-area-pb {
         padding-bottom: env(safe-area-inset-bottom);
       }
     </style>
-<script type="importmap">
+  <script type="importmap">
 {
   "imports": {
     "react": "https://aistudiocdn.com/react@^19.2.1",

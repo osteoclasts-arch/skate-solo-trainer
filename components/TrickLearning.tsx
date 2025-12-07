@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect } from 'react';
 import { Trick, Language, Stance } from '../types';
 import { BASE_TRICKS, TRICK_TIPS_DB, TRANSLATIONS } from '../constants';
@@ -76,20 +74,15 @@ const TrickLearning: React.FC<Props> = ({ language }) => {
   }, {} as Record<string, Trick[]>);
 
   const getStanceContent = (trick: Trick, stance: Stance) => {
-      // 1. Check if specific stance doc exists in Trick object
       if (trick.stanceDocs && trick.stanceDocs[stance]) {
           return trick.stanceDocs[stance];
       }
-      
-      // 2. Default to Base Trick info for Regular
       if (stance === Stance.REGULAR) {
           return {
               videoUrl: trick.videoUrl,
               description: trick.description
           };
       }
-      
-      // 3. Fallback: Use Base Video but Generic Description
       return {
           videoUrl: trick.videoUrl,
           description: null
@@ -99,7 +92,7 @@ const TrickLearning: React.FC<Props> = ({ language }) => {
   const getTipsForStance = (trickName: string, stance: Stance) => {
       let key = trickName;
       if (stance !== Stance.REGULAR) {
-          key = `${stance} ${trickName}`; // e.g., "Fakie Kickflip"
+          key = `${stance} ${trickName}`;
       }
       return TRICK_TIPS_DB[key] || [];
   };
@@ -107,8 +100,6 @@ const TrickLearning: React.FC<Props> = ({ language }) => {
   if (selectedTrick) {
       const activeContent = getStanceContent(selectedTrick, selectedStance);
       const activeTips = getTipsForStance(selectedTrick.name, selectedStance);
-      
-      // Check which tabs should be enabled (if they have tips or videos)
       const stanceTabs = Object.values(Stance);
 
       return (
@@ -133,22 +124,21 @@ const TrickLearning: React.FC<Props> = ({ language }) => {
                 </div>
            </div>
 
-           {/* Stance Selector Tabs */}
-           <div className="flex space-x-2 mb-6 overflow-x-auto pb-2 scrollbar-hide">
+           {/* Stance Selector Tabs - Fixed Clipping Issue */}
+           <div className="flex flex-nowrap space-x-2 mb-6 overflow-x-auto pb-4 -mx-6 px-6 scrollbar-hide w-[calc(100%+3rem)]">
                {stanceTabs.map(stance => {
                    const hasTips = getTipsForStance(selectedTrick.name, stance).length > 0;
                    const hasDoc = selectedTrick.stanceDocs?.[stance];
                    const isRegular = stance === Stance.REGULAR;
                    const isActive = selectedStance === stance;
                    
-                   // Only show tab if there is content or it's Regular
                    if (!isRegular && !hasTips && !hasDoc) return null;
 
                    return (
                        <button
                            key={stance}
                            onClick={() => setSelectedStance(stance)}
-                           className={`px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all whitespace-nowrap border ${
+                           className={`px-5 py-2.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all whitespace-nowrap border flex-shrink-0 ${
                                isActive 
                                  ? 'bg-skate-neon text-black border-skate-neon shadow-[0_0_10px_rgba(204,255,0,0.4)]' 
                                  : 'bg-white/5 text-gray-400 border-white/5 hover:bg-white/10'
@@ -257,8 +247,18 @@ const TrickLearning: React.FC<Props> = ({ language }) => {
         <div className="space-y-8">
           <div className="flex items-center space-x-3">
             <BookOpen className="text-skate-neon w-6 h-6" />
-            <h2 className="text-3xl font-display font-bold uppercase tracking-wide text-white">
-                TRICK<br/><span className="text-gray-500">LIBRARY</span>
+            <h2 className="text-3xl font-display font-bold uppercase tracking-wide text-white leading-tight">
+                {language === 'KR' ? (
+                    <>
+                        트릭<br/>
+                        <span className="text-gray-500">가이드</span>
+                    </>
+                ) : (
+                    <>
+                        TRICK<br/>
+                        <span className="text-gray-500">GUIDE</span>
+                    </>
+                )}
             </h2>
           </div>
 

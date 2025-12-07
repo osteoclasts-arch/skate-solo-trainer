@@ -1,5 +1,3 @@
-
-
 import { Difficulty, Stance, Trick, TrickCategory, TrickTip } from "./types";
 
 export const SKATE_LETTERS = ['S', 'K', 'A', 'T', 'E'];
@@ -68,7 +66,7 @@ export const TRANSLATIONS = {
     AI_PLACEHOLDER: "e.g. 'Backside pop tricks' or 'Focus on pop height'",
     CONFIRM_ABORT: "End current session? Progress will be lost.",
     // Learning
-    LEARNING: "Learning",
+    LEARNING: "Trick Guide",
     PRACTICE_THIS: "Practice This",
     HOW_TO: "How To",
     ANALYZING: "Analyzing session data...",
@@ -85,6 +83,15 @@ export const TRANSLATIONS = {
     LEVEL_BEGINNER: "Beginner",
     LEVEL_INTERMEDIATE: "Intermediate",
     LEVEL_ADVANCED: "Advanced",
+    // Ranking
+    GLOBAL_RANKING: "Global Ranking",
+    YOUR_TIER: "Your Tier",
+    TOP_PERCENT: "Top",
+    TIER_1: "Street Rat",
+    TIER_2: "Local Hero",
+    TIER_3: "Sponsored Am",
+    TIER_4: "G.O.A.T",
+    RANKING_DESC: "Based on Hard/Pro tricks landed",
     // Auth
     LOGIN_GOOGLE: "Sign in with Google",
     LOGOUT: "Logout",
@@ -158,7 +165,7 @@ export const TRANSLATIONS = {
     AI_PLACEHOLDER: "예: '팝을 뒷방향으로 차는 연습' 또는 '알리 높이 높이기'",
     CONFIRM_ABORT: "훈련을 종료하시겠어요? 기록이 저장되지 않습니다.",
     // Learning
-    LEARNING: "기술 도서관",
+    LEARNING: "트릭 가이드",
     PRACTICE_THIS: "이 기술 연습하기",
     HOW_TO: "배우는 법",
     ANALYZING: "데이터 분석 중...",
@@ -175,6 +182,15 @@ export const TRANSLATIONS = {
     LEVEL_BEGINNER: "루키",
     LEVEL_INTERMEDIATE: "아마추어",
     LEVEL_ADVANCED: "프로",
+    // Ranking
+    GLOBAL_RANKING: "전체 랭킹",
+    YOUR_TIER: "나의 티어",
+    TOP_PERCENT: "상위",
+    TIER_1: "Street Rat",
+    TIER_2: "Local Hero",
+    TIER_3: "Sponsored Am",
+    TIER_4: "G.O.A.T",
+    RANKING_DESC: "상급/프로 기술 성공 점수 기반",
     // Auth
     LOGIN_GOOGLE: "구글로 시작하기",
     LOGOUT: "로그아웃",
@@ -205,7 +221,7 @@ export const BASE_TRICKS: Trick[] = [
     name: 'Pop Shuvit', 
     category: TrickCategory.FLATGROUND, 
     difficulty: Difficulty.EASY,
-    videoUrl: 'https://www.youtube.com/watch?v=vA1EPid4aiw', // Updated URL
+    videoUrl: 'https://www.youtube.com/watch?v=vA1EPid4aiw', 
     description: {
       EN: "Spinning the board 180 degrees under your feet without flipping it, while popping.",
       KR: "보드를 뒤집지 않고 발 아래에서 180도 회전시키는 기술입니다."
@@ -277,6 +293,28 @@ export const BASE_TRICKS: Trick[] = [
       KR: "앞발을 땅에 짚고 뒷발로 보드를 팝하여 180도 회전시키는 기술입니다."
     }
   },
+  {
+    id: 'fakie_ollie',
+    name: 'Fakie Ollie',
+    category: TrickCategory.FLATGROUND,
+    difficulty: Difficulty.EASY,
+    videoUrl: 'https://www.youtube.com/watch?v=3X_6X_7X_8o',
+    description: {
+      EN: "An Ollie while riding backward.",
+      KR: "뒤로 가면서(페이키) 하는 알리입니다."
+    }
+  },
+  {
+    id: 'nollie',
+    name: 'Nollie',
+    category: TrickCategory.FLATGROUND,
+    difficulty: Difficulty.EASY,
+    videoUrl: 'https://www.youtube.com/watch?v=4X_9X_0X_1o',
+    description: {
+      EN: "Popping with the nose while riding forward.",
+      KR: "앞으로 가면서 노즈를 팝하여 점프하는 기술입니다."
+    }
+  },
 
   // --- MEDIUM / FLIP TRICKS & GRINDS ---
   { 
@@ -306,7 +344,7 @@ export const BASE_TRICKS: Trick[] = [
     name: 'Varial Kickflip', 
     category: TrickCategory.FLATGROUND, 
     difficulty: Difficulty.MEDIUM,
-    videoUrl: 'https://www.youtube.com/watch?v=MfIkBXXZrEY', // Updated URL
+    videoUrl: 'https://www.youtube.com/watch?v=MfIkBXXZrEY',
     description: {
       EN: "A combination of a Pop Shuvit and a Kickflip.",
       KR: "팝 셔빗과 킥플립이 결합된 기술입니다."
@@ -317,7 +355,7 @@ export const BASE_TRICKS: Trick[] = [
     name: 'Frontside Pop Shuvit', 
     category: TrickCategory.FLATGROUND, 
     difficulty: Difficulty.MEDIUM,
-    videoUrl: 'https://www.youtube.com/watch?v=nEcssJ5_xK4', // Updated URL
+    videoUrl: 'https://www.youtube.com/watch?v=nEcssJ5_xK4',
     description: {
       EN: "Popping the board and spinning it 180 degrees frontside (behind you).",
       KR: "보드를 팝하며 등 뒤쪽으로(프론트사이드) 180도 회전시키는 기술입니다."
@@ -354,6 +392,39 @@ export const BASE_TRICKS: Trick[] = [
     description: {
       EN: "Grinding only on the back truck, like a manual on a ledge.",
       KR: "뒷 트럭으로만 그라인딩하는 기술입니다. 레지 위에서 매뉴얼을 하는 것과 비슷합니다."
+    }
+  },
+  {
+    id: 'fakie_bigspin',
+    name: 'Fakie Bigspin',
+    category: TrickCategory.FLATGROUND,
+    difficulty: Difficulty.MEDIUM,
+    videoUrl: 'https://www.youtube.com/watch?v=abc12345', 
+    description: {
+      EN: "Fakie backside 360 shuvit with a 180 body varial.",
+      KR: "페이키 상태에서 보드를 360도 돌리고 몸을 180도 돌리는 기술입니다."
+    }
+  },
+  {
+    id: 'half_cab',
+    name: 'Half Cab',
+    category: TrickCategory.FLATGROUND,
+    difficulty: Difficulty.MEDIUM,
+    videoUrl: 'https://www.youtube.com/watch?v=def12345',
+    description: {
+      EN: "Fakie Backside 180 Ollie.",
+      KR: "페이키 상태에서 백사이드로 180도 회전하는 알리입니다."
+    }
+  },
+  {
+    id: 'nollie_shuv',
+    name: 'Nollie Pop Shuvit',
+    category: TrickCategory.FLATGROUND,
+    difficulty: Difficulty.MEDIUM,
+    videoUrl: 'https://www.youtube.com/watch?v=ghi12345',
+    description: {
+      EN: "Pop shuvit done from the nose.",
+      KR: "노즈에서 팝을 쳐서 하는 팝 셔빗입니다."
     }
   },
 
@@ -396,7 +467,7 @@ export const BASE_TRICKS: Trick[] = [
     name: 'Frontside Heelflip', 
     category: TrickCategory.FLATGROUND, 
     difficulty: Difficulty.HARD,
-    videoUrl: 'https://www.youtube.com/watch?v=6X_0X_1X_3o', // Placeholder standard FS Heel
+    videoUrl: 'https://www.youtube.com/watch?v=6X_0X_1X_3o',
     description: {
       EN: "A Frontside 180 combined with a Heelflip.",
       KR: "프론트사이드 180와 힐플립이 결합된 기술입니다."
@@ -455,6 +526,28 @@ export const BASE_TRICKS: Trick[] = [
       KR: "뒷 트럭으로 그라인드하고 앞 트럭은 레지 아래로 떨구는 스타일리시한 기술입니다."
     }
   },
+  {
+    id: 'feeble',
+    name: 'Feeble Grind',
+    category: TrickCategory.GRIND,
+    difficulty: Difficulty.HARD,
+    videoUrl: 'https://www.youtube.com/watch?v=jkl12345',
+    description: {
+      EN: "Back truck grind with front truck dipped over the rail on the other side.",
+      KR: "스미스 그라인드와 비슷하지만 앞 트럭이 레일 반대편으로 넘어가는 기술입니다."
+    }
+  },
+  {
+    id: 'overcrook',
+    name: 'Overcrook',
+    category: TrickCategory.GRIND,
+    difficulty: Difficulty.HARD,
+    videoUrl: 'https://www.youtube.com/watch?v=mno12345',
+    description: {
+      EN: "Crooked grind but leaning over the other side of the ledge.",
+      KR: "크룩드 그라인드보다 더 깊게 노즈를 박고 레지 반대편으로 넘기는 기술입니다."
+    }
+  },
 
   // --- PRO ---
   { 
@@ -473,7 +566,7 @@ export const BASE_TRICKS: Trick[] = [
     name: 'Impossible', 
     category: TrickCategory.FLATGROUND, 
     difficulty: Difficulty.PRO,
-    videoUrl: 'https://www.youtube.com/watch?v=WzzhO6fBqsc', // Updated URL
+    videoUrl: 'https://www.youtube.com/watch?v=WzzhO6fBqsc',
     description: {
       EN: "The board wraps vertically around the back foot in a 360 motion.",
       KR: "보드가 뒷발을 감싸며 수직으로 360도 회전하는 기술입니다."
@@ -501,9 +594,43 @@ export const BASE_TRICKS: Trick[] = [
       KR: "보드를 거의 수직으로 세우고 휠을 레지 위에 올린 채 테일로 슬라이딩하는 기술입니다."
     }
   },
+  {
+    id: 'double_kickflip',
+    name: 'Double Kickflip',
+    category: TrickCategory.FLATGROUND,
+    difficulty: Difficulty.PRO,
+    videoUrl: 'https://www.youtube.com/watch?v=pqr12345',
+    description: {
+      EN: "Kickflip that rotates twice.",
+      KR: "보드가 두 바퀴 회전하는 킥플립입니다."
+    }
+  },
+  {
+    id: 'dolphin_flip',
+    name: 'Dolphin Flip',
+    category: TrickCategory.FLATGROUND,
+    difficulty: Difficulty.PRO,
+    videoUrl: 'https://www.youtube.com/watch?v=stu12345',
+    description: {
+      EN: "Forward flip where the board flips vertically between your legs.",
+      KR: "보드가 다리 사이에서 수직으로 앞으로 도는(Forward Flip) 기술입니다."
+    }
+  },
+  {
+    id: 'hospital_flip',
+    name: 'Hospital Flip',
+    category: TrickCategory.FLATGROUND,
+    difficulty: Difficulty.PRO,
+    videoUrl: 'https://www.youtube.com/watch?v=vwx12345',
+    description: {
+      EN: "Half kickflip, catch with front foot, wrap it around like a shuvit.",
+      KR: "킥플립 반 바퀴 후 앞발로 잡아 셔빗처럼 돌려주는 기술입니다. 캐스퍼 플립과 비슷합니다."
+    }
+  },
 ];
 
 export const TRICK_TIPS_DB: Record<string, TrickTip[]> = {
+  // ... (Existing tips remain the same)
   // --- KICKFLIP FAMILY ---
   'Kickflip': [
     { 

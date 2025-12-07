@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { SessionResult, Language, AnalyticsInsight } from '../types';
+import { SessionResult, Language, AnalyticsInsight, Difficulty } from '../types';
 import { TRANSLATIONS } from '../constants';
 import { ResponsiveContainer, AreaChart, Area, XAxis, Tooltip } from 'recharts';
-import { Trophy, TrendingUp, AlertTriangle, Target, BrainCircuit, Sparkles, RefreshCw, Star, Instagram } from 'lucide-react';
+import { Trophy, TrendingUp, AlertTriangle, Target, BrainCircuit, Sparkles, RefreshCw, Star, Instagram, Crown } from 'lucide-react';
 import { getAnalyticsInsight } from '../services/geminiService';
 import html2canvas from 'html2canvas';
 
@@ -24,6 +24,7 @@ const Analytics: React.FC<Props> = ({ history, language, daysSkating = 1 }) => {
   const totalLanded = history.reduce((acc, curr) => acc + curr.landedCount, 0);
   const globalSuccessRate = totalTricks > 0 ? Math.round((totalLanded / totalTricks) * 100) : 0;
 
+  // Streak Calculation
   let currentStreak = 0;
   let bestStreak = 0;
   const sortedHistory = [...history].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
@@ -37,6 +38,42 @@ const Analytics: React.FC<Props> = ({ history, language, daysSkating = 1 }) => {
       }
   });
 
+  // Ranking System Logic
+  const calculateTier = () => {
+      let score = 0;
+      history.forEach(session => {
+          session.trickHistory.forEach(attempt => {
+              if (attempt.landed) {
+                  if (attempt.trick.difficulty === Difficulty.HARD) score += 2;
+                  if (attempt.trick.difficulty === Difficulty.PRO) score += 5;
+              }
+          });
+      });
+
+      // Mock percentiles for gamification
+      let tierName = t.TIER_1;
+      let percentile = 90;
+      let iconColor = "text-gray-500";
+
+      if (score > 100) {
+          tierName = t.TIER_4;
+          percentile = 1;
+          iconColor = "text-skate-neon";
+      } else if (score > 50) {
+          tierName = t.TIER_3;
+          percentile = 10;
+          iconColor = "text-purple-400";
+      } else if (score > 10) {
+          tierName = t.TIER_2;
+          percentile = 40;
+          iconColor = "text-blue-400";
+      }
+
+      return { score, tierName, percentile, iconColor };
+  };
+  const { score, tierName, percentile, iconColor } = calculateTier();
+
+  // Weakness Logic
   const trickStats: Record<string, { attempts: number, landed: number }> = {};
   history.forEach(session => {
       session.trickHistory.forEach(attempt => {
@@ -103,7 +140,7 @@ const Analytics: React.FC<Props> = ({ history, language, daysSkating = 1 }) => {
                     await navigator.share({
                         files: [file],
                         title: 'Skate Solo Trainer Stats',
-                        text: 'Check out my skate progression! 🛹🔥'
+                        text: `Check out my skate stats! I'm ranked as ${tierName} (Top ${percentile}%) 🛹🔥`
                     });
                 } catch (shareError) {
                     console.log('Share cancelled', shareError);
@@ -137,6 +174,7 @@ const Analytics: React.FC<Props> = ({ history, language, daysSkating = 1 }) => {
   return (
     <div className="flex flex-col h-full p-6 space-y-6 overflow-y-auto pb-32 animate-fade-in" ref={containerRef}>
         
+        {/* Header */}
         <div className="flex items-center justify-between mb-2">
             <div className="flex items-center space-x-2">
                 <Target className="text-skate-neon w-6 h-6" />
@@ -156,19 +194,45 @@ const Analytics: React.FC<Props> = ({ history, language, daysSkating = 1 }) => {
             </button>
         </div>
         
-        <div className="flex justify-end mb-2">
-            <div className="flex items-center space-x-2 bg-gradient-to-r from-skate-neon/20 to-transparent px-3 py-1 rounded-full border border-skate-neon/30">
-                <Star className="w-3.5 h-3.5 text-skate-neon fill-skate-neon" />
-                <span className="text-[10px] font-bold text-gray-300 uppercase tracking-wider">{t.EXPERIENCE_LEVEL}: <span className="text-white ml-1">{getExperienceLevel(daysSkating)}</span></span>
+        {/* Level & Rank Badge */}
+        <div className="flex justify-between items-center mb-2">
+             <div className="flex items-center space-x-2 bg-white/5 px-3 py-1 rounded-full border border-white/5">
+                <Star className="w-3.5 h-3.5 text-gray-400" />
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{t.EXPERIENCE_LEVEL}: <span className="text-white ml-1">{getExperienceLevel(daysSkating)}</span></span>
+            </div>
+        </div>
+
+        {/* Global Ranking Card (New Feature) */}
+        <div className="glass-card rounded-3xl p-6 relative overflow-hidden group">
+            <div className="absolute right-0 top-0 w-32 h-32 bg-gradient-to-br from-skate-neon/10 to-transparent rounded-full blur-2xl -mr-6 -mt-6"></div>
+            <div className="relative z-10 flex items-center justify-between">
+                <div>
+                    <h3 className="text-gray-400 text-[10px] font-bold uppercase tracking-widest mb-1">{t.GLOBAL_RANKING}</h3>
+                    <div className="flex items-baseline space-x-2">
+                        <Crown className={`w-6 h-6 ${iconColor}`} />
+                        <span className={`text-4xl font-display font-bold ${iconColor === 'text-skate-neon' ? 'text-skate-neon text-glow' : 'text-white'}`}>{tierName}</span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">{t.RANKING_DESC}</p>
+                </div>
+                <div className="text-right">
+                    <span className="block text-xs font-bold text-gray-400 uppercase tracking-wider">{t.TOP_PERCENT}</span>
+                    <span className="text-3xl font-display font-bold text-white">{percentile}%</span>
+                </div>
+            </div>
+            {/* Progress Bar for next rank */}
+            <div className="mt-4 w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
+                <div 
+                    className="h-full bg-gradient-to-r from-skate-neon to-purple-500" 
+                    style={{ width: `${Math.min((score / 150) * 100, 100)}%` }}
+                ></div>
             </div>
         </div>
 
         {/* AI Diagnostic Summary Section - Holographic Card */}
         <div className="w-full relative rounded-3xl p-[1px] bg-gradient-to-br from-skate-neon/50 via-purple-500/30 to-transparent shadow-2xl overflow-hidden group">
             <div className="absolute inset-0 bg-black/80 backdrop-blur-xl rounded-3xl h-full w-full z-0"></div>
-            <div className="absolute top-0 right-0 w-48 h-48 bg-skate-neon/10 rounded-full blur-[60px] -translate-y-1/2 translate-x-1/2"></div>
             
-            <div className="relative z-10 p-6 min-h-[300px] flex flex-col justify-center">
+            <div className="relative z-10 p-6 min-h-[250px] flex flex-col justify-center">
             {!insight ? (
                 <div className="flex flex-col items-center justify-center py-8 text-center space-y-6">
                     <div className="relative">
