@@ -307,6 +307,8 @@ const App: React.FC = () => {
                   history={sessionHistory} 
                   language={language} 
                   daysSkating={daysSkating}
+                  user={user}
+                  onLogin={handleLogin}
                 />
              );
         case 'LEARNING':
