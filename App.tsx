@@ -1,6 +1,3 @@
-
-
-
 import React, { useState, useEffect } from 'react';
 import { ViewState, SessionSettings, Trick, SessionResult, Difficulty, Language, Stance, User } from './types';
 import Dashboard from './components/Dashboard';
@@ -277,7 +274,7 @@ const App: React.FC = () => {
       case 'LEARNING':
         return <TrickLearning language={language} />;
       case 'AI_VISION':
-        return <AIVision language={language} />;
+        return <AIVision language={language} user={user} />;
       default:
         return null;
     }

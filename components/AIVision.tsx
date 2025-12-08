@@ -1,9 +1,9 @@
 
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Language, VisionAnalysis } from '../types';
+import { Language, VisionAnalysis, User } from '../types';
 import { TRANSLATIONS } from '../constants';
-import { Upload, Zap, AlertTriangle, Play, X, Eye, Video, Edit2, CheckCircle, HelpCircle } from 'lucide-react';
+import { Upload, Zap, AlertTriangle, Play, X, Eye, Video, Edit2, CheckCircle, HelpCircle, Ruler, Footprints } from 'lucide-react';
 import { analyzeMedia } from '../services/geminiService';
 import { dbService } from '../services/dbService';
 import mpPose from '@mediapipe/pose';
@@ -19,9 +19,10 @@ const POSE_CONNECTIONS: [number, number][] = [
 
 interface Props {
   language: Language;
+  user: User | null;
 }
 
-const AIVision: React.FC<Props> = ({ language }) => {
+const AIVision: React.FC<Props> = ({ language, user }) => {
   const t = TRANSLATIONS[language];
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -32,8 +33,10 @@ const AIVision: React.FC<Props> = ({ language }) => {
   
   // Input & Feedback State
   const [trickHint, setTrickHint] = useState('');
+  const [userStance, setUserStance] = useState<'Regular' | 'Goofy'>('Regular'); // Default Regular
   const [showFeedback, setShowFeedback] = useState(false);
-  const [feedbackInput, setFeedbackInput] = useState('');
+  const [feedbackName, setFeedbackName] = useState('');
+  const [feedbackHeight, setFeedbackHeight] = useState('');
   const [feedbackSent, setFeedbackSent] = useState(false);
 
   // Video & Motion Tracking Refs
@@ -184,8 +187,8 @@ const AIVision: React.FC<Props> = ({ language }) => {
       setShowFeedback(false);
       
       try {
-          // Pass the trickHint to the service
-          const analysis = await analyzeMedia(file, language, trickHint);
+          // Pass trickHint and userStance to the service
+          const analysis = await analyzeMedia(file, language, trickHint, userStance);
           if (analysis) {
               setResult(analysis);
           } else {
@@ -200,11 +203,13 @@ const AIVision: React.FC<Props> = ({ language }) => {
   };
 
   const handleSendFeedback = async () => {
-      if (!result || !feedbackInput) return;
-      // In a real app, this would get the actual user ID
-      await dbService.saveVisionFeedback(null, {
-          predicted: result.trickName,
-          actual: feedbackInput
+      if (!result) return;
+      
+      await dbService.saveVisionFeedback(user ? user.uid : null, {
+          predictedName: result.trickName,
+          predictedHeight: result.heightEstimate,
+          actualName: feedbackName || result.trickName,
+          actualHeight: feedbackHeight || result.heightEstimate
       });
       setFeedbackSent(true);
       setShowFeedback(false);
@@ -218,7 +223,8 @@ const AIVision: React.FC<Props> = ({ language }) => {
       setTrickHint('');
       setShowFeedback(false);
       setFeedbackSent(false);
-      setFeedbackInput('');
+      setFeedbackName('');
+      setFeedbackHeight('');
       if (fileInputRef.current) fileInputRef.current.value = '';
       if (requestRef.current) cancelAnimationFrame(requestRef.current);
   };
@@ -299,7 +305,9 @@ const AIVision: React.FC<Props> = ({ language }) => {
                                 {isTrackerReady && (
                                     <div className="absolute top-4 left-4 z-20 px-3 py-1 bg-black/60 backdrop-blur rounded-full flex items-center space-x-2 border border-skate-neon/30">
                                         <div className="w-2 h-2 bg-skate-neon rounded-full animate-pulse"></div>
-                                        <span className="text-[10px] text-white font-bold uppercase tracking-widest">Motion AI Active</span>
+                                        <span className="text-[10px] text-white font-bold uppercase tracking-widest">
+                                            {t.TRACKING_BOARD}
+                                        </span>
                                     </div>
                                 )}
 
@@ -360,6 +368,39 @@ const AIVision: React.FC<Props> = ({ language }) => {
                 {/* ACTION AREA: Input & Button */}
                 {!result && !isAnalyzing && (
                     <div className="space-y-4">
+                        {/* Stance Selector */}
+                        <div className="glass-card p-4 rounded-2xl border border-white/10">
+                            <div className="flex items-center space-x-2 mb-3 text-gray-400">
+                                <Footprints className="w-4 h-4" />
+                                <span className="text-xs font-bold uppercase tracking-widest">{t.SELECT_YOUR_STANCE}</span>
+                            </div>
+                            <div className="flex gap-2 mb-2">
+                                <button
+                                    onClick={() => setUserStance('Regular')}
+                                    className={`flex-1 py-3 rounded-xl font-bold uppercase text-sm border transition-all ${
+                                        userStance === 'Regular'
+                                        ? 'bg-skate-neon text-black border-skate-neon shadow-[0_0_10px_rgba(204,255,0,0.3)]'
+                                        : 'bg-black/40 text-gray-500 border-white/10 hover:bg-white/5'
+                                    }`}
+                                >
+                                    Regular (Left)
+                                </button>
+                                <button
+                                    onClick={() => setUserStance('Goofy')}
+                                    className={`flex-1 py-3 rounded-xl font-bold uppercase text-sm border transition-all ${
+                                        userStance === 'Goofy'
+                                        ? 'bg-skate-neon text-black border-skate-neon shadow-[0_0_10px_rgba(204,255,0,0.3)]'
+                                        : 'bg-black/40 text-gray-500 border-white/10 hover:bg-white/5'
+                                    }`}
+                                >
+                                    Goofy (Right)
+                                </button>
+                            </div>
+                            <p className="text-[10px] text-gray-500 leading-tight">
+                                {t.SELECT_STANCE_DESC}
+                            </p>
+                        </div>
+
                         {/* Trick Name Input & Disclaimer */}
                         <div className="glass-card p-4 rounded-2xl border border-white/10">
                             <div className="flex items-center space-x-2 mb-2 text-gray-400">
@@ -454,23 +495,44 @@ const AIVision: React.FC<Props> = ({ language }) => {
                                         <span>{t.WRONG_ANALYSIS}</span>
                                     </button>
                                 ) : (
-                                    <div className="bg-white/5 p-4 rounded-xl animate-fade-in">
-                                        <p className="text-xs font-bold text-gray-400 mb-2">{t.PROVIDE_FEEDBACK}</p>
-                                        <div className="flex gap-2">
-                                            <input 
-                                                type="text" 
-                                                value={feedbackInput}
-                                                onChange={(e) => setFeedbackInput(e.target.value)}
-                                                className="flex-1 bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-skate-neon outline-none"
-                                                placeholder={result.trickName}
-                                            />
-                                            <button 
-                                                onClick={handleSendFeedback}
-                                                className="bg-skate-neon text-black text-xs font-bold px-4 rounded-lg hover:bg-skate-neonHover"
-                                            >
-                                                {t.SEND_FEEDBACK}
-                                            </button>
+                                    <div className="bg-white/5 p-4 rounded-xl animate-fade-in space-y-3">
+                                        <p className="text-xs font-bold text-gray-400">{t.PROVIDE_FEEDBACK}</p>
+                                        
+                                        <div className="space-y-2">
+                                            {/* Correct Trick Name */}
+                                            <div>
+                                                <label className="text-[10px] text-gray-500 uppercase font-bold mb-1 block">{t.ACTUAL_TRICK_NAME}</label>
+                                                <input 
+                                                    type="text" 
+                                                    value={feedbackName}
+                                                    onChange={(e) => setFeedbackName(e.target.value)}
+                                                    className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-skate-neon outline-none"
+                                                    placeholder={result.trickName}
+                                                />
+                                            </div>
+                                            
+                                            {/* Correct Height */}
+                                            <div>
+                                                 <label className="text-[10px] text-gray-500 uppercase font-bold mb-1 block flex items-center">
+                                                     <Ruler className="w-3 h-3 mr-1" />
+                                                     {t.ACTUAL_HEIGHT}
+                                                 </label>
+                                                 <input 
+                                                    type="text" 
+                                                    value={feedbackHeight}
+                                                    onChange={(e) => setFeedbackHeight(e.target.value)}
+                                                    className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-skate-neon outline-none"
+                                                    placeholder={result.heightEstimate}
+                                                />
+                                            </div>
                                         </div>
+
+                                        <button 
+                                            onClick={handleSendFeedback}
+                                            className="w-full py-3 bg-skate-neon text-black text-xs font-bold rounded-lg hover:bg-skate-neonHover shadow-lg mt-2"
+                                        >
+                                            {t.SEND_FEEDBACK}
+                                        </button>
                                     </div>
                                 )
                             ) : (

@@ -113,7 +113,7 @@ export const TRANSLATIONS = {
     AI_VISION_DESC: "Upload a photo or video to analyze your trick.",
     UPLOAD_MEDIA: "Upload Media",
     ANALYZE_TRICK: "Analyze Trick",
-    ANALYZING_MEDIA: "AI is analyzing...",
+    ANALYZING_MEDIA: "Tracking Skater & Board...",
     TRICK_DETECTED: "Trick Detected",
     FORM_SCORE: "Form Score",
     HEIGHT_EST: "Est. Height",
@@ -123,10 +123,15 @@ export const TRANSLATIONS = {
     FILE_TOO_LARGE: "File is too large. Please use video under 20MB.",
     ENTER_TRICK_NAME: "Trick Name (Optional)",
     TRICK_NAME_DESC: "Providing the trick name helps accuracy. If left blank, AI may guess incorrectly.",
-    WRONG_ANALYSIS: "Result incorrect?",
-    PROVIDE_FEEDBACK: "What was the actual trick?",
+    WRONG_ANALYSIS: "Report Issue",
+    PROVIDE_FEEDBACK: "Help us improve. What was wrong?",
+    ACTUAL_TRICK_NAME: "Actual Trick Name",
+    ACTUAL_HEIGHT: "Actual Height (e.g. 50cm)",
     SEND_FEEDBACK: "Send Feedback",
-    FEEDBACK_THANKS: "Thanks! We'll learn from this."
+    FEEDBACK_THANKS: "Thanks! We'll learn from this.",
+    SELECT_YOUR_STANCE: "Select Your Stance",
+    SELECT_STANCE_DESC: "Essential for detecting Fakie, Nollie, and Switch.",
+    TRACKING_BOARD: "Tracking Board Physics..."
   },
   KR: {
     NEW_SESSION: "새로운 세션",
@@ -236,7 +241,7 @@ export const TRANSLATIONS = {
     AI_VISION_DESC: "영상이나 사진을 올리면 AI가 자세를 분석해드립니다.",
     UPLOAD_MEDIA: "미디어 업로드",
     ANALYZE_TRICK: "트릭 분석하기",
-    ANALYZING_MEDIA: "AI가 분석 중입니다...",
+    ANALYZING_MEDIA: "스케이터와 보드를 추적 중...",
     TRICK_DETECTED: "감지된 트릭",
     FORM_SCORE: "자세 점수",
     HEIGHT_EST: "예상 높이",
@@ -247,9 +252,14 @@ export const TRANSLATIONS = {
     ENTER_TRICK_NAME: "기술 이름 (선택사항)",
     TRICK_NAME_DESC: "기술 이름을 적어주시면 더 정확하게 분석됩니다. 비워두면 AI가 잘못 인식할 수 있습니다.",
     WRONG_ANALYSIS: "결과가 다른가요?",
-    PROVIDE_FEEDBACK: "실제 기술 이름이 무엇인가요?",
+    PROVIDE_FEEDBACK: "AI 학습을 위해 정확한 정보를 알려주세요.",
+    ACTUAL_TRICK_NAME: "실제 기술 이름",
+    ACTUAL_HEIGHT: "실제 높이 (예: 50cm)",
     SEND_FEEDBACK: "피드백 보내기",
-    FEEDBACK_THANKS: "피드백 감사합니다! 학습에 반영하겠습니다."
+    FEEDBACK_THANKS: "피드백 감사합니다! 학습에 반영하겠습니다.",
+    SELECT_YOUR_STANCE: "내 스탠스 선택",
+    SELECT_STANCE_DESC: "페이키, 널리, 스위치를 구분하기 위해 꼭 필요합니다.",
+    TRACKING_BOARD: "보드 물리엔진 분석 중..."
   }
 };
 

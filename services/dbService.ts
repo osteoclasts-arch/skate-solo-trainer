@@ -1,5 +1,3 @@
-
-
 import { getFirestore, doc, setDoc, getDoc, collection, addDoc, getDocs, query, orderBy, Timestamp } from "firebase/firestore";
 import { app } from "./authService";
 import { SessionResult } from "../types";
@@ -103,13 +101,21 @@ export const dbService = {
    * Save Feedback for AI Vision
    */
   async saveVisionFeedback(uid: string | null, feedback: { 
-      predicted: string, 
-      actual: string, 
+      predictedName: string, 
+      predictedHeight: string,
+      actualName: string, 
+      actualHeight: string,
       comments?: string 
   }) {
       if (!db) return;
       try {
-          await addDoc(collection(db, "vision_feedback"), {
+          // If logged in, save to users/{uid}/vision_feedback (usually allowed)
+          // If guest, fallback to root vision_feedback (may be denied by rules, but we try)
+          const collectionRef = uid 
+            ? collection(db, "users", uid, "vision_feedback")
+            : collection(db, "vision_feedback");
+
+          await addDoc(collectionRef, {
               uid: uid || 'anonymous',
               ...feedback,
               timestamp: new Date().toISOString()

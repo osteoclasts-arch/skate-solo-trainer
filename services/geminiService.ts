@@ -1,4 +1,5 @@
 
+
 declare var process: {
   env: {
     API_KEY: string;
@@ -253,7 +254,7 @@ const fileToPart = (file: File): Promise<{ inlineData: { data: string; mimeType:
     });
 };
 
-export const analyzeMedia = async (file: File, language: Language, trickHint?: string): Promise<VisionAnalysis | null> => {
+export const analyzeMedia = async (file: File, language: Language, trickHint?: string, userStance: 'Regular' | 'Goofy' = 'Regular'): Promise<VisionAnalysis | null> => {
     if (!apiKey) return null;
 
     const ai = getAI();
@@ -265,51 +266,106 @@ export const analyzeMedia = async (file: File, language: Language, trickHint?: s
     }
 
     const mediaPart = await fileToPart(file);
-    const availableTricks = BASE_TRICKS.map(t => t.name).join(", ");
     
     const analysisSchema: Schema = {
         type: Type.OBJECT,
         properties: {
-            trickName: { type: Type.STRING, description: "Correct name of the trick (e.g. Fakie Kickflip, Half Cab)" },
+            trickName: { type: Type.STRING, description: "One of: OLLIE, KICKFLIP, HEELFLIP, POP_SHOVE_IT, FS_180_OLLIE, BS_180_OLLIE, UNKNOWN" },
             confidence: { type: Type.NUMBER, description: "0 to 100" },
-            formScore: { type: Type.NUMBER, description: "0 to 10" },
-            heightEstimate: { type: Type.STRING, description: "e.g. '50cm' or '20cm'. Be specific." },
-            postureAnalysis: { type: Type.STRING, description: "Details on shoulders, feet, weight distribution" },
-            landingAnalysis: { type: Type.STRING, description: "Cleanliness, toe drag, wheel bite" },
-            improvementTip: { type: Type.STRING, description: "Actionable advice" }
+            formScore: { type: Type.NUMBER, description: "0 to 100 (Integer)" },
+            heightEstimate: { type: Type.STRING, description: "e.g. '30cm'. Must be 0-50cm." },
+            postureAnalysis: { type: Type.STRING, description: "Analysis of knees, shoulders, and landing stability" },
+            landingAnalysis: { type: Type.STRING, description: "Cleanliness of landing (bolts, toe drag, etc)" },
+            improvementTip: { type: Type.STRING, description: "Strict corrective advice" }
         },
         required: ["trickName", "confidence", "formScore", "heightEstimate", "postureAnalysis", "landingAnalysis", "improvementTip"]
     };
 
     let hintInstruction = "";
     if (trickHint && trickHint.trim().length > 0) {
-        hintInstruction = `IMPORTANT: The user claims this trick is "${trickHint}". Verify if this is accurate, but prioritize your analysis. If it clearly is NOT that trick, correct them politely in the analysis. If it IS that trick, focus on grading the execution of that specific trick.`;
+        hintInstruction = `User claims this is: "${trickHint}". Verify strict compliance with definitions. If it does not match physically, reject the user's claim.`;
     }
 
     const prompt = `
-        You are an expert AI Skateboarding Coach.
-        Analyze this image or video clip frame-by-frame if possible.
-        Language: ${language === 'KR' ? 'Korean (Hangul)' : 'English'}.
-        
-        Reference Trick List: ${availableTricks}
+        You are a STRICT SKATEBOARDING REFEREE and PHYSICS ANALYZER.
+        Your job is to judge flatground tricks with conservative, data-driven precision.
+        Do NOT guess. If unsure, output UNKNOWN.
+
+        USER PROFILE:
+        - Natural Stance: ${userStance}
+        - Language Output: ${language === 'KR' ? 'Korean (Hangul)' : 'English'}
         ${hintInstruction}
 
-        Steps:
-        1. Identify the Stance (Regular, Fakie, Nollie, Switch). Look at foot positioning and movement direction.
-        2. Identify the Board Rotation (Shuvit, 180, 360) and Body Rotation.
-        3. Identify the Flip (Kickflip, Heelflip, etc).
-        4. Combine them to name the trick correctly (e.g., "Half Cab Flip", "Nollie Tre Flip").
-        5. Estimate the maximum height of the board in CM (centimeters). Be realistic.
+        ===================================================
+        GOLD STANDARD BENCHMARKS (REFERENCE)
+        ===================================================
+        1. PERFECT GOOFY OLLIE (Score: 90+, Height: 40cm+):
+           - Rider pops with Left Foot (Back), slides Right Foot (Front).
+           - Board stays strictly vertical under feet (NO flip, NO rotation).
+           - High pop, board sticks to feet at peak.
         
-        Tasks:
-        - Name the trick exactly.
-        - Rate form 0-10.
-        - Estimate Pop Height in CM.
-        - Analyze Posture.
-        - Analyze Landing.
-        - Give 1 Pro Tip.
+        2. PERFECT GOOFY KICKFLIP (Score: 90+, Height: 30cm+):
+           - Rider pops with Left Foot.
+           - Right Foot (Front) flicks off the TOE side edge.
+           - Board rotates 360 degrees along the long axis (heel over toe).
+           - Catch happens in the air.
 
-        Respond in JSON format.
+        ===================================================
+        JUDGING RULES (FOLLOW STRICTLY)
+        ===================================================
+        
+        [TRICK DEFINITIONS]
+        1. OLLIE:
+           - Board & Rider jump up.
+           - NO lateral flip.
+           - NO vertical axis rotation (< 10 deg allowed).
+           - Body rotation < 90 deg.
+        
+        2. KICKFLIP:
+           - Board flips laterally (Toe-side flick).
+           - Full 360 flip rotation required.
+        
+        3. HEELFLIP:
+           - Board flips laterally (Heel-side flick).
+           - Full 360 flip rotation required.
+        
+        4. POP_SHOVE_IT:
+           - Board rotates ~180 degrees on vertical axis (Spin).
+           - NO lateral flip.
+           - Body does NOT rotate.
+        
+        5. FS_180_OLLIE:
+           - Board does NOT spin independently.
+           - Rider + Board rotate together ~180 degrees Frontside (Chest forward).
+        
+        6. BS_180_OLLIE:
+           - Board does NOT spin independently.
+           - Rider + Board rotate together ~180 degrees Backside (Back forward).
+
+        [SCORING RUBRIC]
+        
+        1. jump_height_cm (Conservative Estimate):
+           - Range: 0 - 50 cm.
+           - 0-10cm: Low (POOR)
+           - 10-30cm: Medium (AVERAGE)
+           - 30-50cm: High (PRO)
+           - Do not exaggerate. If barely off ground, say 5cm.
+
+        2. posture_score (0-100):
+           - 0-40 (Bad): Heavy stumble, toe drag, fall, or very low height.
+           - 40-70 (Average): Landed but sketchy, stiff knees, hunchback.
+           - 70-100 (Good): Bolt landing, deep knee bend, no wobble, high style.
+
+        ===================================================
+        ANALYSIS STEPS
+        ===================================================
+        1. Determine Stance Context (Normal vs Fakie/Nollie/Switch) based on ${userStance} and movement direction.
+        2. Analyze Board Physics: Did it Flip? Did it Spin? Did Body Rotate?
+        3. Match to [TRICK DEFINITIONS].
+        4. Estimate Height conservatively (0-50cm).
+        5. Judge Posture (0-100).
+        
+        Output JSON only.
     `;
 
     try {
@@ -321,7 +377,8 @@ export const analyzeMedia = async (file: File, language: Language, trickHint?: s
             },
             config: {
                 responseMimeType: "application/json",
-                responseSchema: analysisSchema
+                responseSchema: analysisSchema,
+                temperature: 0, // Zero temperature for strict, deterministic judging
             }
         });
 
