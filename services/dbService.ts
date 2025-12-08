@@ -1,4 +1,5 @@
 
+
 import { getFirestore, doc, setDoc, getDoc, collection, addDoc, getDocs, query, orderBy, Timestamp } from "firebase/firestore";
 import { app } from "./authService";
 import { SessionResult } from "../types";
@@ -96,5 +97,25 @@ export const dbService = {
     } catch (error) {
         console.error("Error requesting pro verification:", error);
     }
+  },
+
+  /**
+   * Save Feedback for AI Vision
+   */
+  async saveVisionFeedback(uid: string | null, feedback: { 
+      predicted: string, 
+      actual: string, 
+      comments?: string 
+  }) {
+      if (!db) return;
+      try {
+          await addDoc(collection(db, "vision_feedback"), {
+              uid: uid || 'anonymous',
+              ...feedback,
+              timestamp: new Date().toISOString()
+          });
+      } catch (e) {
+          console.error("Error saving feedback", e);
+      }
   }
 };

@@ -1,11 +1,12 @@
 
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Language, VisionAnalysis } from '../types';
 import { TRANSLATIONS } from '../constants';
-import { Upload, Camera, Zap, AlertTriangle, Play, X, Eye, Rewind, FastForward } from 'lucide-react';
+import { Upload, Zap, AlertTriangle, Play, X, Eye, Video, Edit2, CheckCircle, HelpCircle } from 'lucide-react';
 import { analyzeMedia } from '../services/geminiService';
+import { dbService } from '../services/dbService';
 import mpPose from '@mediapipe/pose';
-import * as drawingUtils from '@mediapipe/drawing_utils';
 
 // Manually define POSE_CONNECTIONS to avoid import issues with CDN builds
 const POSE_CONNECTIONS: [number, number][] = [
@@ -29,11 +30,18 @@ const AIVision: React.FC<Props> = ({ language }) => {
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
+  // Input & Feedback State
+  const [trickHint, setTrickHint] = useState('');
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [feedbackInput, setFeedbackInput] = useState('');
+  const [feedbackSent, setFeedbackSent] = useState(false);
+
   // Video & Motion Tracking Refs
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [playbackRate, setPlaybackRate] = useState(1.0);
-  const [pose, setPose] = useState<any>(null); // Use any to avoid type issues with the dynamic import
+  const [playbackRate, setPlaybackRate] = useState(0.5); // Default to Slow Motion
+  const [pose, setPose] = useState<any>(null);
+  const [isTrackerReady, setIsTrackerReady] = useState(false);
   const requestRef = useRef<number>(0);
 
   useEffect(() => {
@@ -57,12 +65,52 @@ const AIVision: React.FC<Props> = ({ language }) => {
     // Use onResults callback
     poseInstance.onResults(onResults);
     setPose(poseInstance);
+    setIsTrackerReady(true);
 
     return () => {
         if (requestRef.current) cancelAnimationFrame(requestRef.current);
         poseInstance.close();
     };
   }, []);
+
+  const drawSkeleton = (ctx: CanvasRenderingContext2D, landmarks: any[]) => {
+    const width = ctx.canvas.width;
+    const height = ctx.canvas.height;
+
+    // Draw Connections
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#E3FF37'; // Skate Neon
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    POSE_CONNECTIONS.forEach(([i, j]) => {
+      const p1 = landmarks[i];
+      const p2 = landmarks[j];
+      
+      // Check visibility to avoid drawing low-confidence points
+      if (p1 && p2 && (p1.visibility === undefined || p1.visibility > 0.5) && (p2.visibility === undefined || p2.visibility > 0.5)) {
+        ctx.beginPath();
+        ctx.moveTo(p1.x * width, p1.y * height);
+        ctx.lineTo(p2.x * width, p2.y * height);
+        ctx.stroke();
+      }
+    });
+
+    // Draw Landmarks (Joints)
+    ctx.fillStyle = '#FFFFFF';
+    landmarks.forEach((p) => {
+      if (p.visibility === undefined || p.visibility > 0.5) {
+        ctx.beginPath();
+        ctx.arc(p.x * width, p.y * height, 4, 0, 2 * Math.PI);
+        ctx.fill();
+        
+        // Add a subtle glow/border
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+        ctx.stroke();
+      }
+    });
+  };
 
   const onResults = (results: any) => {
       const canvas = canvasRef.current;
@@ -72,31 +120,17 @@ const AIVision: React.FC<Props> = ({ language }) => {
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
-      // Match canvas size to video display size
-      canvas.width = video.clientWidth;
-      canvas.height = video.clientHeight;
+      // Ensure canvas matches the video source dimensions exactly for correct overlay
+      if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+      }
 
       ctx.save();
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       
-      // Draw Skeleton
       if (results.poseLandmarks) {
-          // Customize drawing style
-          // Connectors
-          if (drawingUtils && drawingUtils.drawConnectors) {
-            drawingUtils.drawConnectors(ctx, results.poseLandmarks, POSE_CONNECTIONS, { 
-                color: '#E3FF37', // Skate Neon
-                lineWidth: 2 
-            });
-          }
-          // Landmarks (Joints)
-          if (drawingUtils && drawingUtils.drawLandmarks) {
-            drawingUtils.drawLandmarks(ctx, results.poseLandmarks, { 
-                color: '#FFFFFF', 
-                lineWidth: 1,
-                radius: 3
-            });
-          }
+          drawSkeleton(ctx, results.poseLandmarks);
       }
       ctx.restore();
   };
@@ -134,7 +168,11 @@ const AIVision: React.FC<Props> = ({ language }) => {
         setPreviewUrl(URL.createObjectURL(selectedFile));
         setResult(null);
         setError(null);
-        setPlaybackRate(1.0);
+        setFeedbackSent(false);
+        setShowFeedback(false);
+        
+        // Default to Slow Motion for analysis
+        setPlaybackRate(0.5);
     }
   };
 
@@ -142,9 +180,12 @@ const AIVision: React.FC<Props> = ({ language }) => {
       if (!file) return;
       setIsAnalyzing(true);
       setError(null);
+      setFeedbackSent(false);
+      setShowFeedback(false);
       
       try {
-          const analysis = await analyzeMedia(file, language);
+          // Pass the trickHint to the service
+          const analysis = await analyzeMedia(file, language, trickHint);
           if (analysis) {
               setResult(analysis);
           } else {
@@ -158,11 +199,26 @@ const AIVision: React.FC<Props> = ({ language }) => {
       }
   };
 
+  const handleSendFeedback = async () => {
+      if (!result || !feedbackInput) return;
+      // In a real app, this would get the actual user ID
+      await dbService.saveVisionFeedback(null, {
+          predicted: result.trickName,
+          actual: feedbackInput
+      });
+      setFeedbackSent(true);
+      setShowFeedback(false);
+  };
+
   const reset = () => {
       setFile(null);
       setPreviewUrl(null);
       setResult(null);
       setError(null);
+      setTrickHint('');
+      setShowFeedback(false);
+      setFeedbackSent(false);
+      setFeedbackInput('');
       if (fileInputRef.current) fileInputRef.current.value = '';
       if (requestRef.current) cancelAnimationFrame(requestRef.current);
   };
@@ -209,33 +265,48 @@ const AIVision: React.FC<Props> = ({ language }) => {
                 <div className="relative rounded-3xl overflow-hidden border border-white/10 shadow-2xl bg-black">
                     <button 
                         onClick={reset}
-                        className="absolute top-4 right-4 z-20 bg-black/50 p-2 rounded-full hover:bg-black/80 text-white"
+                        className="absolute top-4 right-4 z-30 bg-black/50 p-2 rounded-full hover:bg-black/80 text-white"
                     >
                         <X className="w-5 h-5" />
                     </button>
                     
-                    <div className="relative w-full aspect-video bg-black flex items-center justify-center">
+                    {/* Media Container - Matches Aspect Ratio */}
+                    <div className="relative w-full aspect-video bg-black flex items-center justify-center overflow-hidden">
                         {file?.type.startsWith('video') ? (
                             <>
+                                {/* Video Element */}
                                 <video 
                                     ref={videoRef}
                                     src={previewUrl} 
-                                    controls={false} // Custom controls below
-                                    className="absolute inset-0 w-full h-full object-contain" 
+                                    controls={false} 
+                                    className="absolute inset-0 w-full h-full object-contain z-10" 
                                     onPlay={handleVideoPlay}
                                     onPause={handleVideoPause}
+                                    onLoadedMetadata={() => {
+                                        if(videoRef.current) videoRef.current.playbackRate = playbackRate;
+                                    }}
                                     loop
                                     playsInline
                                     crossOrigin="anonymous"
                                 />
+                                {/* Skeleton Overlay Canvas - Matches Video Dimensions via object-contain logic */}
                                 <canvas 
                                     ref={canvasRef}
-                                    className="absolute inset-0 w-full h-full pointer-events-none z-10"
+                                    className="absolute inset-0 w-full h-full object-contain z-20 pointer-events-none"
                                 />
+                                
+                                {/* Status Indicator */}
+                                {isTrackerReady && (
+                                    <div className="absolute top-4 left-4 z-20 px-3 py-1 bg-black/60 backdrop-blur rounded-full flex items-center space-x-2 border border-skate-neon/30">
+                                        <div className="w-2 h-2 bg-skate-neon rounded-full animate-pulse"></div>
+                                        <span className="text-[10px] text-white font-bold uppercase tracking-widest">Motion AI Active</span>
+                                    </div>
+                                )}
+
                                 {/* Play Button Overlay */}
-                                <div className="absolute bottom-4 left-0 right-0 flex justify-center space-x-4 z-20 pointer-events-auto">
-                                    <button onClick={() => { if(videoRef.current) videoRef.current.paused ? videoRef.current.play() : videoRef.current.pause() }} className="p-3 bg-black/60 rounded-full text-white hover:bg-skate-neon hover:text-black transition-colors">
-                                        <Play className="w-5 h-5 fill-current" />
+                                <div className="absolute bottom-4 left-0 right-0 flex justify-center space-x-4 z-30 pointer-events-auto">
+                                    <button onClick={() => { if(videoRef.current) videoRef.current.paused ? videoRef.current.play() : videoRef.current.pause() }} className="p-3 bg-black/60 rounded-full text-white hover:bg-skate-neon hover:text-black transition-colors backdrop-blur-md">
+                                        <Play className="w-6 h-6 fill-current" />
                                     </button>
                                 </div>
                             </>
@@ -246,7 +317,7 @@ const AIVision: React.FC<Props> = ({ language }) => {
 
                     {/* Analyzing Overlay */}
                     {isAnalyzing && (
-                        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center z-30">
+                        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center z-40">
                             <div className="relative mb-4">
                                 <div className="absolute inset-0 bg-skate-neon/50 blur-xl rounded-full animate-pulse"></div>
                                 <Zap className="w-12 h-12 text-skate-neon relative z-10 animate-bounce" />
@@ -260,15 +331,16 @@ const AIVision: React.FC<Props> = ({ language }) => {
 
                 {/* Video Controls (Speed) */}
                 {file?.type.startsWith('video') && (
-                    <div className="flex justify-center space-x-2">
+                    <div className="flex justify-center items-center space-x-2 bg-white/5 p-2 rounded-2xl w-fit mx-auto border border-white/5">
+                        <Video className="w-4 h-4 text-gray-500 mr-2" />
                         {[0.25, 0.5, 1.0].map(rate => (
                             <button
                                 key={rate}
                                 onClick={() => changePlaybackRate(rate)}
                                 className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider border transition-all ${
                                     playbackRate === rate 
-                                    ? 'bg-skate-neon text-black border-skate-neon' 
-                                    : 'bg-white/5 text-gray-400 border-white/5 hover:bg-white/10'
+                                    ? 'bg-skate-neon text-black border-skate-neon shadow-[0_0_10px_rgba(204,255,0,0.3)]' 
+                                    : 'bg-black/20 text-gray-400 border-transparent hover:bg-white/10'
                                 }`}
                             >
                                 {rate}x
@@ -285,15 +357,38 @@ const AIVision: React.FC<Props> = ({ language }) => {
                     </div>
                 )}
 
-                {/* Action Button */}
+                {/* ACTION AREA: Input & Button */}
                 {!result && !isAnalyzing && (
-                    <button 
-                        onClick={handleAnalyze}
-                        className="w-full py-4 bg-skate-neon text-black rounded-2xl font-display text-2xl font-bold uppercase tracking-wider hover:bg-skate-neonHover transition-all shadow-[0_0_20px_rgba(204,255,0,0.3)] active:scale-95 flex items-center justify-center space-x-2"
-                    >
-                        <Zap className="w-5 h-5 fill-black" />
-                        <span>{t.ANALYZE_TRICK}</span>
-                    </button>
+                    <div className="space-y-4">
+                        {/* Trick Name Input & Disclaimer */}
+                        <div className="glass-card p-4 rounded-2xl border border-white/10">
+                            <div className="flex items-center space-x-2 mb-2 text-gray-400">
+                                <Edit2 className="w-4 h-4" />
+                                <span className="text-xs font-bold uppercase tracking-widest">{t.ENTER_TRICK_NAME}</span>
+                            </div>
+                            <input 
+                                type="text" 
+                                value={trickHint}
+                                onChange={(e) => setTrickHint(e.target.value)}
+                                placeholder="e.g. Kickflip, Hardflip..."
+                                className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white text-sm focus:border-skate-neon outline-none placeholder-gray-600 mb-2"
+                            />
+                            <div className="flex items-start space-x-2">
+                                <AlertTriangle className="w-3 h-3 text-yellow-500 mt-0.5 flex-shrink-0" />
+                                <p className="text-[10px] text-gray-500 leading-tight">
+                                    {t.TRICK_NAME_DESC}
+                                </p>
+                            </div>
+                        </div>
+
+                        <button 
+                            onClick={handleAnalyze}
+                            className="w-full py-4 bg-skate-neon text-black rounded-2xl font-display text-2xl font-bold uppercase tracking-wider hover:bg-skate-neonHover transition-all shadow-[0_0_20px_rgba(204,255,0,0.3)] active:scale-95 flex items-center justify-center space-x-2"
+                        >
+                            <Zap className="w-5 h-5 fill-black" />
+                            <span>{t.ANALYZE_TRICK}</span>
+                        </button>
+                    </div>
                 )}
 
                 {/* Results Card */}
@@ -345,6 +440,45 @@ const AIVision: React.FC<Props> = ({ language }) => {
                                     "{result.improvementTip}"
                                 </p>
                             </div>
+                        </div>
+
+                        {/* Feedback Section */}
+                        <div className="mt-4 pt-4 border-t border-white/5">
+                            {!feedbackSent ? (
+                                !showFeedback ? (
+                                    <button 
+                                        onClick={() => setShowFeedback(true)}
+                                        className="text-xs text-gray-500 hover:text-white transition-colors flex items-center space-x-1 mx-auto"
+                                    >
+                                        <HelpCircle className="w-3 h-3" />
+                                        <span>{t.WRONG_ANALYSIS}</span>
+                                    </button>
+                                ) : (
+                                    <div className="bg-white/5 p-4 rounded-xl animate-fade-in">
+                                        <p className="text-xs font-bold text-gray-400 mb-2">{t.PROVIDE_FEEDBACK}</p>
+                                        <div className="flex gap-2">
+                                            <input 
+                                                type="text" 
+                                                value={feedbackInput}
+                                                onChange={(e) => setFeedbackInput(e.target.value)}
+                                                className="flex-1 bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-skate-neon outline-none"
+                                                placeholder={result.trickName}
+                                            />
+                                            <button 
+                                                onClick={handleSendFeedback}
+                                                className="bg-skate-neon text-black text-xs font-bold px-4 rounded-lg hover:bg-skate-neonHover"
+                                            >
+                                                {t.SEND_FEEDBACK}
+                                            </button>
+                                        </div>
+                                    </div>
+                                )
+                            ) : (
+                                <div className="flex items-center justify-center space-x-2 text-green-400 py-2">
+                                    <CheckCircle className="w-4 h-4" />
+                                    <span className="text-xs font-bold">{t.FEEDBACK_THANKS}</span>
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}

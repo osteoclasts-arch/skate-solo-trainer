@@ -1,3 +1,4 @@
+
 declare var process: {
   env: {
     API_KEY: string;
@@ -252,7 +253,7 @@ const fileToPart = (file: File): Promise<{ inlineData: { data: string; mimeType:
     });
 };
 
-export const analyzeMedia = async (file: File, language: Language): Promise<VisionAnalysis | null> => {
+export const analyzeMedia = async (file: File, language: Language, trickHint?: string): Promise<VisionAnalysis | null> => {
     if (!apiKey) return null;
 
     const ai = getAI();
@@ -280,12 +281,18 @@ export const analyzeMedia = async (file: File, language: Language): Promise<Visi
         required: ["trickName", "confidence", "formScore", "heightEstimate", "postureAnalysis", "landingAnalysis", "improvementTip"]
     };
 
+    let hintInstruction = "";
+    if (trickHint && trickHint.trim().length > 0) {
+        hintInstruction = `IMPORTANT: The user claims this trick is "${trickHint}". Verify if this is accurate, but prioritize your analysis. If it clearly is NOT that trick, correct them politely in the analysis. If it IS that trick, focus on grading the execution of that specific trick.`;
+    }
+
     const prompt = `
         You are an expert AI Skateboarding Coach.
         Analyze this image or video clip frame-by-frame if possible.
         Language: ${language === 'KR' ? 'Korean (Hangul)' : 'English'}.
         
         Reference Trick List: ${availableTricks}
+        ${hintInstruction}
 
         Steps:
         1. Identify the Stance (Regular, Fakie, Nollie, Switch). Look at foot positioning and movement direction.
