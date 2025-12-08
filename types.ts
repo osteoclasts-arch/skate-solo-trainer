@@ -99,14 +99,27 @@ export interface AnalyticsInsight {
   aiFeedback: string;
 }
 
+// Updated Vision Analysis Type matching the new requirements
 export interface VisionAnalysis {
-  trickName: string;
-  confidence: number;
-  formScore: number; // 0-10
-  heightEstimate: string; // e.g., "30cm" or "High"
-  postureAnalysis: string;
-  landingAnalysis: string;
-  improvementTip: string;
+  id: string;
+  timestamp: string;
+  trickName: string; // e.g., "Kickflip"
+  isLanded: boolean;
+  confidence: number; // 0.0 - 1.0
+  score: number; // 0 - 100
+  heightMeters: number; // e.g., 0.45
+  rotationDegrees: number; // e.g., 180
+  videoUrl?: string; // Optional if we store it
+  
+  // AI Coaching Feedback
+  feedbackText?: string; 
+  improvementTip?: string; 
+
+  // Legacy fields for backward compatibility if needed
+  formScore?: number; 
+  heightEstimate?: string; 
+  postureAnalysis?: string; 
+  landingAnalysis?: string; 
 }
 
 export type ViewState = 'DASHBOARD' | 'ANALYTICS' | 'SETUP' | 'ACTIVE_SESSION' | 'SUMMARY' | 'LEARNING' | 'AI_VISION';

@@ -1,6 +1,7 @@
+
 import { getFirestore, doc, setDoc, getDoc, collection, addDoc, getDocs, query, orderBy, Timestamp } from "firebase/firestore";
 import { app } from "./authService";
-import { SessionResult } from "../types";
+import { SessionResult, VisionAnalysis } from "../types";
 
 // Initialize Firestore only if app is initialized
 const db = app ? getFirestore(app) : null;
@@ -50,10 +51,7 @@ export const dbService = {
   async saveSession(uid: string, session: SessionResult) {
     if (!db) return;
     try {
-      // Create a reference to the sessions subcollection
       const sessionsRef = collection(db, "users", uid, "sessions");
-      // Add the session document. We use the session ID as the doc ID or let Firestore generate one.
-      // Using session.id (timestamp) is fine, but ensuring it's a string.
       await setDoc(doc(sessionsRef, session.id), session);
     } catch (error) {
       console.error("Error saving session:", error);
@@ -81,9 +79,6 @@ export const dbService = {
     }
   },
 
-  /**
-   * Request Pro Verification
-   */
   async requestProVerification(uid: string) {
     if (!db) return;
     try {
@@ -97,20 +92,11 @@ export const dbService = {
     }
   },
 
-  /**
-   * Save Feedback for AI Vision
-   */
-  async saveVisionFeedback(uid: string | null, feedback: { 
-      predictedName: string, 
-      predictedHeight: string,
-      actualName: string, 
-      actualHeight: string,
-      comments?: string 
-  }) {
+  // --- VISION FEEDBACK & ANALYSIS ---
+
+  async saveVisionFeedback(uid: string | null, feedback: any) {
       if (!db) return;
       try {
-          // If logged in, save to users/{uid}/vision_feedback (usually allowed)
-          // If guest, fallback to root vision_feedback (may be denied by rules, but we try)
           const collectionRef = uid 
             ? collection(db, "users", uid, "vision_feedback")
             : collection(db, "vision_feedback");
@@ -122,6 +108,19 @@ export const dbService = {
           });
       } catch (e) {
           console.error("Error saving feedback", e);
+      }
+  },
+
+  /**
+   * Save a full analysis result to the user's history
+   */
+  async saveAnalysisResult(uid: string, analysis: VisionAnalysis) {
+      if (!db) return;
+      try {
+          const collectionRef = collection(db, "users", uid, "analysis_history");
+          await setDoc(doc(collectionRef, analysis.id), analysis);
+      } catch (e) {
+          console.error("Error saving analysis result", e);
       }
   }
 };

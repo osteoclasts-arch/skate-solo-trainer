@@ -1,5 +1,4 @@
 
-
 declare var process: {
   env: {
     API_KEY: string;
@@ -254,113 +253,63 @@ const fileToPart = (file: File): Promise<{ inlineData: { data: string; mimeType:
     });
 };
 
-export const analyzeMedia = async (file: File, language: Language, trickHint?: string, userStance: 'Regular' | 'Goofy' = 'Regular'): Promise<VisionAnalysis | null> => {
-    if (!apiKey) return null;
+// --- NEW FUNCTION: Generate Feedback based on Vision Analysis ---
 
-    const ai = getAI();
-    
-    // Check file size (client-side safety check)
-    // 20MB limit
-    if (file.size > 20 * 1024 * 1024) {
-        throw new Error("File too large");
-    }
-
-    const mediaPart = await fileToPart(file);
-    
-    const analysisSchema: Schema = {
-        type: Type.OBJECT,
-        properties: {
-            trickName: { type: Type.STRING, description: "One of: OLLIE, KICKFLIP, HEELFLIP, POP_SHOVE_IT, FS_180_OLLIE, BS_180_OLLIE, UNKNOWN" },
-            confidence: { type: Type.NUMBER, description: "0 to 100" },
-            formScore: { type: Type.NUMBER, description: "0 to 100 (Integer)" },
-            heightEstimate: { type: Type.STRING, description: "e.g. '30cm'. Must be 0-50cm." },
-            physicsReasoning: { type: Type.STRING, description: "Detailed check: Did board flip? Did board spin? Did body rotate? WHY is it this trick?" },
-            postureAnalysis: { type: Type.STRING, description: "Analysis of knees, shoulders, and landing stability" },
-            landingAnalysis: { type: Type.STRING, description: "Cleanliness of landing (bolts, toe drag, etc)" },
-            improvementTip: { type: Type.STRING, description: "Strict corrective advice" }
-        },
-        required: ["trickName", "confidence", "formScore", "heightEstimate", "physicsReasoning", "postureAnalysis", "landingAnalysis", "improvementTip"]
+export const generateCoachingFeedback = async (
+    analysis: VisionAnalysis, 
+    language: Language
+): Promise<{ feedback: string, tips: string }> => {
+    if (!apiKey) return { 
+        feedback: "AI Key missing. Good job trying!", 
+        tips: "Keep practicing." 
     };
 
-    let hintInstruction = "";
-    if (trickHint && trickHint.trim().length > 0) {
-        hintInstruction = `User claims this is: "${trickHint}". Verify strict compliance with definitions. If it does not match physically, reject the user's claim.`;
-    }
+    const ai = getAI();
 
+    // Prepare context for the prompt based on numerical data
     const prompt = `
-        You are a STRICT SKATEBOARDING REFEREE and PHYSICS ANALYZER.
-        Your job is to judge flatground tricks with conservative, data-driven precision.
-        Do NOT guess. If unsure, output UNKNOWN.
-
-        USER PROFILE:
-        - Natural Stance: ${userStance}
-        - Language Output: ${language === 'KR' ? 'Korean (Hangul)' : 'English'}
-        ${hintInstruction}
-
-        ===================================================
-        CRITICAL: OLLIE VS KICKFLIP DISTINCTION
-        ===================================================
-        Common Error: Mistaking a stylish Ollie (where the rider kicks their foot out) for a Kickflip.
+        You are a professional skateboard coach. A computer vision model has analyzed a user's trick video.
+        Provide detailed, helpful, and specific feedback based on the data.
         
-        1. OLLIE CHECKLIST (MUST MEET ALL):
-           - [ ] The board stays relatively flat (grip tape up) or goes vertical (rocket).
-           - [ ] The board NEVER flips upside down.
-           - [ ] The board NEVER reveals its graphic side to the sky during the peak.
-           - [ ] Board rotation on Roll axis = 0 degrees.
-        
-        2. KICKFLIP CHECKLIST (MUST MEET ALL):
-           - [ ] The board rotates 360 degrees on its Roll axis.
-           - [ ] You MUST see the graphic (bottom) of the board facing up at some point.
-           - [ ] If you do not clearly see the graphic side, IT IS NOT A FLIP. It is an Ollie.
+        Language: Korean (Hangul).
 
-        ===================================================
-        TRICK DEFINITIONS
-        ===================================================
-        1. OLLIE: Jump with board. No flip. No spin.
-        2. KICKFLIP: Full 360 lateral flip (Toe-side).
-        3. HEELFLIP: Full 360 lateral flip (Heel-side).
-        4. POP_SHOVE_IT: 180 vertical spin. No flip.
-        5. FS_180_OLLIE: Body + Board rotate 180 Frontside.
-        6. BS_180_OLLIE: Body + Board rotate 180 Backside.
+        Analysis Data:
+        - Trick: ${analysis.trickName}
+        - Outcome: ${analysis.isLanded ? "Success (Landed)" : "Failed (Bailed)"}
+        - Score: ${analysis.score}/100 (Where 100 is pro perfect, 0 is terrible)
+        - Jump Height: ${analysis.heightMeters}m
+        ${analysis.rotationDegrees > 0 ? `- Rotation: ${analysis.rotationDegrees} degrees` : ''}
 
-        [SCORING RUBRIC]
-        1. jump_height_cm: Conservative 0-50cm.
-        2. posture_score: 0-100 based on style/stability.
+        Instructions:
+        1. "feedback": A 2-3 sentence summary of what went right or wrong based on the score and success. Be encouraging but technical.
+        2. "tips": 2-3 bullet points on specific things to focus on for the next attempt (e.g. pop harder, level out, shoulders).
 
-        ===================================================
-        ANALYSIS PROCEDURE (CHAIN OF THOUGHT)
-        ===================================================
-        1. **Board Identification**: Locate the skateboard.
-        2. **Physics Verification**:
-           - Did the board rotate on the Y-axis (Spin)?
-           - Did the board rotate on the X-axis (Flip)? -> IF NO FLIP DETECTED, IT IS AN OLLIE.
-        3. **Body Verification**: Did the rider's chest/back rotate 180?
-        4. **Classify**: Assign trick name based on physics.
-        5. **Report**: Fill 'physicsReasoning' with your findings (e.g., "Board lifted but did not rotate X-axis. Grip tape remained visible. Classified as Ollie.").
-
-        Output JSON only.
+        Output JSON: { "feedback": string, "tips": string }
     `;
 
     try {
         const response = await ai.models.generateContent({
             model: "gemini-2.5-flash",
-            contents: {
-                role: 'user',
-                parts: [mediaPart, { text: prompt }]
-            },
+            contents: prompt,
             config: {
                 responseMimeType: "application/json",
-                responseSchema: analysisSchema,
-                temperature: 0, // Zero temperature for strict, deterministic judging
             }
         });
 
         if (response.text) {
-            return JSON.parse(response.text) as VisionAnalysis;
+             const json = JSON.parse(response.text);
+             return { feedback: json.feedback, tips: json.tips };
         }
-        return null;
+        return { feedback: "분석을 완료했습니다.", tips: "꾸준히 연습하세요." };
     } catch (error) {
-        console.error("Error analyzing media:", error);
-        return null;
+        console.error("Error generating coaching feedback:", error);
+        return { feedback: "AI 피드백 생성 실패.", tips: "다시 시도해주세요." };
     }
+};
+
+// Deprecated or Legacy functions below if any...
+export const analyzeMedia = async (file: File, language: Language, trickHint?: string, userStance: 'Regular' | 'Goofy' = 'Regular'): Promise<VisionAnalysis | null> => {
+    // This function can remain as a legacy wrapper or be removed if fully replaced. 
+    // For now, I'll leave it to avoid breaking other imports, but return null so the new flow is used.
+    return null; 
 };
