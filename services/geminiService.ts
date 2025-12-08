@@ -282,47 +282,66 @@ export const analyzeMedia = async (
         : "";
 
     const prompt = `
-        You are a strict Skateboard Competition Judge (Referee) and a helpful Coach.
-        Analyze the video to classify the trick.
+# Role
+You are the world's most precise AI Skateboard Trick Analyst and Competition Judge. Your goal is to identify the exact name of the skateboard trick in the video by analyzing the physics of the board and the rider's interaction with obstacles.
 
-        [STRICT SIDE-VIEW PHYSICS RULES]
-        1. OLLIE:
-           - Board Thickness Change is LOW (Remains a thin line).
-           - Board Length Change is LOW (Does not shorten/spin).
-           - Board does NOT flip or spin.
-        2. KICKFLIP / HEELFLIP:
-           - Board Thickness Change is HIGH (Spikes > 1.5x as the flat deck faces the camera).
-           - Board Length Change is LOW (Does not point at camera).
-           - Visual Cue: FLICK OUTWARD vs DOWNWARD.
-        3. SHUVIT / POP SHUVIT:
-           - Board Thickness Change is LOW (Remains relatively flat).
-           - Board Length Change is HIGH (Shortens significantly < 0.7x as it turns 90 degrees).
-           - Visual Cue: SCOOP BACKWARD.
-        4. TRE FLIP / VARIAL:
-           - BOTH Thickness (Flip) and Length (Spin) changes are HIGH.
+# Analysis Logic (Chain of Thought)
+You must analyze the video step-by-step in the following order. Do not jump to a conclusion until you have evaluated all factors.
 
-        [INPUT CONTEXT]
-        User Hint (Self-reported): ${trickHint || "None"} (Use this as a strong prior).
-        User History: ${contextStr}
-        Candidates: [${allTricks}]
+## STEP 1: Stance & Pop Mechanism
+- Analyze which foot pops the board (Back foot vs. Front foot).
+- Determine the approach (Forward or Backward/Fakie).
+- Identify the starting stance context if possible (Ollie, Nollie, Fakie, Switch).
 
-        [TASK]
-        1. Classify the trick based on the physics rules above + visual motion.
-           - If unclear, return "UNKNOWN".
-        2. Even if UNKNOWN, you MUST estimate jump height and score.
-        3. Score (0-100) based on landing cleanliness and height.
-        4. **CRITICAL:** The 'feedbackText' and 'improvementTip' MUST be in KOREAN (Hangul).
+## STEP 2: Board Dynamics (CRITICAL)
+Analyze the board's rotation on 3 axes INDEPENDENTLY from the rider's body:
+1. **Flip Axis (X-axis):** Does the board flip along its length? (e.g., Kickflip, Heelflip)
+2. **Shove-it Axis (Y-axis):** Does the board spin horizontally? (e.g., Shove-it, 360 Shove-it)
+3. **Combined:** Is it a combination? (e.g., Kickflip + 360 Shove-it = Tre Flip/360 Flip)
+   - *Warning:* If the board flips but the body also rotates 180, check if it's a "Sex Change/Body Varial" or a "180 Flip".
 
-        Output JSON format:
-        {
-            "trickName": "string",
-            "confidence": number,
-            "score": number,
-            "heightMeters": number,
-            "rotationDegrees": number,
-            "feedbackText": "string (MUST BE KOREAN)",
-            "improvementTip": "string (MUST BE KOREAN)"
-        }
+## STEP 3: Body Dynamics
+- Does the rider's body rotate? (180, 360, etc.)
+- Does the body rotate in the SAME direction as the board, or OPPOSITE? (e.g., Bigspin vs. Varial)
+- *Crucial Check:* If the body rotates but the board does NOT flip, it is a rotation trick (e.g., Frontside 180). If the board flips while the body rotates, it is a flip variation (e.g., Frontside Flip).
+
+## STEP 4: Obstacle Interaction (If applicable)
+- Is the rider interacting with a rail, ledge, or coping?
+- **Trucks:** Are the trucks touching? (50-50, 5-0, Nosegrind, K-Grind/Crooked)
+- **Deck/Wood:** Is the wood touching? (Boardslide, Lipslide, Noseslide, Tailslide)
+- *Differentiation:* Distinguish between Boardslide (rail between legs) and Lipslide (tail passes over rail).
+
+## STEP 5: Final Identification
+Combine findings from Steps 1-4 to name the trick. Use standard skateboarding terminology (e.g., "Nollie Tre Flip", "Backside Smith Grind").
+
+# Constraints & Rules
+- **Look at the Board First:** The board's movement defines the trick. The body style is secondary.
+- **Ignore "Style" Movements:** Do not confuse arm waving or pre-winding with the actual trick mechanics.
+- **Landing:** Check if the rider lands clean. If they land and revert immediately, note it, but identify the main trick first.
+- If the trick is ambiguous, list the two most likely possibilities and explain the visual evidence for the primary choice.
+
+# Input Context
+User Hint (Self-reported): ${trickHint || "None"}
+User History: ${contextStr}
+Possible Candidates: [${allTricks}]
+
+# Output Format
+You MUST return a JSON object with the following fields. 
+IMPORTANT: 'feedbackText' and 'improvementTip' MUST be in KOREAN (Hangul).
+
+{
+  "trickName": "String (The Final Trick Name from Step 5)",
+  "confidence": 0.0 to 1.0,
+  "stance_pop": "String (Analysis from Step 1)",
+  "board_rotation": "String (Analysis from Step 2)",
+  "body_rotation": "String (Analysis from Step 3)",
+  "obstacle_interaction": "String (Analysis from Step 4)",
+  "reasoning": "String (Brief explanation of why this is the specific trick)",
+  "score": 0-100 (Integer, based on cleanliness and height),
+  "heightMeters": 0.0-2.0 (Float, approximate jump height),
+  "feedbackText": "String (KOREAN: Detailed coaching feedback based on the analysis)",
+  "improvementTip": "String (KOREAN: One specific tip to improve technique)"
+}
     `;
 
     try {
@@ -346,12 +365,12 @@ export const analyzeMedia = async (
              return {
                  id: Date.now().toString(),
                  timestamp: new Date().toISOString(),
-                 trickName: data.trickName,
+                 trickName: data.trickName || data.trick_name || "UNKNOWN",
                  isLanded: data.score > 40,
                  confidence: data.confidence || 0.8,
                  score: data.score,
                  heightMeters: data.heightMeters,
-                 rotationDegrees: data.rotationDegrees || 0,
+                 rotationDegrees: 0, // Not explicitly returned by this prompt, default to 0
                  feedbackText: data.feedbackText,
                  improvementTip: data.improvementTip
              };
