@@ -106,7 +106,7 @@ const Dashboard: React.FC<Props> = ({
             </h1>
             
             {/* Instagram ID Sub-header */}
-            <a href="https://instagram.com/osteoclasts_" target="_blank" rel="noopener noreferrer" className="flex items-center space-x-1 mt-1 opacity-60 hover:opacity-100 transition-opacity">
+            <a href="https://instagram.com/osteoclasts_" target="_blank" rel="noopener noreferrer" className="flex items-center space-x-1 mt-1 opacity-60 hover:opacity-100 transition-opacity w-fit">
                 <Instagram className="w-3 h-3 text-skate-neon" />
                 <span className="text-xs font-bold text-gray-400 tracking-wider">@OSTEOCLASTS_</span>
             </a>
@@ -264,7 +264,7 @@ const Dashboard: React.FC<Props> = ({
             DESIGNED BY <span className="font-bold text-gray-300">@OSTEOCLASTS_</span>
           </span>
         </a>
-        <span className="text-[10px] text-gray-600 font-mono tracking-widest">v1.2.0</span>
+        <span className="text-[10px] text-gray-600 font-mono tracking-widest">v1.2.1</span>
       </div>
     </div>
   );

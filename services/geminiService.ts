@@ -238,13 +238,21 @@ const fileToPart = (file: File): Promise<{ inlineData: { data: string; mimeType:
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onloadend = () => {
+            if (!reader.result) {
+                reject(new Error("Failed to read file"));
+                return;
+            }
             const base64String = reader.result as string;
-            // Remove the data URL prefix (e.g., "data:image/jpeg;base64,")
-            const base64Data = base64String.split(',')[1];
+            // Robustly extract base64 data: check if comma exists before splitting
+            const base64Data = base64String.includes(',') 
+                ? base64String.split(',')[1] 
+                : base64String;
+            
             resolve({
                 inlineData: {
                     data: base64Data,
-                    mimeType: file.type
+                    // Provide fallback mimeType to prevent SDK errors if file.type is empty
+                    mimeType: file.type || 'video/mp4'
                 }
             });
         };
@@ -324,6 +332,7 @@ export const analyzeMedia = async (
     `;
 
     try {
+        if (!file) throw new Error("No file provided");
         const videoPart = await fileToPart(file);
 
         const response = await ai.models.generateContent({

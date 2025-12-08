@@ -32,6 +32,9 @@ class ObstacleTracker {
         }
 
         const roiH = height * 0.4; // Only scan bottom 40%
+        // Guard against invalid dimensions
+        if (roiH <= 0 || width <= 0 || height <= 0) return this.detectedObstacles;
+
         const startY = height - roiH;
         
         try {
@@ -150,13 +153,18 @@ class BoardTracker {
         try {
             // Check bounds
             if (centerX < 0 || centerX > width || centerY < 0 || centerY > height) return;
+            if (sampleSize <= 0) return;
 
-            const frame = ctx.getImageData(
-                Math.max(0, centerX - sampleSize/2), 
-                Math.max(0, centerY - sampleSize/2), 
-                sampleSize, 
-                sampleSize
-            );
+            // Ensure we don't request pixels outside canvas
+            const sx = Math.max(0, centerX - sampleSize/2);
+            const sy = Math.max(0, centerY - sampleSize/2);
+            // safe width/height ensuring we don't go out of bounds
+            const sw = Math.min(sampleSize, width - sx);
+            const sh = Math.min(sampleSize, height - sy);
+
+            if (sw <= 0 || sh <= 0) return;
+
+            const frame = ctx.getImageData(sx, sy, sw, sh);
             const data = frame.data;
             let r = 0, g = 0, b = 0, count = 0;
 
@@ -212,34 +220,47 @@ class BoardTracker {
         const roiH = 150;
         const startX = Math.max(0, Math.min(width - roiW, roiX - roiW / 2));
         const startY = Math.max(0, Math.min(height - roiH, roiY - roiH / 2));
-        const frame = ctx.getImageData(startX, startY, roiW, roiH);
-        const data = frame.data;
         
+        // Safety check for getImageData
+        if (roiW <= 0 || roiH <= 0 || startX < 0 || startY < 0 || startX + roiW > width || startY + roiH > height) {
+            // Skip tracking if ROI is invalid or out of bounds to avoid buffer error
+            return null;
+        }
+
         let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0, sumY2 = 0;
         let pixelCount = 0;
         const pixels: {x: number, y: number}[] = [];
-        const threshold = 45;
-        const [Tr, Tg, Tb] = this.colorMean;
-        const step = 2;
 
-        for (let y = 0; y < roiH; y += step) { 
-            for (let x = 0; x < roiW; x += step) {
-                const idx = (y * roiW + x) * 4;
-                const r = data[idx];
-                const g = data[idx + 1];
-                const b = data[idx + 2];
-                const dist = Math.abs(r - Tr) + Math.abs(g - Tg) + Math.abs(b - Tb);
+        try {
+            const frame = ctx.getImageData(startX, startY, roiW, roiH);
+            const data = frame.data;
+            
+            const threshold = 45;
+            const [Tr, Tg, Tb] = this.colorMean;
+            const step = 2;
 
-                if (dist < threshold * 3) {
-                    const absX = startX + x;
-                    const absY = startY + y;
-                    sumX += absX; sumY += absY;
-                    sumX2 += absX * absX; sumY2 += absY * absY;
-                    sumXY += absX * absY;
-                    pixels.push({x: absX, y: absY});
-                    pixelCount++;
+            for (let y = 0; y < roiH; y += step) { 
+                for (let x = 0; x < roiW; x += step) {
+                    const idx = (y * roiW + x) * 4;
+                    const r = data[idx];
+                    const g = data[idx + 1];
+                    const b = data[idx + 2];
+                    const dist = Math.abs(r - Tr) + Math.abs(g - Tg) + Math.abs(b - Tb);
+
+                    if (dist < threshold * 3) {
+                        const absX = startX + x;
+                        const absY = startY + y;
+                        sumX += absX; sumY += absY;
+                        sumX2 += absX * absX; sumY2 += absY * absY;
+                        sumXY += absX * absY;
+                        pixels.push({x: absX, y: absY});
+                        pixelCount++;
+                    }
                 }
             }
+        } catch (e) {
+            // Fail silently on frame read error
+            return null;
         }
 
         if (pixelCount > 20) {
@@ -501,6 +522,9 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
       
       const width = canvasRef.current.width;
       const height = canvasRef.current.height;
+
+      // Ensure valid dimensions to avoid buffer errors
+      if (width <= 0 || height <= 0) return;
 
       ctx.save();
       ctx.clearRect(0, 0, width, height);
