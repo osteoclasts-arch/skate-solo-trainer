@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { SessionResult, Language, AnalyticsInsight, Difficulty, User } from '../types';
 import { TRANSLATIONS } from '../constants';
 import { ResponsiveContainer, AreaChart, Area, XAxis, Tooltip } from 'recharts';
-import { Trophy, TrendingUp, AlertTriangle, Target, BrainCircuit, Sparkles, RefreshCw, Star, Instagram, Crown, Info, X, Lock } from 'lucide-react';
+import { Trophy, TrendingUp, AlertTriangle, Target, BrainCircuit, Sparkles, RefreshCw, Star, Instagram, Crown, Info, X, Lock, CheckCircle, Clock } from 'lucide-react';
 import { getAnalyticsInsight } from '../services/geminiService';
 import html2canvas from 'html2canvas';
 
@@ -13,9 +13,10 @@ interface Props {
   daysSkating?: number;
   user: User | null;
   onLogin: () => void;
+  onRequestPro?: () => void;
 }
 
-const Analytics: React.FC<Props> = ({ history, language, daysSkating = 1, user, onLogin }) => {
+const Analytics: React.FC<Props> = ({ history, language, daysSkating = 1, user, onLogin, onRequestPro }) => {
   const t = TRANSLATIONS[language];
   const [insight, setInsight] = useState<AnalyticsInsight | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -172,10 +173,12 @@ const Analytics: React.FC<Props> = ({ history, language, daysSkating = 1, user, 
   }, [history.length]);
 
   const getExperienceLevel = (days: number) => {
-      if (days <= 30) return t.LEVEL_BEGINNER;
-      if (days <= 180) return t.LEVEL_INTERMEDIATE;
-      return t.LEVEL_ADVANCED;
+      if (user?.isPro) return t.LEVEL_ADVANCED;
+      if (days <= 60) return t.LEVEL_BEGINNER;
+      return t.LEVEL_INTERMEDIATE;
   };
+  
+  const currentLevel = getExperienceLevel(daysSkating);
 
   const GoogleIcon = () => (
       <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -225,26 +228,51 @@ const Analytics: React.FC<Props> = ({ history, language, daysSkating = 1, user, 
                         {t.EXPERIENCE_LEVEL}
                      </h3>
                      <div className="space-y-4">
-                         <div className={`p-4 rounded-xl border ${daysSkating <= 30 ? 'bg-skate-neon/10 border-skate-neon' : 'bg-white/5 border-white/5'}`}>
+                         {/* Beginner */}
+                         <div className={`p-4 rounded-xl border ${currentLevel === t.LEVEL_BEGINNER ? 'bg-skate-neon/10 border-skate-neon' : 'bg-white/5 border-white/5'}`}>
                              <div className="flex justify-between items-center mb-1">
-                                 <h4 className={`font-bold uppercase ${daysSkating <= 30 ? 'text-skate-neon' : 'text-gray-400'}`}>{t.LEVEL_BEGINNER}</h4>
-                                 <span className="text-xs font-mono text-gray-500">0 - 30 Days</span>
+                                 <h4 className={`font-bold uppercase ${currentLevel === t.LEVEL_BEGINNER ? 'text-skate-neon' : 'text-gray-400'}`}>{t.LEVEL_BEGINNER}</h4>
+                                 <span className="text-xs font-mono text-gray-500">0 - 60 Days</span>
                              </div>
-                             <p className="text-xs text-gray-300">스케이트보드에 입문한 루키 단계입니다. 기본기와 흥미 위주의 훈련을 추천합니다.</p>
+                             <p className="text-xs text-gray-300">스케이트보드에 입문한 비기너 단계입니다. 기본기와 흥미 위주의 훈련을 추천합니다.</p>
                          </div>
-                         <div className={`p-4 rounded-xl border ${daysSkating > 30 && daysSkating <= 180 ? 'bg-purple-500/10 border-purple-500' : 'bg-white/5 border-white/5'}`}>
+                         
+                         {/* Amateur */}
+                         <div className={`p-4 rounded-xl border ${currentLevel === t.LEVEL_INTERMEDIATE ? 'bg-purple-500/10 border-purple-500' : 'bg-white/5 border-white/5'}`}>
                              <div className="flex justify-between items-center mb-1">
-                                 <h4 className={`font-bold uppercase ${daysSkating > 30 && daysSkating <= 180 ? 'text-purple-400' : 'text-gray-400'}`}>{t.LEVEL_INTERMEDIATE}</h4>
-                                 <span className="text-xs font-mono text-gray-500">31 - 180 Days</span>
+                                 <h4 className={`font-bold uppercase ${currentLevel === t.LEVEL_INTERMEDIATE ? 'text-purple-400' : 'text-gray-400'}`}>{t.LEVEL_INTERMEDIATE}</h4>
+                                 <span className="text-xs font-mono text-gray-500">61+ Days</span>
                              </div>
                              <p className="text-xs text-gray-300">기술의 일관성을 높이고 새로운 트릭에 도전하는 아마추어 단계입니다.</p>
                          </div>
-                         <div className={`p-4 rounded-xl border ${daysSkating > 180 ? 'bg-blue-500/10 border-blue-500' : 'bg-white/5 border-white/5'}`}>
+
+                         {/* Pro */}
+                         <div className={`p-4 rounded-xl border ${currentLevel === t.LEVEL_ADVANCED ? 'bg-blue-500/10 border-blue-500' : 'bg-white/5 border-white/5'}`}>
                              <div className="flex justify-between items-center mb-1">
-                                 <h4 className={`font-bold uppercase ${daysSkating > 180 ? 'text-blue-400' : 'text-gray-400'}`}>{t.LEVEL_ADVANCED}</h4>
-                                 <span className="text-xs font-mono text-gray-500">180+ Days</span>
+                                 <h4 className={`font-bold uppercase ${currentLevel === t.LEVEL_ADVANCED ? 'text-blue-400' : 'text-gray-400'}`}>{t.LEVEL_ADVANCED}</h4>
+                                 <span className="text-xs font-mono text-gray-500">{t.LEVEL_REQ_PRO}</span>
                              </div>
-                             <p className="text-xs text-gray-300">자신만의 스타일을 완성하고 고난도 기술을 연마하는 프로 단계입니다.</p>
+                             <p className="text-xs text-gray-300 mb-3">자신만의 스타일을 완성하고 고난도 기술을 연마하는 프로 단계입니다. 이 단계로 승급하려면 별도의 승인이 필요합니다.</p>
+                             
+                             {/* Request Pro Button */}
+                             {currentLevel === t.LEVEL_INTERMEDIATE && !user?.isPro && (
+                                <div className="mt-2 pt-2 border-t border-white/5">
+                                    {user?.proRequestStatus === 'pending' ? (
+                                        <button disabled className="w-full py-2 bg-yellow-500/20 text-yellow-500 rounded-lg text-xs font-bold uppercase cursor-not-allowed flex items-center justify-center gap-1">
+                                            <Clock className="w-3 h-3" />
+                                            {t.REQUEST_PENDING}
+                                        </button>
+                                    ) : (
+                                        <button 
+                                            onClick={onRequestPro}
+                                            className="w-full py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg text-xs font-bold uppercase transition-colors flex items-center justify-center gap-1"
+                                        >
+                                            <CheckCircle className="w-3 h-3" />
+                                            {t.REQUEST_PRO}
+                                        </button>
+                                    )}
+                                </div>
+                             )}
                          </div>
                      </div>
                  </div>
@@ -278,7 +306,7 @@ const Analytics: React.FC<Props> = ({ history, language, daysSkating = 1, user, 
                 className="flex items-center space-x-2 bg-white/5 px-3 py-1 rounded-full border border-white/5 hover:bg-white/10 transition-colors active:scale-95"
              >
                 <Star className="w-3.5 h-3.5 text-gray-400" />
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{t.EXPERIENCE_LEVEL}: <span className="text-white ml-1">{getExperienceLevel(daysSkating)}</span></span>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{t.EXPERIENCE_LEVEL}: <span className="text-white ml-1">{currentLevel}</span></span>
                 <Info className="w-3 h-3 text-gray-500 ml-1" />
             </button>
         </div>

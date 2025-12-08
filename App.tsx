@@ -1,4 +1,6 @@
 
+
+
 import React, { useState, useEffect } from 'react';
 import { ViewState, SessionSettings, Trick, SessionResult, Difficulty, Language, Stance, User } from './types';
 import Dashboard from './components/Dashboard';
@@ -7,12 +9,13 @@ import ActiveSession from './components/ActiveSession';
 import SessionSummary from './components/SessionSummary';
 import Analytics from './components/Analytics';
 import TrickLearning from './components/TrickLearning';
+import AIVision from './components/AIVision';
 import { BASE_TRICKS, TRANSLATIONS } from './constants';
 import { generateAISession } from './services/geminiService';
 import { signInWithGoogle, logout, getFirebaseAuth } from './services/authService';
 import { dbService } from './services/dbService';
 import { onAuthStateChanged } from 'firebase/auth';
-import { Home, BarChart2, BookOpen, Layers } from 'lucide-react';
+import { Home, BarChart2, BookOpen, Layers, Eye } from 'lucide-react';
 
 const App: React.FC = () => {
   const [view, setView] = useState<ViewState>('DASHBOARD');
@@ -51,23 +54,27 @@ const App: React.FC = () => {
     if (auth) {
       const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
         if (firebaseUser) {
-          // 1. Set User
-          setUser({
+          // 1. Set User Basic Info
+          const newUser: User = {
             uid: firebaseUser.uid,
             name: firebaseUser.displayName || 'Skater',
             email: firebaseUser.email || '',
             photoURL: firebaseUser.photoURL || undefined
-          });
+          };
 
           // 2. Fetch Cloud Data
           setIsLoadingData(true);
           try {
-             // Load Profile (Start Date)
+             // Load Profile (Start Date & Pro Status)
              const profile = await dbService.getUserProfile(firebaseUser.uid);
-             if (profile && profile.startDate) {
-                setStartDate(profile.startDate);
-                // Also update local storage to keep in sync
-                localStorage.setItem('skate_start_date', profile.startDate);
+             if (profile) {
+                 if (profile.startDate) {
+                    setStartDate(profile.startDate);
+                    localStorage.setItem('skate_start_date', profile.startDate);
+                 }
+                 // Sync Pro Status
+                 newUser.isPro = profile.isPro;
+                 newUser.proRequestStatus = profile.proRequestStatus;
              }
 
              // Load History
@@ -81,6 +88,8 @@ const App: React.FC = () => {
           } finally {
              setIsLoadingData(false);
           }
+          
+          setUser(newUser);
 
         } else {
           setUser(null);
@@ -115,279 +124,202 @@ const App: React.FC = () => {
       }
   };
 
+  const handleRequestPro = async () => {
+      if (user) {
+          await dbService.requestProVerification(user.uid);
+          setUser(prev => prev ? ({ ...prev, proRequestStatus: 'pending' }) : null);
+      }
+  };
+
   const calculateDaysSkating = () => {
       const start = new Date(startDate);
       const now = new Date();
       const diffTime = Math.abs(now.getTime() - start.getTime());
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-      return diffDays || 1; 
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      return diffDays;
   };
 
-  const daysSkating = calculateDaysSkating();
+  const startSession = async (settings: SessionSettings) => {
+    setIsGenerating(true);
+    let tricks: Trick[] = [];
 
-  const toggleLanguage = () => {
-    const newLang = language === 'EN' ? 'KR' : 'EN';
-    setLanguage(newLang);
-    localStorage.setItem('skate_app_language', newLang);
-  };
-
-  const t = TRANSLATIONS[language];
-
-  // Weighted Random Stance Generator
-  const getRandomStance = (allowed: Stance[]): Stance => {
-    if (allowed.length === 0) return Stance.REGULAR;
-    if (allowed.length === 1) return allowed[0];
-
-    const weights: Record<Stance, number> = {
-        [Stance.REGULAR]: 0.40,
-        [Stance.FAKIE]: 0.25,
-        [Stance.SWITCH]: 0.20,
-        [Stance.NOLLIE]: 0.15
-    };
-
-    let totalWeight = 0;
-    allowed.forEach(s => totalWeight += weights[s]);
-
-    const r = Math.random() * totalWeight;
-
-    let cumulative = 0;
-    for (const s of allowed) {
-        cumulative += weights[s];
-        if (r <= cumulative) return s;
+    if (settings.useAI) {
+       tricks = await generateAISession(settings);
+    } else {
+       tricks = generateLocalTricks(settings);
     }
-    return allowed[0];
+    
+    // Fallback if AI fails or returns empty
+    if (tricks.length === 0) {
+        tricks = generateLocalTricks(settings);
+    }
+
+    setActiveTricks(tricks);
+    setIsGenerating(false);
+    setView('ACTIVE_SESSION');
   };
 
   const generateLocalTricks = (settings: SessionSettings): Trick[] => {
-    const categoryTricks = BASE_TRICKS.filter(t => settings.categories.includes(t.category));
-    
-    const easyPool = categoryTricks.filter(t => t.difficulty === Difficulty.EASY);
-    const mediumPool = categoryTricks.filter(t => t.difficulty === Difficulty.MEDIUM);
-    const hardPool = categoryTricks.filter(t => t.difficulty === Difficulty.HARD);
-    const proPool = categoryTricks.filter(t => t.difficulty === Difficulty.PRO);
-    
-    const advancedPool = [...hardPool, ...proPool];
-
-    let selectedTricks: Trick[] = [];
-    const targetCount = settings.trickCount;
-
-    const selectRandomUnique = (pool: Trick[], count: number) => {
-        if (pool.length === 0) return [];
-        const shuffled = [...pool].sort(() => Math.random() - 0.5);
-        let selected: Trick[] = [];
-
-        if (count <= shuffled.length) {
-            selected = shuffled.slice(0, count);
-        } else {
-            selected = [...shuffled];
-            while (selected.length < count) {
-                selected.push(shuffled[Math.floor(Math.random() * shuffled.length)]);
-            }
-        }
-        return selected.map(t => ({ ...t }));
-    };
-
-    let countEasy = 0;
-    let countMedium = 0;
-    let countAdvanced = 0;
-
-    switch (settings.difficulty) {
-      case Difficulty.EASY:
-        selectedTricks = selectRandomUnique(easyPool, targetCount);
-        break;
-      case Difficulty.MEDIUM:
-        countEasy = Math.round(targetCount * 0.30);
-        countMedium = targetCount - countEasy;
-        selectedTricks = [
-            ...selectRandomUnique(easyPool, countEasy),
-            ...selectRandomUnique(mediumPool, countMedium)
-        ];
-        break;
-      case Difficulty.HARD:
-        countEasy = Math.round(targetCount * 0.10);
-        countMedium = Math.round(targetCount * 0.30);
-        countAdvanced = targetCount - countEasy - countMedium;
-        selectedTricks = [
-            ...selectRandomUnique(easyPool, countEasy),
-            ...selectRandomUnique(mediumPool, countMedium),
-            ...selectRandomUnique(hardPool, countAdvanced)
-        ];
-        break;
-      case Difficulty.PRO:
-        countEasy = Math.round(targetCount * 0.05);
-        countMedium = Math.round(targetCount * 0.20);
-        countAdvanced = targetCount - countEasy - countMedium;
-        selectedTricks = [
-            ...selectRandomUnique(easyPool, countEasy),
-            ...selectRandomUnique(mediumPool, countMedium),
-            ...selectRandomUnique(advancedPool, countAdvanced)
-        ];
-        break;
-    }
-
-    if (selectedTricks.length < targetCount) {
-        const remaining = targetCount - selectedTricks.length;
-        const filler = selectRandomUnique(categoryTricks, remaining);
-        selectedTricks = [...selectedTricks, ...filler];
-    }
-
-    selectedTricks = selectedTricks.sort(() => 0.5 - Math.random());
-    
-    return selectedTricks.map((trick, index) => ({
-      ...trick,
-      id: `${trick.id}-${Date.now()}-${index}`,
-      stance: getRandomStance(settings.selectedStances)
-    }));
-  };
-
-  const handleStartSession = async (settings: SessionSettings) => {
-    setIsGenerating(true);
-    try {
-      let tricks: Trick[] = [];
-
-      if (settings.useAI) {
-        tricks = await generateAISession(settings);
-      } 
+      // 1. Filter by category
+      let filtered = BASE_TRICKS.filter(t => settings.categories.includes(t.category));
       
-      if (tricks.length === 0) {
-        tricks = generateLocalTricks(settings);
+      // 2. Filter by difficulty
+      filtered = filtered.filter(t => t.difficulty === settings.difficulty);
+      
+      if (filtered.length === 0) {
+          // Fallback to all if too strict
+          filtered = BASE_TRICKS;
       }
 
-      setActiveTricks(tricks);
-      setView('ACTIVE_SESSION');
-    } catch (e) {
-      console.error("Failed to start session", e);
-      setActiveTricks(generateLocalTricks(settings));
-      setView('ACTIVE_SESSION');
-    } finally {
-      setIsGenerating(false);
-    }
+      // 3. Shuffle and pick
+      const shuffled = [...filtered].sort(() => 0.5 - Math.random());
+      const selectedTricks = shuffled.slice(0, settings.trickCount);
+
+      // 4. If we need more tricks than available, cycle through
+      while (selectedTricks.length < settings.trickCount) {
+          const randomTrick = filtered[Math.floor(Math.random() * filtered.length)];
+          selectedTricks.push(randomTrick);
+      }
+
+      // 5. Apply Stances Mix
+      return selectedTricks.map((trick, index) => {
+          // Randomly assign a stance from selectedStances
+          const randomStance = settings.selectedStances[Math.floor(Math.random() * settings.selectedStances.length)];
+          return {
+              ...trick,
+              id: `${trick.id}-${index}-${Date.now()}`, // Unique ID for session
+              stance: randomStance
+          };
+      });
   };
 
   const handleSessionComplete = async (result: SessionResult) => {
+    const newHistory = [result, ...sessionHistory];
+    setSessionHistory(newHistory);
     setLastResult(result);
-    setSessionHistory(prev => {
-        const newHistory = [result, ...prev];
-        localStorage.setItem('skate_session_history', JSON.stringify(newHistory));
-        return newHistory;
-    });
-
+    localStorage.setItem('skate_session_history', JSON.stringify(newHistory));
+    
+    // Save to Cloud if logged in
     if (user) {
         await dbService.saveSession(user.uid, result);
     }
+
     setView('SUMMARY');
   };
 
-  const handleAbort = () => {
-    if (confirm(t.CONFIRM_ABORT)) {
-      setView('DASHBOARD');
-    }
-  };
-
-  const renderContent = () => {
+  const renderView = () => {
     if (isAuthChecking) {
         return (
-            <div className="flex flex-col items-center justify-center h-full space-y-4">
-                <div className="w-12 h-12 border-4 border-skate-neon rounded-full border-t-transparent animate-spin"></div>
+            <div className="flex h-screen items-center justify-center bg-black">
+                <div className="animate-spin h-8 w-8 border-4 border-skate-neon rounded-full border-t-transparent"></div>
             </div>
         );
     }
 
-    if (isLoadingData && view === 'DASHBOARD') {
-        return <div className="flex items-center justify-center h-full text-skate-neon animate-pulse font-display text-xl tracking-widest">SYNCING DATA...</div>;
-    }
-
     switch (view) {
-        case 'DASHBOARD':
-             return (
-                <Dashboard 
-                    onStart={() => setView('SETUP')} 
-                    onLearning={() => setView('LEARNING')}
-                    history={sessionHistory} 
-                    language={language}
-                    onLanguageToggle={toggleLanguage}
-                    daysSkating={daysSkating}
-                    startDate={startDate}
-                    onUpdateStartDate={updateStartDate}
-                    user={user}
-                    onLogin={handleLogin}
-                    onLogout={handleLogout}
-                />
-             );
-        case 'ANALYTICS':
-             return (
-                <Analytics 
-                  history={sessionHistory} 
-                  language={language} 
-                  daysSkating={daysSkating}
-                  user={user}
-                  onLogin={handleLogin}
-                />
-             );
-        case 'LEARNING':
-             return <TrickLearning language={language} />;
-        case 'SETUP':
-             return (
-                <SessionSetup 
-                  onStart={handleStartSession} 
-                  onBack={() => setView('DASHBOARD')}
-                  isGenerating={isGenerating} 
-                  language={language}
-                />
-             );
-        case 'ACTIVE_SESSION':
-             return (
-                <ActiveSession 
-                  tricks={activeTricks} 
-                  onComplete={handleSessionComplete} 
-                  onAbort={handleAbort}
-                  language={language}
-                />
-             );
-        case 'SUMMARY':
-             return lastResult ? (
-                <SessionSummary 
-                  result={lastResult} 
-                  onHome={() => setView('DASHBOARD')} 
-                  language={language}
-                />
-             ) : null;
-        default:
-            return null;
+      case 'DASHBOARD':
+        return (
+          <Dashboard 
+            onStart={() => setView('SETUP')} 
+            onLearning={() => setView('LEARNING')}
+            history={sessionHistory}
+            language={language}
+            onLanguageToggle={() => setLanguage(l => {
+                const next = l === 'EN' ? 'KR' : 'EN';
+                localStorage.setItem('skate_app_language', next);
+                return next;
+            })}
+            daysSkating={calculateDaysSkating()}
+            startDate={startDate}
+            onUpdateStartDate={updateStartDate}
+            user={user}
+            onLogin={handleLogin}
+            onLogout={handleLogout}
+          />
+        );
+      case 'SETUP':
+        return (
+          <SessionSetup 
+            onStart={startSession} 
+            onBack={() => setView('DASHBOARD')}
+            isGenerating={isGenerating}
+            language={language}
+          />
+        );
+      case 'ACTIVE_SESSION':
+        return (
+          <ActiveSession 
+            tricks={activeTricks} 
+            onComplete={handleSessionComplete} 
+            onAbort={() => setView('DASHBOARD')} 
+            language={language}
+          />
+        );
+      case 'SUMMARY':
+        return lastResult ? (
+          <SessionSummary 
+            result={lastResult} 
+            onHome={() => setView('DASHBOARD')}
+            language={language}
+          />
+        ) : null;
+      case 'ANALYTICS':
+        return (
+          <Analytics 
+            history={sessionHistory} 
+            language={language}
+            daysSkating={calculateDaysSkating()}
+            user={user}
+            onLogin={handleLogin}
+            onRequestPro={handleRequestPro}
+          />
+        );
+      case 'LEARNING':
+        return <TrickLearning language={language} />;
+      case 'AI_VISION':
+        return <AIVision language={language} />;
+      default:
+        return null;
     }
   };
 
-  const showNav = ['DASHBOARD', 'ANALYTICS', 'LEARNING'].includes(view);
-
   return (
-    <div className="h-[100dvh] w-full text-white font-sans overflow-hidden flex flex-col">
-      <div className="flex-1 overflow-hidden relative">
-        {renderContent()}
-      </div>
+    <div className="h-screen w-full bg-black text-white overflow-hidden font-sans relative">
+      {renderView()}
 
-      {showNav && (
-        <div className="absolute bottom-6 left-0 right-0 px-6 z-50 pointer-events-none">
-            <div className="glass-nav rounded-full px-2 py-2 flex justify-between items-center shadow-2xl pointer-events-auto max-w-sm mx-auto">
+      {/* Floating Island Navigation */}
+      {!isAuthChecking && (view === 'DASHBOARD' || view === 'ANALYTICS' || view === 'LEARNING' || view === 'SUMMARY' || view === 'AI_VISION') && (
+         <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 w-[95%] max-w-md z-50">
+            <nav className="glass-nav rounded-full px-6 py-4 flex justify-between items-center shadow-2xl">
                 <button 
                     onClick={() => setView('DASHBOARD')}
-                    className={`flex flex-col items-center justify-center w-14 h-14 rounded-full transition-all duration-300 ${view === 'DASHBOARD' ? 'bg-skate-neon text-black shadow-[0_0_15px_rgba(204,255,0,0.5)] transform -translate-y-2' : 'text-gray-400 hover:text-white'}`}
+                    className={`flex flex-col items-center space-y-1 transition-all ${view === 'DASHBOARD' ? 'text-skate-neon scale-110' : 'text-gray-500 hover:text-white'}`}
                 >
-                    <Home className={`w-6 h-6 ${view === 'DASHBOARD' ? 'stroke-[2.5px]' : 'stroke-2'}`} />
+                    <Home className={`w-5 h-5 ${view === 'DASHBOARD' && 'drop-shadow-[0_0_8px_rgba(204,255,0,0.5)]'}`} />
                 </button>
                 <button 
                     onClick={() => setView('LEARNING')}
-                    className={`flex flex-col items-center justify-center w-14 h-14 rounded-full transition-all duration-300 ${view === 'LEARNING' ? 'bg-skate-neon text-black shadow-[0_0_15px_rgba(204,255,0,0.5)] transform -translate-y-2' : 'text-gray-400 hover:text-white'}`}
+                    className={`flex flex-col items-center space-y-1 transition-all ${view === 'LEARNING' ? 'text-skate-neon scale-110' : 'text-gray-500 hover:text-white'}`}
                 >
-                    <BookOpen className={`w-6 h-6 ${view === 'LEARNING' ? 'stroke-[2.5px]' : 'stroke-2'}`} />
+                    <BookOpen className={`w-5 h-5 ${view === 'LEARNING' && 'drop-shadow-[0_0_8px_rgba(204,255,0,0.5)]'}`} />
+                </button>
+                 <button 
+                    onClick={() => setView('AI_VISION')}
+                    className={`flex flex-col items-center space-y-1 transition-all ${view === 'AI_VISION' ? 'text-skate-neon scale-110' : 'text-gray-500 hover:text-white'}`}
+                >
+                    <div className="relative">
+                        {view === 'AI_VISION' && <div className="absolute inset-0 bg-skate-neon blur-md opacity-50 rounded-full"></div>}
+                        <Eye className={`w-6 h-6 relative z-10 ${view === 'AI_VISION' && 'fill-skate-neon text-black'}`} />
+                    </div>
                 </button>
                 <button 
                     onClick={() => setView('ANALYTICS')}
-                    className={`flex flex-col items-center justify-center w-14 h-14 rounded-full transition-all duration-300 ${view === 'ANALYTICS' ? 'bg-skate-neon text-black shadow-[0_0_15px_rgba(204,255,0,0.5)] transform -translate-y-2' : 'text-gray-400 hover:text-white'}`}
+                    className={`flex flex-col items-center space-y-1 transition-all ${view === 'ANALYTICS' ? 'text-skate-neon scale-110' : 'text-gray-500 hover:text-white'}`}
                 >
-                    <BarChart2 className={`w-6 h-6 ${view === 'ANALYTICS' ? 'stroke-[2.5px]' : 'stroke-2'}`} />
+                    <BarChart2 className={`w-5 h-5 ${view === 'ANALYTICS' && 'drop-shadow-[0_0_8px_rgba(204,255,0,0.5)]'}`} />
                 </button>
-            </div>
-        </div>
+            </nav>
+         </div>
       )}
     </div>
   );

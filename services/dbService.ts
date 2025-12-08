@@ -9,6 +9,8 @@ const db = app ? getFirestore(app) : null;
 export interface UserProfileData {
   startDate: string;
   lastLogin?: string;
+  isPro?: boolean;
+  proRequestStatus?: 'none' | 'pending' | 'rejected';
 }
 
 export const dbService = {
@@ -77,6 +79,22 @@ export const dbService = {
     } catch (error) {
       console.error("Error loading sessions:", error);
       return [];
+    }
+  },
+
+  /**
+   * Request Pro Verification
+   */
+  async requestProVerification(uid: string) {
+    if (!db) return;
+    try {
+        const userRef = doc(db, "users", uid);
+        await setDoc(userRef, { 
+            proRequestStatus: 'pending',
+            proRequestDate: new Date().toISOString()
+        }, { merge: true });
+    } catch (error) {
+        console.error("Error requesting pro verification:", error);
     }
   }
 };

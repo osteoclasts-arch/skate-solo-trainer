@@ -1,5 +1,4 @@
 
-
 export enum Stance {
   REGULAR = 'Regular',
   FAKIE = 'Fakie',
@@ -26,6 +25,8 @@ export interface User {
   name: string;
   email?: string;
   photoURL?: string;
+  isPro?: boolean;
+  proRequestStatus?: 'none' | 'pending' | 'rejected';
 }
 
 export interface StanceContent {
@@ -98,6 +99,16 @@ export interface AnalyticsInsight {
   aiFeedback: string;
 }
 
-export type ViewState = 'DASHBOARD' | 'ANALYTICS' | 'SETUP' | 'ACTIVE_SESSION' | 'SUMMARY' | 'LEARNING';
+export interface VisionAnalysis {
+  trickName: string;
+  confidence: number;
+  formScore: number; // 0-10
+  heightEstimate: string; // e.g., "30cm" or "High"
+  postureAnalysis: string;
+  landingAnalysis: string;
+  improvementTip: string;
+}
+
+export type ViewState = 'DASHBOARD' | 'ANALYTICS' | 'SETUP' | 'ACTIVE_SESSION' | 'SUMMARY' | 'LEARNING' | 'AI_VISION';
 
 export type Language = 'EN' | 'KR';

@@ -7,7 +7,7 @@ declare var process: {
 };
 
 import { GoogleGenAI, Type, Schema } from "@google/genai";
-import { Trick, SessionSettings, Difficulty, TrickCategory, SessionResult, TrickTip, Language, AnalyticsInsight } from "../types";
+import { Trick, SessionSettings, Difficulty, TrickCategory, SessionResult, TrickTip, Language, AnalyticsInsight, VisionAnalysis } from "../types";
 import { TRICK_TIPS_DB } from "../constants";
 
 const apiKey = process.env.API_KEY || '';
@@ -185,10 +185,10 @@ export const getAnalyticsInsight = async (
 
     let experienceContext = "";
     if (daysSkating !== undefined) {
-        if (daysSkating <= 30) {
-            experienceContext = "User is a BEGINNER (0-30 days). Be very encouraging. Focus on basics like Ollie, balance, and having fun. Don't be too harsh.";
+        if (daysSkating <= 60) {
+            experienceContext = "User is a BEGINNER (0-60 days). Be very encouraging. Focus on basics like Ollie, balance, and having fun. Don't be too harsh.";
         } else if (daysSkating <= 180) {
-            experienceContext = "User is INTERMEDIATE (31-180 days). Challenge them to improve consistency and try harder tricks. Focus on technique refinement.";
+            experienceContext = "User is INTERMEDIATE (61-180 days). Challenge them to improve consistency and try harder tricks. Focus on technique refinement.";
         } else {
             experienceContext = "User is ADVANCED (180+ days). Provide high-level pro tips, focus on style, fluidity, and perfect consistency.";
         }
@@ -231,6 +231,92 @@ export const getAnalyticsInsight = async (
         return null;
     } catch (error) {
         console.error("Error generating analytics insight:", error);
+        return null;
+    }
+};
+
+const fileToPart = (file: File): Promise<{ inlineData: { data: string; mimeType: string } }> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            const base64String = reader.result as string;
+            // Remove the data URL prefix (e.g., "data:image/jpeg;base64,")
+            const base64Data = base64String.split(',')[1];
+            resolve({
+                inlineData: {
+                    data: base64Data,
+                    mimeType: file.type
+                }
+            });
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+};
+
+export const analyzeMedia = async (file: File, language: Language): Promise<VisionAnalysis | null> => {
+    if (!apiKey) return null;
+
+    const ai = getAI();
+    
+    // Check file size (client-side safety check)
+    // 20MB limit
+    if (file.size > 20 * 1024 * 1024) {
+        throw new Error("File too large");
+    }
+
+    const mediaPart = await fileToPart(file);
+    
+    const analysisSchema: Schema = {
+        type: Type.OBJECT,
+        properties: {
+            trickName: { type: Type.STRING },
+            confidence: { type: Type.NUMBER, description: "0 to 100" },
+            formScore: { type: Type.NUMBER, description: "0 to 10" },
+            heightEstimate: { type: Type.STRING, description: "e.g. '30cm' or 'Low/Medium/High'" },
+            postureAnalysis: { type: Type.STRING },
+            landingAnalysis: { type: Type.STRING },
+            improvementTip: { type: Type.STRING }
+        },
+        required: ["trickName", "confidence", "formScore", "heightEstimate", "postureAnalysis", "landingAnalysis", "improvementTip"]
+    };
+
+    const prompt = `
+        You are an expert AI Skateboarding Coach.
+        Analyze this image or video clip of a skateboard trick.
+        Language: ${language === 'KR' ? 'Korean (Hangul)' : 'English'}.
+
+        Identify:
+        1. What trick is being performed?
+        2. How confident are you?
+        3. Rate the form (0-10).
+        4. Estimate the pop height.
+        5. Analyze the body posture (shoulders, feet position, balance).
+        6. Analyze the landing (clean, sketchy, toe drag).
+        7. Provide one specific pro tip to improve this trick.
+
+        Respond in JSON format.
+    `;
+
+    try {
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: {
+                role: 'user',
+                parts: [mediaPart, { text: prompt }]
+            },
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: analysisSchema
+            }
+        });
+
+        if (response.text) {
+            return JSON.parse(response.text) as VisionAnalysis;
+        }
+        return null;
+    } catch (error) {
+        console.error("Error analyzing media:", error);
         return null;
     }
 };
