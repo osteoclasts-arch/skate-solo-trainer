@@ -1,5 +1,6 @@
 
 
+
 import { Difficulty, Stance, Trick, TrickCategory, TrickTip } from "./types";
 
 export const SKATE_LETTERS = ['S', 'K', 'A', 'T', 'E'];
@@ -62,6 +63,7 @@ export const TRANSLATIONS = {
     Grind: "Grind",
     Transition: "Transition",
     Regular: "Regular",
+    Goofy: "Goofy",
     Fakie: "Fakie",
     Switch: "Switch",
     Nollie: "Nollie",
@@ -190,6 +192,7 @@ export const TRANSLATIONS = {
     Grind: "그라인드",
     Transition: "트랜지션",
     Regular: "레귤러",
+    Goofy: "구피",
     Fakie: "페이키",
     Switch: "스위치",
     Nollie: "널리",

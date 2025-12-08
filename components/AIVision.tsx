@@ -1,15 +1,182 @@
-
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Language, User, VisionAnalysis } from '../types';
 import { TRANSLATIONS } from '../constants';
-import { Upload, Zap, AlertTriangle, Play, X, Eye, Video, CheckCircle, HelpCircle, Ruler, FileVideo, Activity } from 'lucide-react';
-import { analyzeVideoMock } from '../services/visionService';
+import { Upload, Zap, Play, X, Eye, Video, FileVideo, Activity } from 'lucide-react';
 import { generateCoachingFeedback } from '../services/geminiService';
 import { dbService } from '../services/dbService';
+// @ts-ignore
+import mpPose from '@mediapipe/pose';
+
+const POSE_CONNECTIONS = [
+  [11, 12], [11, 13], [13, 15], [12, 14], [14, 16], [11, 23], [12, 24], 
+  [23, 24], [23, 25], [24, 26], [25, 27], [26, 28], [27, 29], [28, 30], 
+  [29, 31], [30, 32], [27, 31], [28, 32]
+];
 
 interface Props {
   language: Language;
   user: User | null;
+}
+
+// --- ADVANCED BOARD TRACKER (ROI + PCA + PHYSICS) ---
+class BoardTracker {
+    colorMean: [number, number, number] = [0, 0, 0];
+    isCalibrated = false;
+    
+    // Physics State
+    pos: { x: number, y: number } = { x: 0, y: 0 };
+    velocity: { x: number, y: number } = { x: 0, y: 0 };
+    angle: number = 0;
+    
+    // History for smoothing
+    history: { x: number, y: number }[] = [];
+
+    calibrate(ctx: CanvasRenderingContext2D, width: number, height: number, leftFoot: any, rightFoot: any) {
+        if (!leftFoot || !rightFoot) return;
+        
+        // Sample area strictly between feet + slight offset down
+        const lx = leftFoot.x * width;
+        const ly = leftFoot.y * height;
+        const rx = rightFoot.x * width;
+        const ry = rightFoot.y * height;
+        
+        const centerX = (lx + rx) / 2;
+        const centerY = Math.max(ly, ry) + (height * 0.02); // Slightly below ankles
+        const sampleSize = 40; // 40x40 pixel box
+
+        try {
+            const frame = ctx.getImageData(centerX - sampleSize/2, centerY - sampleSize/2, sampleSize, sampleSize);
+            const data = frame.data;
+            let r = 0, g = 0, b = 0, count = 0;
+
+            for (let i = 0; i < data.length; i += 4) {
+                r += data[i];
+                g += data[i + 1];
+                b += data[i + 2];
+                count++;
+            }
+            
+            this.colorMean = [r / count, g / count, b / count];
+            this.isCalibrated = true;
+            this.pos = { x: centerX, y: centerY };
+        } catch (e) {
+            console.error("Calibration failed", e);
+        }
+    }
+
+    track(ctx: CanvasRenderingContext2D, width: number, height: number, leftAnkle: any, rightAnkle: any): { x: number, y: number, angle: number, confidence: number } | null {
+        if (!this.isCalibrated) return null;
+
+        // 1. Define Search ROI (Region of Interest)
+        // We look specifically UNDER the skater.
+        // If we have foot landmarks, bias search there. If not (mid-air), use physics prediction.
+        
+        let roiX = this.pos.x;
+        let roiY = this.pos.y;
+        
+        // If feet are visible, pull the search window towards them, but allow it to detach (gravity)
+        if (leftAnkle && rightAnkle && leftAnkle.visibility > 0.5) {
+             const feetX = ((leftAnkle.x + rightAnkle.x) / 2) * width;
+             const feetY = ((leftAnkle.y + rightAnkle.y) / 2) * height;
+             
+             // Board is usually below ankles
+             const expectedBoardY = feetY + (height * 0.05); 
+             
+             // Weighting: 40% Physics Prediction, 60% Feet Location
+             // This keeps it attached on ground, but allows separation in air
+             roiX = (this.pos.x + this.velocity.x) * 0.4 + feetX * 0.6;
+             roiY = (this.pos.y + this.velocity.y) * 0.4 + expectedBoardY * 0.6;
+        } else {
+             // Freefall physics prediction
+             roiX = this.pos.x + this.velocity.x;
+             roiY = this.pos.y + this.velocity.y;
+        }
+
+        const roiW = 200; // Search window width
+        const roiH = 150; // Search window height
+        
+        const startX = Math.max(0, Math.min(width - roiW, roiX - roiW / 2));
+        const startY = Math.max(0, Math.min(height - roiH, roiY - roiH / 2));
+
+        const frame = ctx.getImageData(startX, startY, roiW, roiH);
+        const data = frame.data;
+        
+        // PCA Variables
+        let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0, sumY2 = 0;
+        let pixelCount = 0;
+        const threshold = 45; // Similarity threshold
+
+        const [Tr, Tg, Tb] = this.colorMean;
+
+        // Efficient Scan
+        for (let y = 0; y < roiH; y += 4) { 
+            for (let x = 0; x < roiW; x += 4) {
+                const idx = (y * roiW + x) * 4;
+                const r = data[idx];
+                const g = data[idx + 1];
+                const b = data[idx + 2];
+
+                const dist = Math.sqrt((r - Tr) ** 2 + (g - Tg) ** 2 + (b - Tb) ** 2);
+
+                if (dist < threshold) {
+                    const absX = startX + x;
+                    const absY = startY + y;
+                    
+                    sumX += absX;
+                    sumY += absY;
+                    sumX2 += absX * absX;
+                    sumY2 += absY * absY;
+                    sumXY += absX * absY;
+                    pixelCount++;
+                }
+            }
+        }
+
+        // 2. Update Logic
+        if (pixelCount > 10) {
+            // Found the board!
+            const meanX = sumX / pixelCount;
+            const meanY = sumY / pixelCount;
+
+            // Update Velocity (Current - Last)
+            this.velocity = {
+                x: meanX - this.pos.x,
+                y: meanY - this.pos.y
+            };
+
+            this.pos = { x: meanX, y: meanY };
+
+            // PCA for Rotation
+            const varX = (sumX2 / pixelCount) - (meanX * meanX);
+            const varY = (sumY2 / pixelCount) - (meanY * meanY);
+            const covXY = (sumXY / pixelCount) - (meanX * meanY);
+            
+            // Calculate angle
+            const newAngle = 0.5 * Math.atan2(2 * covXY, varX - varY);
+            // Smooth angle to reduce jitter
+            this.angle = this.angle * 0.7 + newAngle * 0.3;
+
+        } else {
+            // Lost Tracking -> Use Physics Fallback
+            // Apply Gravity
+            this.velocity.y += 0.5; // Pseudo gravity
+            this.velocity.x *= 0.95; // Air resistance
+
+            this.pos.x += this.velocity.x;
+            this.pos.y += this.velocity.y;
+            
+            // Keep previous angle
+        }
+
+        // Bounds Check
+        this.pos.x = Math.max(0, Math.min(width, this.pos.x));
+        this.pos.y = Math.max(0, Math.min(height, this.pos.y));
+
+        this.history.push({ ...this.pos });
+        if (this.history.length > 50) this.history.shift();
+
+        return { x: this.pos.x, y: this.pos.y, angle: this.angle, confidence: Math.min(1, pixelCount / 50) };
+    }
 }
 
 const AIVision: React.FC<Props> = ({ language, user }) => {
@@ -19,71 +186,245 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<VisionAnalysis | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   
-  // Video Ref
+  const [userStance, setUserStance] = useState<'Regular' | 'Goofy'>('Regular');
+  const [trickNameInput, setTrickNameInput] = useState("");
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const poseRef = useRef<any>(null);
+  const boardTrackerRef = useRef<BoardTracker>(new BoardTracker());
+  const requestRef = useRef<number>();
+  const statsRef = useRef({ maxHeight: 0, rotationAccumulator: 0, frameCount: 0 });
+
+  useEffect(() => {
+    const initPose = async () => {
+        try {
+            const pose = new mpPose.Pose({
+                locateFile: (file: string) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`,
+            });
+            pose.setOptions({
+                modelComplexity: 1,
+                smoothLandmarks: true,
+                minDetectionConfidence: 0.5,
+                minTrackingConfidence: 0.5,
+            });
+            pose.onResults(onPoseResults);
+            poseRef.current = pose;
+        } catch (e) {
+            console.error("Failed to load Pose", e);
+            setError("Failed to load AI models. Please refresh.");
+        }
+    };
+    initPose();
+    return () => {
+        if (poseRef.current) poseRef.current.close();
+        cancelAnimationFrame(requestRef.current!);
+    };
+  }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
-        // Max 50MB for video
         if (selectedFile.size > 50 * 1024 * 1024) {
             setError(t.FILE_TOO_LARGE);
             return;
         }
         setFile(selectedFile);
-        setPreviewUrl(URL.createObjectURL(selectedFile));
+        const url = URL.createObjectURL(selectedFile);
+        setPreviewUrl(url);
         setResult(null);
         setError(null);
+        boardTrackerRef.current = new BoardTracker();
+        statsRef.current = { maxHeight: 0, rotationAccumulator: 0, frameCount: 0 };
     }
   };
 
-  const handleAnalyze = async () => {
-      if (!file) return;
+  const startAnalysis = () => {
+      if (!videoRef.current || !poseRef.current) return;
       setIsAnalyzing(true);
       setError(null);
       
-      try {
-          // 1. Mock Vision Analysis (Simulate Backend)
-          const visionResult = await analyzeVideoMock(file);
-          
-          // 2. Generate Text Feedback via Gemini
-          const coaching = await generateCoachingFeedback(visionResult, language);
-          
-          // 3. Merge Results
-          const finalResult: VisionAnalysis = {
-              ...visionResult,
-              feedbackText: coaching.feedback,
-              improvementTip: coaching.tips
-          };
+      const video = videoRef.current;
+      video.currentTime = 0;
+      video.playbackRate = 0.5;
+      video.play();
+      
+      processFrame();
+  };
 
-          setResult(finalResult);
+  const processFrame = async () => {
+      if (!videoRef.current || !canvasRef.current || !poseRef.current) return;
+      const video = videoRef.current;
+      
+      if (video.paused || video.ended) {
+          if (video.ended) completeAnalysis();
+          return;
+      }
 
-          // 4. Save to DB (if user logged in)
-          if (user) {
-              await dbService.saveAnalysisResult(user.uid, finalResult);
+      await poseRef.current.send({ image: video });
+      requestRef.current = requestAnimationFrame(processFrame);
+  };
+
+  const onPoseResults = (results: any) => {
+      if (!canvasRef.current || !videoRef.current) return;
+      const ctx = canvasRef.current.getContext('2d');
+      if (!ctx) return;
+      
+      const width = canvasRef.current.width;
+      const height = canvasRef.current.height;
+
+      ctx.save();
+      ctx.clearRect(0, 0, width, height);
+      ctx.drawImage(results.image, 0, 0, width, height);
+
+      let leftAnkle = null;
+      let rightAnkle = null;
+
+      if (results.poseLandmarks) {
+          drawSkeleton(ctx, results.poseLandmarks, width, height);
+          
+          leftAnkle = results.poseLandmarks[27];
+          rightAnkle = results.poseLandmarks[28];
+
+          if (!boardTrackerRef.current.isCalibrated && statsRef.current.frameCount < 15) {
+             boardTrackerRef.current.calibrate(ctx, width, height, leftAnkle, rightAnkle);
           }
 
-      } catch (e: any) {
-          console.error(e);
-          setError("Analysis failed. Please try again.");
-      } finally {
-          setIsAnalyzing(false);
+          const hipY = (results.poseLandmarks[23].y + results.poseLandmarks[24].y) / 2;
+          const currentHeight = (1 - hipY); 
+          if (currentHeight > statsRef.current.maxHeight) {
+              statsRef.current.maxHeight = currentHeight;
+          }
+      }
+
+      // Track Board using ROI logic
+      const board = boardTrackerRef.current.track(ctx, width, height, leftAnkle, rightAnkle);
+      if (board) {
+          drawBoardVisuals(ctx, board);
+      }
+
+      ctx.restore();
+      statsRef.current.frameCount++;
+  };
+
+  const drawSkeleton = (ctx: CanvasRenderingContext2D, landmarks: any[], w: number, h: number) => {
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = '#E3FF37'; 
+      ctx.fillStyle = '#FFFFFF';
+
+      POSE_CONNECTIONS.forEach(([i, j]) => {
+          const p1 = landmarks[i];
+          const p2 = landmarks[j];
+          if (p1 && p2 && p1.visibility > 0.5 && p2.visibility > 0.5) {
+              ctx.beginPath();
+              ctx.moveTo(p1.x * w, p1.y * h);
+              ctx.lineTo(p2.x * w, p2.y * h);
+              ctx.stroke();
+          }
+      });
+
+      landmarks.forEach((lm) => {
+          if (lm.visibility > 0.5) {
+              ctx.beginPath();
+              ctx.arc(lm.x * w, lm.y * h, 4, 0, 2 * Math.PI);
+              ctx.fill();
+          }
+      });
+  };
+
+  const drawBoardVisuals = (ctx: CanvasRenderingContext2D, board: {x: number, y: number, angle: number}) => {
+      ctx.save();
+      ctx.translate(board.x, board.y);
+      ctx.rotate(board.angle);
+
+      // --- IMPROVED VISUALS: DECK + WHEELS ---
+      
+      const deckLen = 120; // Length pixels
+      const deckWid = 32;  // Width pixels
+      
+      // 1. Deck (Rect)
+      ctx.fillStyle = 'rgba(0, 255, 255, 0.2)'; // Cyan transparent fill
+      ctx.strokeStyle = '#00FFFF'; // Cyan border
+      ctx.lineWidth = 3;
+      
+      ctx.beginPath();
+      ctx.roundRect(-deckLen/2, -deckWid/2, deckLen, deckWid, 10);
+      ctx.fill();
+      ctx.stroke();
+
+      // 2. Trucks & Wheels
+      const truckX = deckLen * 0.3; // Distance from center
+      const wheelOut = deckWid * 0.7; // Width out from center
+
+      ctx.fillStyle = '#FFFFFF'; // White Wheels
+      const wheelR = 6;
+
+      // Draw 4 Wheels
+      // Front Left
+      ctx.beginPath(); ctx.arc(truckX, -wheelOut, wheelR, 0, Math.PI*2); ctx.fill();
+      // Front Right
+      ctx.beginPath(); ctx.arc(truckX, wheelOut, wheelR, 0, Math.PI*2); ctx.fill();
+      // Back Left
+      ctx.beginPath(); ctx.arc(-truckX, -wheelOut, wheelR, 0, Math.PI*2); ctx.fill();
+      // Back Right
+      ctx.beginPath(); ctx.arc(-truckX, wheelOut, wheelR, 0, Math.PI*2); ctx.fill();
+
+      // 3. Nose/Tail Indicators
+      ctx.fillStyle = '#FF00FF'; // Magenta dot for nose/tail
+      ctx.beginPath(); ctx.arc(deckLen/2, 0, 4, 0, Math.PI*2); ctx.fill(); // Front
+      ctx.beginPath(); ctx.arc(-deckLen/2, 0, 4, 0, Math.PI*2); ctx.fill(); // Back
+
+      ctx.restore();
+
+      // 4. Trajectory Path
+      ctx.strokeStyle = 'rgba(255, 100, 0, 0.6)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      boardTrackerRef.current.history.forEach((pt, i) => {
+          if (i === 0) ctx.moveTo(pt.x, pt.y);
+          else ctx.lineTo(pt.x, pt.y);
+      });
+      ctx.stroke();
+  };
+
+  const completeAnalysis = async () => {
+      setIsAnalyzing(false);
+      
+      const estimatedHeightM = Math.max(0, (statsRef.current.maxHeight - 0.4) * 2).toFixed(2);
+      
+      const analysisData: VisionAnalysis = {
+          id: Date.now().toString(),
+          timestamp: new Date().toISOString(),
+          trickName: trickNameInput || "Ollie (Detected)",
+          isLanded: true, 
+          confidence: 0.85,
+          score: Math.min(100, Math.floor(statsRef.current.maxHeight * 150)), 
+          heightMeters: parseFloat(estimatedHeightM),
+          rotationDegrees: 0,
+          feedbackText: "",
+          improvementTip: ""
+      };
+
+      const feedback = await generateCoachingFeedback(analysisData, language);
+      analysisData.feedbackText = feedback.feedback;
+      analysisData.improvementTip = feedback.tips;
+
+      setResult(analysisData);
+
+      if (user) {
+          await dbService.saveAnalysisResult(user.uid, analysisData);
       }
   };
 
-  const reset = () => {
-      setFile(null);
-      setPreviewUrl(null);
-      setResult(null);
-      setError(null);
-      if (fileInputRef.current) fileInputRef.current.value = '';
+  const handleFeedbackSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
+      alert(t.FEEDBACK_THANKS);
   };
 
   return (
     <div className="flex flex-col h-full p-6 pb-32 overflow-y-auto animate-fade-in relative bg-black">
-        {/* Header */}
         <div className="flex items-center space-x-3 mb-6">
             <Eye className="text-skate-neon w-6 h-6" />
             <div>
@@ -96,23 +437,6 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
             </div>
         </div>
 
-        {/* Instructions / Constraints */}
-        {!previewUrl && (
-            <div className="mb-6 bg-white/5 border border-white/5 rounded-2xl p-4">
-                <h3 className="text-gray-400 text-xs font-bold uppercase tracking-widest mb-2 flex items-center">
-                    <Video className="w-3 h-3 mr-1" />
-                    Recording Guidelines
-                </h3>
-                <ul className="text-xs text-gray-400 space-y-1 list-disc list-inside">
-                    <li>Use a tripod (fixed camera).</li>
-                    <li>Record from the <strong>side view</strong>.</li>
-                    <li>Keep your whole body and board in frame.</li>
-                    <li>Ensure good lighting.</li>
-                </ul>
-            </div>
-        )}
-
-        {/* Upload Area */}
         {!previewUrl ? (
             <div 
                 onClick={() => fileInputRef.current?.click()}
@@ -130,104 +454,115 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
                 </div>
                 <p className="text-white font-bold uppercase tracking-wider mb-2">{t.UPLOAD_MEDIA}</p>
                 <p className="text-gray-500 text-xs text-center max-w-[200px]">
-                    Select a video clip (Max 50MB)
+                    Select a video clip (Max 50MB). Side view is best.
                 </p>
             </div>
         ) : (
             <div className="flex flex-col space-y-6">
-                {/* Preview Container */}
-                <div className="relative rounded-3xl overflow-hidden border border-white/10 shadow-2xl bg-black">
+                <div className="relative rounded-3xl overflow-hidden border border-white/10 shadow-2xl bg-black aspect-video">
                     <button 
-                        onClick={reset}
+                        onClick={() => { setPreviewUrl(null); setResult(null); }}
                         className="absolute top-4 right-4 z-30 bg-black/50 p-2 rounded-full hover:bg-black/80 text-white"
                     >
                         <X className="w-5 h-5" />
                     </button>
                     
-                    {/* Media Container */}
-                    <div className="relative w-full aspect-video bg-black flex items-center justify-center overflow-hidden">
-                        <video 
-                            ref={videoRef}
-                            src={previewUrl} 
-                            controls={true} 
-                            className="w-full h-full object-contain" 
-                            playsInline
-                            crossOrigin="anonymous"
-                        />
-                    </div>
+                    <video 
+                        ref={videoRef}
+                        src={previewUrl} 
+                        className="absolute inset-0 w-full h-full object-contain opacity-0" 
+                        muted
+                        playsInline
+                        crossOrigin="anonymous"
+                        onLoadedMetadata={() => {
+                            if(canvasRef.current && videoRef.current) {
+                                canvasRef.current.width = videoRef.current.videoWidth;
+                                canvasRef.current.height = videoRef.current.videoHeight;
+                            }
+                        }}
+                    />
+                    <canvas 
+                        ref={canvasRef}
+                        className="absolute inset-0 w-full h-full object-contain bg-black"
+                    />
 
-                    {/* Analyzing Overlay */}
-                    {isAnalyzing && (
-                        <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center z-40">
-                            <div className="relative mb-4">
-                                <div className="absolute inset-0 bg-skate-neon/50 blur-xl rounded-full animate-pulse"></div>
-                                <Activity className="w-12 h-12 text-skate-neon relative z-10 animate-spin" />
-                            </div>
-                            <p className="text-white font-display text-xl font-bold uppercase tracking-widest animate-pulse">
-                                Analyzing Trick...
-                            </p>
-                            <p className="text-gray-400 text-xs mt-2">Classifying & Scoring</p>
-                        </div>
+                    {!isAnalyzing && !result && (
+                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <Play className="w-16 h-16 text-white/50" />
+                         </div>
                     )}
                 </div>
 
-                {/* Error Message */}
-                {error && (
-                    <div className="bg-red-500/10 border border-red-500/50 p-4 rounded-xl flex items-center space-x-3 text-red-400">
-                        <AlertTriangle className="w-5 h-5" />
-                        <span className="text-sm font-bold">{error}</span>
+                {!result && !isAnalyzing && (
+                    <div className="glass-card p-5 rounded-2xl space-y-4">
+                        <div>
+                             <label className="text-gray-400 text-[10px] font-bold uppercase tracking-widest mb-2 block">{t.SELECT_YOUR_STANCE}</label>
+                             <div className="flex gap-2">
+                                 {['Regular', 'Goofy'].map(s => (
+                                     <button 
+                                        key={s}
+                                        onClick={() => setUserStance(s as 'Regular' | 'Goofy')}
+                                        className={`flex-1 py-3 rounded-xl font-bold uppercase text-xs transition-all ${userStance === s ? 'bg-skate-neon text-black' : 'bg-white/5 text-gray-400'}`}
+                                     >
+                                         {/* @ts-ignore */}
+                                         {t[s] || s}
+                                     </button>
+                                 ))}
+                             </div>
+                        </div>
+
+                        <div>
+                             <label className="text-gray-400 text-[10px] font-bold uppercase tracking-widest mb-2 block">{t.ENTER_TRICK_NAME}</label>
+                             <input 
+                                type="text"
+                                value={trickNameInput}
+                                onChange={(e) => setTrickNameInput(e.target.value)}
+                                placeholder="e.g. Kickflip"
+                                className="w-full bg-black/50 border border-white/10 rounded-xl p-3 text-white text-sm focus:border-skate-neon outline-none"
+                             />
+                             <p className="text-[10px] text-gray-500 mt-1">{t.TRICK_NAME_DESC}</p>
+                        </div>
+
+                        <button 
+                            onClick={startAnalysis}
+                            className="w-full py-4 bg-white text-black rounded-2xl font-display text-2xl font-bold uppercase tracking-wider hover:bg-gray-200 transition-all flex items-center justify-center space-x-2"
+                        >
+                            <Zap className="w-5 h-5 fill-black" />
+                            <span>{t.ANALYZE_TRICK}</span>
+                        </button>
+                    </div>
+                )}
+                
+                {isAnalyzing && (
+                    <div className="text-center p-4">
+                        <Activity className="w-8 h-8 text-skate-neon mx-auto mb-2 animate-spin" />
+                        <p className="text-skate-neon font-bold uppercase animate-pulse">{t.ANALYZING_MEDIA}</p>
+                        <p className="text-xs text-gray-500 mt-1">{t.TRACKING_BOARD}</p>
                     </div>
                 )}
 
-                {/* ACTION AREA */}
-                {!result && !isAnalyzing && (
-                    <button 
-                        onClick={handleAnalyze}
-                        className="w-full py-4 bg-skate-neon text-black rounded-2xl font-display text-2xl font-bold uppercase tracking-wider hover:bg-skate-neonHover transition-all shadow-[0_0_20px_rgba(204,255,0,0.3)] active:scale-95 flex items-center justify-center space-x-2"
-                    >
-                        <Zap className="w-5 h-5 fill-black" />
-                        <span>Start Analysis</span>
-                    </button>
-                )}
-
-                {/* Results Card */}
                 {result && (
                     <div className="space-y-4 animate-slide-up">
-                        {/* Main Score Card */}
                         <div className="glass-card p-6 rounded-3xl border border-skate-neon/30 relative overflow-hidden">
-                            <div className="absolute top-0 right-0 p-4 opacity-10">
-                                <Zap className="w-24 h-24 text-skate-neon" />
-                            </div>
-                            
                             <div className="relative z-10">
                                 <div className="flex justify-between items-start mb-2">
-                                    <span className="text-skate-neon text-[10px] font-bold uppercase tracking-[0.2em] block">
-                                        AI RESULT
-                                    </span>
-                                    {result.isLanded ? (
-                                        <span className="bg-green-500/20 text-green-400 text-xs font-bold px-2 py-1 rounded-lg border border-green-500/30">LANDED</span>
-                                    ) : (
-                                        <span className="bg-red-500/20 text-red-400 text-xs font-bold px-2 py-1 rounded-lg border border-red-500/30">MISSED</span>
-                                    )}
+                                    <span className="text-skate-neon text-[10px] font-bold uppercase tracking-[0.2em] block">AI ANALYSIS</span>
+                                    <span className="bg-green-500/20 text-green-400 text-xs font-bold px-2 py-1 rounded-lg border border-green-500/30">SUCCESS</span>
                                 </div>
                                 <h3 className="text-4xl font-display font-bold text-white mb-4">{result.trickName}</h3>
                                 
                                 <div className="grid grid-cols-2 gap-3">
                                     <div className="bg-white/5 px-4 py-3 rounded-xl border border-white/5">
-                                        <span className="block text-[10px] text-gray-500 uppercase font-bold mb-1">SCORE</span>
+                                        <span className="block text-[10px] text-gray-500 uppercase font-bold mb-1">{t.FORM_SCORE}</span>
                                         <div className="flex items-baseline">
-                                            <span className={`text-3xl font-display font-bold ${result.score > 70 ? 'text-skate-neon' : 'text-white'}`}>
-                                                {result.score}
-                                            </span>
+                                            <span className="text-3xl font-display font-bold text-skate-neon">{result.score}</span>
                                             <span className="text-gray-500 text-sm">/100</span>
                                         </div>
                                     </div>
                                     <div className="bg-white/5 px-4 py-3 rounded-xl border border-white/5">
-                                        <span className="block text-[10px] text-gray-500 uppercase font-bold mb-1">HEIGHT</span>
+                                        <span className="block text-[10px] text-gray-500 uppercase font-bold mb-1">{t.HEIGHT_EST}</span>
                                         <div className="flex items-baseline">
-                                            <span className="text-3xl font-display font-bold text-white">
-                                                {Math.round(result.heightMeters * 100)}
-                                            </span>
+                                            <span className="text-3xl font-display font-bold text-white">{Math.round(result.heightMeters * 100)}</span>
                                             <span className="text-gray-500 text-sm">cm</span>
                                         </div>
                                     </div>
@@ -235,31 +570,33 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
                             </div>
                         </div>
 
-                        {/* AI Feedback Section */}
                         <div className="bg-gradient-to-br from-skate-neon/10 to-transparent p-5 rounded-2xl border border-skate-neon/20">
                             <h4 className="text-skate-neon text-[10px] font-bold uppercase tracking-widest mb-3 flex items-center">
                                 <Zap className="w-3 h-3 mr-1 fill-skate-neon" />
-                                COACH FEEDBACK
+                                {t.IMPROVEMENT_TIP}
                             </h4>
                             <p className="text-white text-sm font-medium leading-relaxed mb-4">
-                                {result.feedbackText || "No feedback generated."}
+                                {result.feedbackText}
                             </p>
-                            
                             {result.improvementTip && (
                                 <div className="bg-black/40 p-3 rounded-xl border border-white/5">
                                     <p className="text-xs text-gray-300">
-                                        <strong className="text-skate-neon block mb-1">NEXT STEPS:</strong>
+                                        <strong className="text-skate-neon block mb-1">TIP:</strong>
                                         {result.improvementTip}
                                     </p>
                                 </div>
                             )}
                         </div>
 
-                        {!user && (
-                            <div className="text-center p-4">
-                                <p className="text-xs text-gray-500">Sign in to save this analysis to your history.</p>
-                            </div>
-                        )}
+                        <div className="p-4 rounded-2xl bg-white/5">
+                            <h4 className="text-gray-400 text-[10px] font-bold uppercase tracking-widest mb-3">{t.WRONG_ANALYSIS}</h4>
+                            <form onSubmit={handleFeedbackSubmit} className="space-y-3">
+                                <input type="text" placeholder={t.ACTUAL_TRICK_NAME} className="w-full bg-black border border-white/10 rounded-lg p-2 text-xs text-white" />
+                                <button type="submit" className="w-full py-2 bg-white/10 text-white rounded-lg text-xs font-bold hover:bg-white/20 transition-colors">
+                                    {t.SEND_FEEDBACK}
+                                </button>
+                            </form>
+                        </div>
                     </div>
                 )}
             </div>
