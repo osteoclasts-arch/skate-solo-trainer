@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Language, User, VisionAnalysis } from '../types';
 import { TRANSLATIONS } from '../constants';
-import { Upload, Zap, Play, Pause, X, Eye, Video, FileVideo, Activity, Info, Camera, Box, AlertTriangle, Clock, FastForward, Rewind, Scissors, RotateCcw } from 'lucide-react';
+import { Upload, Zap, Play, Pause, X, Eye, Video, FileVideo, Activity, Info, Camera, Box, AlertTriangle, Clock, FastForward, Rewind, Scissors, RotateCcw, Target } from 'lucide-react';
 import { analyzeMedia } from '../services/geminiService';
 import { dbService } from '../services/dbService';
 // @ts-ignore
@@ -337,6 +337,7 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<VisionAnalysis | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [videoReady, setVideoReady] = useState(false);
   
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -410,6 +411,7 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
         setPreviewUrl(url);
         setResult(null);
         setError(null);
+        setVideoReady(false); // Reset ready state
         setDetectedObstacleName(null);
         setTrickNameInput("");
         setIsPlaying(false);
@@ -423,6 +425,7 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
         
         // Don't auto play. Just load.
         if (videoRef.current) {
+            videoRef.current.load();
             videoRef.current.currentTime = 0;
             videoRef.current.pause();
         }
@@ -472,7 +475,7 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
       try {
           const aiResult = await analyzeMedia(
               file, 
-              'KR', 
+              language, 
               initialContext, 
               trickNameInput,
               effectiveStart,
@@ -534,7 +537,11 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
 
   const processSingleFrame = async () => {
     if (!videoRef.current || !poseRef.current) return;
-    await poseRef.current.send({ image: videoRef.current });
+    try {
+        await poseRef.current.send({ image: videoRef.current });
+    } catch(e) {
+        console.log("Not ready to process frame");
+    }
   }
 
   const togglePlay = () => {
@@ -546,7 +553,7 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
           videoRef.current.play().then(() => {
               setIsPlaying(true);
               processFrame();
-          });
+          }).catch(e => console.error(e));
       }
   };
 
@@ -606,6 +613,7 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
               canvasRef.current.width = videoRef.current.videoWidth;
               canvasRef.current.height = videoRef.current.videoHeight;
           }
+          setVideoReady(true);
           // Process one frame to show preview
           processSingleFrame();
       }
@@ -692,46 +700,39 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
       });
   };
 
+  const drawMarker = (ctx: CanvasRenderingContext2D, x: number, y: number, color: string) => {
+      ctx.beginPath();
+      ctx.arc(x, y, 4, 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.fill();
+      
+      ctx.beginPath();
+      ctx.moveTo(x - 8, y);
+      ctx.lineTo(x + 8, y);
+      ctx.moveTo(x, y - 8);
+      ctx.lineTo(x, y + 8);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+  };
+
   const drawBoardVisuals = (ctx: CanvasRenderingContext2D, board: {x: number, y: number, angle: number, length: number, width: number}) => {
       ctx.save();
       ctx.translate(board.x, board.y);
       ctx.rotate(board.angle);
 
-      // Visuals: Deck
-      const deckLen = Math.max(80, board.length); 
-      const deckWid = Math.max(25, board.width);
-      
-      ctx.fillStyle = 'rgba(227, 255, 55, 0.2)'; // Neon see-through
-      ctx.strokeStyle = '#E3FF37';
-      ctx.lineWidth = 2;
-      
-      ctx.beginPath();
-      ctx.roundRect(-deckLen/2, -deckWid/2, deckLen, deckWid, 8);
-      ctx.fill();
-      ctx.stroke();
-
-      // Visuals: Wheels (Simulated based on deck orientation)
+      const deckLen = Math.max(80, board.length);
       const truckOffset = deckLen * 0.35;
-      const wheelOffset = deckWid * 0.6;
-      const wheelR = Math.max(3, deckWid * 0.15);
 
-      ctx.fillStyle = '#FFFFFF';
-      const wheelPositions = [
-          { x: truckOffset, y: -wheelOffset },
-          { x: truckOffset, y: wheelOffset },
-          { x: -truckOffset, y: -wheelOffset },
-          { x: -truckOffset, y: wheelOffset }
-      ];
+      // Draw Center Marker
+      drawMarker(ctx, 0, 0, '#FF00FF'); // Magenta Center
 
-      wheelPositions.forEach(p => {
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, wheelR, 0, Math.PI*2);
-          ctx.fill();
-      });
-
-      // Visuals: Center Indicator
-      ctx.fillStyle = '#FF00FF';
-      ctx.beginPath(); ctx.arc(0, 0, 3, 0, Math.PI*2); ctx.fill();
+      // Draw Estimated Trucks (Axles) Markers
+      // We don't draw the board shape anymore, just the technical markers
+      ctx.translate(truckOffset, 0);
+      drawMarker(ctx, 0, 0, '#E3FF37'); // Front Truck (Neon)
+      ctx.translate(-2 * truckOffset, 0);
+      drawMarker(ctx, 0, 0, '#E3FF37'); // Back Truck (Neon)
 
       ctx.restore();
 
@@ -833,7 +834,7 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
                         className="absolute inset-0 w-full h-full object-contain opacity-0" 
                         muted
                         playsInline
-                        crossOrigin="anonymous"
+                        preload="metadata"
                         onTimeUpdate={onTimeUpdate}
                         onLoadedMetadata={onLoadedMetadata}
                     />
@@ -975,7 +976,10 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
 
                         <button 
                             onClick={startAnalysis}
-                            className="w-full py-4 bg-white text-black rounded-2xl font-display text-2xl font-bold uppercase tracking-wider hover:bg-gray-200 transition-all flex items-center justify-center space-x-2"
+                            disabled={!videoReady}
+                            className={`w-full py-4 rounded-2xl font-display text-2xl font-bold uppercase tracking-wider transition-all flex items-center justify-center space-x-2 ${
+                                videoReady ? 'bg-white text-black hover:bg-gray-200' : 'bg-gray-800 text-gray-500 cursor-not-allowed'
+                            }`}
                         >
                             <Zap className="w-5 h-5 fill-black" />
                             <span>{t.ANALYZE_TRICK}</span>

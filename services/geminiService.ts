@@ -173,11 +173,11 @@ export const getAnalyticsInsight = async (
     const insightSchema: Schema = {
         type: Type.OBJECT,
         properties: {
-            diagnosis: { type: Type.STRING, description: "One-line overall assessment title (Korean)" },
-            summary: { type: Type.STRING, description: "2-3 sentences summarizing performance (Korean)" },
-            weaknessAnalysis: { type: Type.STRING, description: "Comment on the specific weaknesses (Korean)" },
-            improvementSuggestions: { type: Type.ARRAY, items: { type: Type.STRING }, description: "3 specific actionable tips (Korean)" },
-            aiFeedback: { type: Type.STRING, description: "Motivating closing comment (Korean)" }
+            diagnosis: { type: Type.STRING, description: "One-line overall assessment title" },
+            summary: { type: Type.STRING, description: "2-3 sentences summarizing performance" },
+            weaknessAnalysis: { type: Type.STRING, description: "Comment on the specific weaknesses" },
+            improvementSuggestions: { type: Type.ARRAY, items: { type: Type.STRING }, description: "3 specific actionable tips" },
+            aiFeedback: { type: Type.STRING, description: "Motivating closing comment" }
         },
         required: ["diagnosis", "summary", "weaknessAnalysis", "improvementSuggestions", "aiFeedback"]
     };
@@ -275,7 +275,7 @@ export const analyzeMedia = async (
 
     const ai = getAI();
 
-    // Use full base tricks list
+    // Use full base tricks list for context, though Stage 2 will determine the specific one
     const allTricks = BASE_TRICKS.map(t => t.name).join(", ");
     
     // Create User Context string
@@ -288,69 +288,68 @@ export const analyzeMedia = async (
         ? `IMPORTANT: Analyze the video strictly between timestamp ${startTime}s and ${endTime}s. IGNORE any actions before ${startTime}s or after ${endTime}s.`
         : "";
 
+    // Language Logic
+    const langName = language === 'KR' ? 'KOREAN (Hangul)' : 'ENGLISH';
+    const langCode = language === 'KR' ? 'KOREAN' : 'ENGLISH';
+
+    // USER PROVIDED PROMPT FOR 2-STAGE ANALYSIS
     const prompt = `
+# SYSTEM INSTRUCTION: 2-STAGE ANALYSIS
+You must analyze the provided video in two strict stages.
+
+--- STAGE 1: BOARD TRACKING & STATE EXTRACTION (INTERNAL) ---
 # Role
-You are the world's most precise AI Skateboard Trick Analyst and Competition Judge. Your goal is to identify the exact name of the skateboard trick in the video by analyzing the physics of the board and the rider's interaction with obstacles.
+You are a Computer Vision Object Tracking Engine optimized for extreme sports. Your SOLE purpose is to track the "Skateboard Deck" and "Wheels" frame-by-frame. You do NOT identify trick names in this stage.
 
-# Analysis Scope
-${timeRangeStr}
+# Objective
+Analyze the provided video frames and extract the precise location and visual state of the skateboard.
 
-# Analysis Logic (Chain of Thought)
-You must analyze the video step-by-step in the following order. Do not jump to a conclusion until you have evaluated all factors.
+# Visual Definitions (Visual Anchors)
+To distinguish the board from the background and the rider's shoes, look for these specific features:
+1.  **The Deck Edge:** A thin sandwich line of wood (maple layers).
+2.  **The Trucks:** Silver/Metallic mechanical parts attached to the board.
+3.  **The Wheels:** Small, round, usually white or urethane-colored objects.
+4.  **Contrast:**
+    - **Top:** Usually black (Grip tape).
+    - **Bottom:** Usually colored/patterned (Graphic).
 
-## STEP 1: Stance & Pop Mechanism
-- Analyze which foot pops the board (Back foot vs. Front foot).
-- Determine the approach (Forward or Backward/Fakie).
-- Identify the starting stance context if possible (Ollie, Nollie, Fakie, Switch).
+# Instructions for Analysis
+For each sampled frame, determine the following:
+1.  **Location:** Where is the board relative to the rider's feet? (e.g., Attached, Floating Mid-air, Vertical)
+2.  **Orientation (CRITICAL):**
+    - \`Flat\`: Board is parallel to the ground.
+    - \`Vertical/Edge\`: Board is sideways (90 degrees).
+    - \`Inverted\`: Board is upside down (Graphic facing up).
+3.  **Visible Side:** Can you see the Black Grip tape, the Graphic Bottom, or just the Edge?
 
-## STEP 2: Board Dynamics (CRITICAL)
-Analyze the board's rotation on 3 axes INDEPENDENTLY from the rider's body:
-1. **Flip Axis (X-axis):** Does the board flip along its length? (e.g., Kickflip, Heelflip)
-2. **Shove-it Axis (Y-axis):** Does the board spin horizontally? (e.g., Shove-it, 360 Shove-it)
-3. **Combined:** Is it a combination? (e.g., Kickflip + 360 Shove-it = Tre Flip/360 Flip)
-   - *Warning:* If the board flips but the body also rotates 180, check if it's a "Sex Change/Body Varial" or a "180 Flip".
+*NOTE: Use this Stage 1 analysis internally to deduce the board's physics. Do not output the raw frame list, but summarize the physics findings in the 'board_physics' field.*
 
-## STEP 3: Body Dynamics
-- Does the rider's body rotate? (180, 360, etc.)
-- Does the body rotate in the SAME direction as the board, or OPPOSITE? (e.g., Bigspin vs. Varial)
-- *Crucial Check:* If the body rotates but the board does NOT flip, it is a rotation trick (e.g., Frontside 180). If the board flips while the body rotates, it is a flip variation (e.g., Frontside Flip).
+--- STAGE 2: TRICK IDENTIFICATION ---
+Using the visual observations and physics data extracted in Stage 1, identify the skateboard trick. 
 
-## STEP 4: Obstacle Interaction (If applicable)
-- Is the rider interacting with a rail, ledge, or coping?
-- **Trucks:** Are the trucks touching? (50-50, 5-0, Nosegrind, K-Grind/Crooked)
-- **Deck/Wood:** Is the wood touching? (Boardslide, Lipslide, Noseslide, Tailslide)
-- *Differentiation:* Distinguish between Boardslide (rail between legs) and Lipslide (tail passes over rail).
-
-## STEP 5: Final Identification
-Combine findings from Steps 1-4 to name the trick. Use standard skateboarding terminology (e.g., "Nollie Tre Flip", "Backside Smith Grind").
-
-# Constraints & Rules
-- **Look at the Board First:** The board's movement defines the trick. The body style is secondary.
-- **Ignore "Style" Movements:** Do not confuse arm waving or pre-winding with the actual trick mechanics.
-- **Landing:** Check if the rider lands clean. If they land and revert immediately, note it, but identify the main trick first.
-- If the trick is ambiguous, list the two most likely possibilities and explain the visual evidence for the primary choice.
+1. **Board Physics:** Determine if the board flips (Kickflip/Heelflip), rotates (Shove-it), or does both (Tre Flip).
+2. **Body Physics:** Determine if the rider rotates with the board.
+3. **Stance:** Determine stance based on pop foot.
+4. **Identification:** Combine these factors to name the trick.
 
 # Input Context
-User Hint (Self-reported): ${trickHint || "None"}
+Analysis Scope: ${timeRangeStr}
+User Hint: ${trickHint || "None"}
 User History: ${contextStr}
 Possible Candidates: [${allTricks}]
 
 # Output Format
-You MUST return a JSON object with the following fields. 
-IMPORTANT: 'feedbackText' and 'improvementTip' MUST be in KOREAN (Hangul).
+Return a SINGLE JSON object with the following fields. 
+IMPORTANT: 'feedbackText' and 'improvementTip' MUST be in ${langName}.
 
 {
-  "trickName": "String (The Final Trick Name from Step 5)",
+  "trickName": "String (The Final Trick Name from Stage 2)",
   "confidence": 0.0 to 1.0,
-  "stance_pop": "String (Analysis from Step 1)",
-  "board_rotation": "String (Analysis from Step 2)",
-  "body_rotation": "String (Analysis from Step 3)",
-  "obstacle_interaction": "String (Analysis from Step 4)",
-  "reasoning": "String (Brief explanation of why this is the specific trick)",
+  "board_physics": "String (Summary of Stage 1 observations, e.g., 'Board flipped once on axis, grip tape visible at landing')",
   "score": 0-100 (Integer, based on cleanliness and height),
   "heightMeters": 0.0-2.0 (Float, approximate jump height),
-  "feedbackText": "String (KOREAN: Detailed coaching feedback based on the analysis)",
-  "improvementTip": "String (KOREAN: One specific tip to improve technique)"
+  "feedbackText": "String (${langCode}: Detailed coaching feedback based on the analysis)",
+  "improvementTip": "String (${langCode}: One specific tip to improve technique)"
 }
     `;
 
@@ -380,7 +379,7 @@ IMPORTANT: 'feedbackText' and 'improvementTip' MUST be in KOREAN (Hangul).
                  confidence: data.confidence || 0.8,
                  score: data.score,
                  heightMeters: data.heightMeters,
-                 rotationDegrees: 0, // Not explicitly returned by this prompt, default to 0
+                 rotationDegrees: 0, 
                  feedbackText: data.feedbackText,
                  improvementTip: data.improvementTip
              };
