@@ -267,7 +267,9 @@ export const analyzeMedia = async (
     file: File, 
     language: Language, 
     userContext: string[] = [],
-    trickHint?: string
+    trickHint?: string,
+    startTime?: number,
+    endTime?: number
 ): Promise<VisionAnalysis | null> => {
     if (!apiKey) return null;
 
@@ -281,9 +283,17 @@ export const analyzeMedia = async (
         ? `The user has recently practiced or corrected these tricks: ${userContext.join(", ")}. Prioritize these if the visual evidence is ambiguous.` 
         : "";
 
+    // Time Range Context
+    const timeRangeStr = (startTime !== undefined && endTime !== undefined)
+        ? `IMPORTANT: Analyze the video strictly between timestamp ${startTime}s and ${endTime}s. IGNORE any actions before ${startTime}s or after ${endTime}s.`
+        : "";
+
     const prompt = `
 # Role
 You are the world's most precise AI Skateboard Trick Analyst and Competition Judge. Your goal is to identify the exact name of the skateboard trick in the video by analyzing the physics of the board and the rider's interaction with obstacles.
+
+# Analysis Scope
+${timeRangeStr}
 
 # Analysis Logic (Chain of Thought)
 You must analyze the video step-by-step in the following order. Do not jump to a conclusion until you have evaluated all factors.

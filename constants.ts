@@ -1,3 +1,4 @@
+
 import { Difficulty, Stance, Trick, TrickCategory, TrickTip } from "./types";
 
 export const SKATE_LETTERS = ['S', 'K', 'A', 'T', 'E'];
@@ -113,6 +114,7 @@ export const TRANSLATIONS = {
     UPLOAD_MEDIA: "Upload Media",
     ANALYZE_TRICK: "Analyze Trick",
     ANALYZING_MEDIA: "Tracking Skater & Board...",
+    ANALYZING_WITH_GEMINI: "Analyzing with Gemini 3 Pro...",
     TRICK_DETECTED: "Trick Detected",
     FORM_SCORE: "Form Score",
     HEIGHT_EST: "Est. Height",
@@ -135,7 +137,12 @@ export const TRANSLATIONS = {
     UPLOAD_GUIDE: "Upload Guide",
     GUIDE_1: "Use a Tripod (Static Camera)",
     GUIDE_2: "Film from Side View",
-    GUIDE_3: "Keep Whole Body in Frame"
+    GUIDE_3: "Keep Whole Body in Frame",
+    TRIM_RANGE: "Trim Range",
+    SET_START: "Set Start",
+    SET_END: "Set End",
+    RESET_TRIM: "Reset",
+    CLIP_DURATION: "Clip Duration"
   },
   KR: {
     NEW_SESSION: "새로운 세션",
@@ -247,6 +254,7 @@ export const TRANSLATIONS = {
     UPLOAD_MEDIA: "미디어 업로드",
     ANALYZE_TRICK: "트릭 분석하기",
     ANALYZING_MEDIA: "스케이터와 보드를 추적 중...",
+    ANALYZING_WITH_GEMINI: "Gemini 3 Pro가 정밀 분석 중...",
     TRICK_DETECTED: "감지된 트릭",
     FORM_SCORE: "자세 점수",
     HEIGHT_EST: "예상 높이",
@@ -269,7 +277,12 @@ export const TRANSLATIONS = {
     UPLOAD_GUIDE: "촬영 가이드",
     GUIDE_1: "삼각대 고정 (흔들림 X)",
     GUIDE_2: "측면 촬영 (Side View)",
-    GUIDE_3: "전신과 보드가 나오게"
+    GUIDE_3: "전신과 보드가 나오게",
+    TRIM_RANGE: "구간 편집",
+    SET_START: "시작점",
+    SET_END: "종료점",
+    RESET_TRIM: "초기화",
+    CLIP_DURATION: "선택된 길이"
   }
 };
 

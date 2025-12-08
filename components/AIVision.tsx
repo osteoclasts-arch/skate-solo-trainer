@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Language, User, VisionAnalysis } from '../types';
 import { TRANSLATIONS } from '../constants';
-import { Upload, Zap, Play, Pause, X, Eye, Video, FileVideo, Activity, Info, Camera, Box, AlertTriangle, Clock, FastForward, Rewind } from 'lucide-react';
+import { Upload, Zap, Play, Pause, X, Eye, Video, FileVideo, Activity, Info, Camera, Box, AlertTriangle, Clock, FastForward, Rewind, Scissors, RotateCcw } from 'lucide-react';
 import { analyzeMedia } from '../services/geminiService';
 import { dbService } from '../services/dbService';
 // @ts-ignore
@@ -342,6 +342,10 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
   const [playbackSpeed, setPlaybackSpeed] = useState(0.5); 
+  
+  // Trimming State
+  const [trimStart, setTrimStart] = useState(0);
+  const [trimEnd, setTrimEnd] = useState(0);
 
   const [userStance, setUserStance] = useState<'Regular' | 'Goofy'>('Regular');
   const [userContext, setUserContext] = useState<string[]>([]);
@@ -410,6 +414,8 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
         setTrickNameInput("");
         setIsPlaying(false);
         setProgress(0);
+        setTrimStart(0);
+        setTrimEnd(0);
         
         // Reset Logic
         boardTrackerRef.current.reset();
@@ -432,7 +438,7 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
       statsRef.current = { maxHeight: 0, frameCount: 0 };
       
       const video = videoRef.current;
-      video.currentTime = 0;
+      video.currentTime = trimStart > 0 ? trimStart : 0;
       video.playbackRate = 1.5; // Fast forward for UX
       
       try {
@@ -459,8 +465,19 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
       // We pass userContext (history) but physicsContext will be empty/initial.
       const initialContext = [`User Stance: ${userStance}`, ...userContext];
       
+      // If trimEnd is 0, we consider it not trimmed or full duration
+      const effectiveEnd = trimEnd > 0 ? trimEnd : duration;
+      const effectiveStart = trimStart;
+
       try {
-          const aiResult = await analyzeMedia(file, 'KR', initialContext, trickNameInput);
+          const aiResult = await analyzeMedia(
+              file, 
+              'KR', 
+              initialContext, 
+              trickNameInput,
+              effectiveStart,
+              effectiveEnd
+            );
           
           let finalResult: VisionAnalysis;
           
@@ -540,6 +557,27 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
       setProgress(time);
       processSingleFrame(); 
   };
+  
+  // Trimming Handlers
+  const handleSetStart = () => {
+      if(videoRef.current) {
+          const t = videoRef.current.currentTime;
+          setTrimStart(t);
+          if (trimEnd > 0 && t >= trimEnd) setTrimEnd(0); // Reset end if start passes it
+      }
+  };
+  
+  const handleSetEnd = () => {
+      if(videoRef.current) {
+          setTrimEnd(videoRef.current.currentTime);
+      }
+  };
+
+  const handleResetTrim = () => {
+      setTrimStart(0);
+      setTrimEnd(0);
+      if(videoRef.current) videoRef.current.currentTime = 0;
+  };
 
   const handleSpeedChange = (speed: number) => {
       setPlaybackSpeed(speed);
@@ -550,7 +588,14 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
 
   const onTimeUpdate = () => {
       if (videoRef.current) {
-          setProgress(videoRef.current.currentTime);
+          const curr = videoRef.current.currentTime;
+          setProgress(curr);
+
+          // Trimming Loop Logic
+          if (trimEnd > 0 && curr >= trimEnd) {
+              videoRef.current.currentTime = trimStart;
+              if (!isPlaying) videoRef.current.pause();
+          }
       }
   };
 
@@ -810,16 +855,67 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
                          </div>
                     )}
 
-                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-4 transition-opacity opacity-0 group-hover:opacity-100 flex flex-col space-y-2 z-30">
-                        <input 
-                            type="range" 
-                            min="0" 
-                            max={duration} 
-                            step="0.01" 
-                            value={progress} 
-                            onChange={handleSeek}
-                            className="w-full h-1 bg-white/20 rounded-full appearance-none cursor-pointer accent-skate-neon hover:h-2 transition-all"
-                        />
+                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-4 transition-opacity opacity-100 flex flex-col space-y-3 z-30">
+                        {/* Trim Controls Overlay */}
+                        {!isAnalyzing && !result && (
+                            <div className="flex items-center justify-between mb-1 px-1">
+                                <span className="text-[10px] font-bold text-skate-neon uppercase tracking-wide flex items-center">
+                                    <Scissors className="w-3 h-3 mr-1" />
+                                    {t.TRIM_RANGE}: 
+                                    <span className="text-white ml-1">
+                                        {trimStart.toFixed(1)}s - {trimEnd > 0 ? trimEnd.toFixed(1) : duration.toFixed(1)}s
+                                    </span>
+                                </span>
+                                <div className="flex gap-2">
+                                     <button 
+                                        onClick={handleSetStart}
+                                        className="bg-white/10 hover:bg-white/20 px-2 py-1 rounded text-[10px] font-bold text-white border border-white/10"
+                                     >
+                                         [ {t.SET_START}
+                                     </button>
+                                     <button 
+                                        onClick={handleSetEnd}
+                                        className="bg-white/10 hover:bg-white/20 px-2 py-1 rounded text-[10px] font-bold text-white border border-white/10"
+                                     >
+                                         {t.SET_END} ]
+                                     </button>
+                                     <button 
+                                        onClick={handleResetTrim}
+                                        className="bg-white/10 hover:bg-white/20 px-2 py-1 rounded text-[10px] font-bold text-gray-400 hover:text-white"
+                                     >
+                                         <RotateCcw className="w-3 h-3" />
+                                     </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Progress Bar (Visualizing Trim) */}
+                        <div className="relative w-full h-1 bg-white/20 rounded-full">
+                            {/* Trimmed Section Highlight */}
+                            {trimEnd > 0 && (
+                                <div 
+                                    className="absolute top-0 bottom-0 bg-skate-neon/30"
+                                    style={{
+                                        left: `${(trimStart / duration) * 100}%`,
+                                        width: `${((trimEnd - trimStart) / duration) * 100}%`
+                                    }}
+                                ></div>
+                            )}
+                            <input 
+                                type="range" 
+                                min="0" 
+                                max={duration} 
+                                step="0.01" 
+                                value={progress} 
+                                onChange={handleSeek}
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                            />
+                            {/* Playhead */}
+                            <div 
+                                className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-skate-neon rounded-full shadow pointer-events-none"
+                                style={{ left: `${(progress / duration) * 100}%` }}
+                            ></div>
+                        </div>
                         
                         <div className="flex justify-between items-center">
                             <div className="flex items-center space-x-4">
@@ -890,7 +986,7 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
                 {isAnalyzing && (
                     <div className="text-center p-4">
                         <Activity className="w-8 h-8 text-skate-neon mx-auto mb-2 animate-spin" />
-                        <p className="text-skate-neon font-bold uppercase animate-pulse">{t.ANALYZING_MEDIA}</p>
+                        <p className="text-skate-neon font-bold uppercase animate-pulse">{t.ANALYZING_WITH_GEMINI}</p>
                         <p className="text-xs text-gray-500 mt-1">{t.TRACKING_BOARD}</p>
                     </div>
                 )}
