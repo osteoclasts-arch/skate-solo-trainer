@@ -253,63 +253,113 @@ const fileToPart = (file: File): Promise<{ inlineData: { data: string; mimeType:
     });
 };
 
-// --- NEW FUNCTION: Generate Feedback based on Vision Analysis ---
+// --- VISION ANALYSIS ---
+
+export const analyzeMedia = async (
+    file: File, 
+    language: Language, 
+    userContext: string[] = [],
+    trickHint?: string
+): Promise<VisionAnalysis | null> => {
+    if (!apiKey) return null;
+
+    const ai = getAI();
+
+    // Use full base tricks list
+    const allTricks = BASE_TRICKS.map(t => t.name).join(", ");
+    
+    // Create User Context string
+    const contextStr = userContext.length > 0 
+        ? `The user has recently practiced or corrected these tricks: ${userContext.join(", ")}. Prioritize these if the visual evidence is ambiguous.` 
+        : "";
+
+    const prompt = `
+        You are a strict Skateboard Competition Judge (Referee).
+        Analyze the video and side-view physics data to classify the trick.
+
+        [STRICT SIDE-VIEW PHYSICS RULES]
+        1. OLLIE:
+           - Board Thickness Change is LOW (Remains a thin line).
+           - Board Length Change is LOW (Does not shorten/spin).
+           - Board does NOT flip or spin.
+        2. KICKFLIP / HEELFLIP:
+           - Board Thickness Change is HIGH (Spikes > 2.0x as the flat deck faces the camera).
+           - Board Length Change is LOW (Does not point at camera).
+        3. SHUVIT / POP SHUVIT:
+           - Board Thickness Change is LOW (Remains relatively flat).
+           - Board Length Change is HIGH (Shortens significantly < 0.6x as it turns 90 degrees).
+        4. TRE FLIP / VARIAL:
+           - BOTH Thickness (Flip) and Length (Spin) changes are HIGH.
+
+        [INPUT CONTEXT]
+        User Hint (Self-reported): ${trickHint || "None"} (If provided, verify if the video matches this trick name. If physics don't match, trust physics).
+        User History: ${contextStr}
+        Candidates: [${allTricks}]
+
+        [TASK]
+        1. Classify the trick based on the physics rules above + visual motion.
+           - If unclear, return "UNKNOWN".
+        2. Even if UNKNOWN, you MUST estimate jump height and score.
+        3. Score (0-100) based on landing cleanliness and height.
+
+        Output JSON format:
+        {
+            "trickName": "string",
+            "confidence": number,
+            "score": number,
+            "heightMeters": number,
+            "rotationDegrees": number,
+            "feedbackText": "string (${language === 'KR' ? 'Korean' : 'English'})",
+            "improvementTip": "string"
+        }
+    `;
+
+    try {
+        const videoPart = await fileToPart(file);
+
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: {
+                parts: [videoPart.inlineData, { text: prompt }]
+            },
+            config: {
+                responseMimeType: "application/json",
+                temperature: 0 // Deterministic physics judgment
+            }
+        });
+
+        if (response.text) {
+             const data = JSON.parse(response.text);
+             return {
+                 id: Date.now().toString(),
+                 timestamp: new Date().toISOString(),
+                 trickName: data.trickName,
+                 isLanded: data.score > 40,
+                 confidence: data.confidence || 0.8,
+                 score: data.score,
+                 heightMeters: data.heightMeters,
+                 rotationDegrees: data.rotationDegrees || 0,
+                 feedbackText: data.feedbackText,
+                 improvementTip: data.improvementTip
+             };
+        }
+        return null;
+    } catch (error) {
+        console.error("Error analyzing media:", error);
+        return null;
+    }
+};
 
 export const generateCoachingFeedback = async (
     analysis: VisionAnalysis, 
     language: Language
 ): Promise<{ feedback: string, tips: string }> => {
-    if (!apiKey) return { 
-        feedback: "AI Key missing. Good job trying!", 
+    if (analysis.feedbackText && analysis.improvementTip) {
+        return { feedback: analysis.feedbackText, tips: analysis.improvementTip };
+    }
+    
+    return { 
+        feedback: "Analysis complete.", 
         tips: "Keep practicing." 
     };
-
-    const ai = getAI();
-
-    // Prepare context for the prompt based on numerical data
-    const prompt = `
-        You are a professional skateboard coach. A computer vision model has analyzed a user's trick video.
-        Provide detailed, helpful, and specific feedback based on the data.
-        
-        Language: Korean (Hangul).
-
-        Analysis Data:
-        - Trick: ${analysis.trickName}
-        - Outcome: ${analysis.isLanded ? "Success (Landed)" : "Failed (Bailed)"}
-        - Score: ${analysis.score}/100 (Where 100 is pro perfect, 0 is terrible)
-        - Jump Height: ${analysis.heightMeters}m
-        ${analysis.rotationDegrees > 0 ? `- Rotation: ${analysis.rotationDegrees} degrees` : ''}
-
-        Instructions:
-        1. "feedback": A 2-3 sentence summary of what went right or wrong based on the score and success. Be encouraging but technical.
-        2. "tips": 2-3 bullet points on specific things to focus on for the next attempt (e.g. pop harder, level out, shoulders).
-
-        Output JSON: { "feedback": string, "tips": string }
-    `;
-
-    try {
-        const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: prompt,
-            config: {
-                responseMimeType: "application/json",
-            }
-        });
-
-        if (response.text) {
-             const json = JSON.parse(response.text);
-             return { feedback: json.feedback, tips: json.tips };
-        }
-        return { feedback: "분석을 완료했습니다.", tips: "꾸준히 연습하세요." };
-    } catch (error) {
-        console.error("Error generating coaching feedback:", error);
-        return { feedback: "AI 피드백 생성 실패.", tips: "다시 시도해주세요." };
-    }
-};
-
-// Deprecated or Legacy functions below if any...
-export const analyzeMedia = async (file: File, language: Language, trickHint?: string, userStance: 'Regular' | 'Goofy' = 'Regular'): Promise<VisionAnalysis | null> => {
-    // This function can remain as a legacy wrapper or be removed if fully replaced. 
-    // For now, I'll leave it to avoid breaking other imports, but return null so the new flow is used.
-    return null; 
 };

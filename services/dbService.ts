@@ -1,5 +1,5 @@
 
-import { getFirestore, doc, setDoc, getDoc, collection, addDoc, getDocs, query, orderBy, Timestamp } from "firebase/firestore";
+import { getFirestore, doc, setDoc, getDoc, collection, addDoc, getDocs, query, orderBy, Timestamp, limit } from "firebase/firestore";
 import { app } from "./authService";
 import { SessionResult, VisionAnalysis } from "../types";
 
@@ -108,6 +108,31 @@ export const dbService = {
           });
       } catch (e) {
           console.error("Error saving feedback", e);
+      }
+  },
+
+  /**
+   * Get user's past feedback to use as context for AI learning
+   */
+  async getUserFeedbacks(uid: string): Promise<string[]> {
+      if (!db) return [];
+      try {
+          const feedbackRef = collection(db, "users", uid, "vision_feedback");
+          const q = query(feedbackRef, orderBy("timestamp", "desc"), limit(10));
+          const snap = await getDocs(q);
+          
+          const contexts: string[] = [];
+          snap.forEach(d => {
+              const data = d.data();
+              if (data.actualTrickName) {
+                  contexts.push(data.actualTrickName);
+              }
+          });
+          // Return unique trick names the user has practiced/corrected
+          return [...new Set(contexts)];
+      } catch (e) {
+          console.error("Error getting feedbacks", e);
+          return [];
       }
   },
 

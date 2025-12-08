@@ -1,6 +1,3 @@
-
-
-
 import { Difficulty, Stance, Trick, TrickCategory, TrickTip } from "./types";
 
 export const SKATE_LETTERS = ['S', 'K', 'A', 'T', 'E'];
@@ -133,7 +130,12 @@ export const TRANSLATIONS = {
     FEEDBACK_THANKS: "Thanks! We'll learn from this.",
     SELECT_YOUR_STANCE: "Select Your Stance",
     SELECT_STANCE_DESC: "Essential for detecting Fakie, Nollie, and Switch.",
-    TRACKING_BOARD: "Tracking Board Physics..."
+    TRACKING_BOARD: "Tracking Board Physics...",
+    TRACKING_OBSTACLE: "Obstacle Detected:",
+    UPLOAD_GUIDE: "Upload Guide",
+    GUIDE_1: "Use a Tripod (Static Camera)",
+    GUIDE_2: "Film from Side View",
+    GUIDE_3: "Keep Whole Body in Frame"
   },
   KR: {
     NEW_SESSION: "새로운 세션",
@@ -262,7 +264,12 @@ export const TRANSLATIONS = {
     FEEDBACK_THANKS: "피드백 감사합니다! 학습에 반영하겠습니다.",
     SELECT_YOUR_STANCE: "내 스탠스 선택",
     SELECT_STANCE_DESC: "페이키, 널리, 스위치를 구분하기 위해 꼭 필요합니다.",
-    TRACKING_BOARD: "보드 물리엔진 분석 중..."
+    TRACKING_BOARD: "보드 물리엔진 분석 중...",
+    TRACKING_OBSTACLE: "장애물 감지:",
+    UPLOAD_GUIDE: "촬영 가이드",
+    GUIDE_1: "삼각대 고정 (흔들림 X)",
+    GUIDE_2: "측면 촬영 (Side View)",
+    GUIDE_3: "전신과 보드가 나오게"
   }
 };
 

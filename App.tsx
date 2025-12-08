@@ -12,7 +12,7 @@ import { generateAISession } from './services/geminiService';
 import { signInWithGoogle, logout, getFirebaseAuth } from './services/authService';
 import { dbService } from './services/dbService';
 import { onAuthStateChanged } from 'firebase/auth';
-import { Home, BarChart2, BookOpen, Layers, Eye } from 'lucide-react';
+import { Home, BarChart2, BookOpen, Layers, Eye, Instagram } from 'lucide-react';
 
 const App: React.FC = () => {
   const [view, setView] = useState<ViewState>('DASHBOARD');
@@ -207,19 +207,34 @@ const App: React.FC = () => {
   const renderView = () => {
     if (isAuthChecking) {
         return (
-            <div className="flex h-screen flex-col items-center justify-center bg-black space-y-8 animate-fade-in">
-                <div className="text-center">
-                    <h1 className="text-7xl font-display font-bold text-white tracking-tighter leading-none mb-4">
+            <div className="flex h-screen flex-col items-center justify-center bg-black space-y-12 animate-fade-in relative overflow-hidden">
+                {/* Background ambient glow */}
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-skate-neon/10 rounded-full blur-[100px] animate-pulse-slow"></div>
+
+                <div className="text-center relative z-10">
+                    <h1 className="text-[5rem] font-display font-bold text-white tracking-tighter leading-[0.85] mb-6">
                         SKATE<br/>
-                        <span className="text-skate-neon text-glow">SOLO</span>
+                        <span className="text-skate-neon text-glow drop-shadow-[0_0_15px_rgba(204,255,0,0.5)]">SOLO</span>
                     </h1>
-                    <div className="animate-spin h-6 w-6 border-2 border-skate-neon rounded-full border-t-transparent mx-auto"></div>
+                    <div className="flex items-center justify-center space-x-3">
+                        <div className="h-1 w-1 bg-gray-500 rounded-full animate-bounce"></div>
+                        <div className="h-1 w-1 bg-white rounded-full animate-bounce delay-75"></div>
+                        <div className="h-1 w-1 bg-skate-neon rounded-full animate-bounce delay-150"></div>
+                    </div>
                 </div>
                 
-                <div className="absolute bottom-12 flex items-center space-x-2 opacity-60">
-                    <span className="text-[10px] font-mono text-gray-500 tracking-[0.2em] uppercase">
-                        Designed by <span className="text-white font-bold hover:text-skate-neon transition-colors cursor-default">@OSTEOCLASTS_</span>
-                    </span>
+                <div className="absolute bottom-16 flex flex-col items-center space-y-2 opacity-80">
+                    <a 
+                        href="https://instagram.com/osteoclasts_" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="flex items-center space-x-2 bg-white/5 px-4 py-2 rounded-full border border-white/5 hover:bg-white/10 transition-colors"
+                    >
+                        <Instagram className="w-4 h-4 text-gray-400" />
+                        <span className="text-xs font-bold text-gray-300 tracking-wider">
+                            @OSTEOCLASTS_
+                        </span>
+                    </a>
                 </div>
             </div>
         );

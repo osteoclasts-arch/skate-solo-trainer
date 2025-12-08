@@ -1,8 +1,9 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Language, User, VisionAnalysis } from '../types';
 import { TRANSLATIONS } from '../constants';
-import { Upload, Zap, Play, X, Eye, Video, FileVideo, Activity } from 'lucide-react';
-import { generateCoachingFeedback } from '../services/geminiService';
+import { Upload, Zap, Play, X, Eye, Video, FileVideo, Activity, Info, Camera, Box, AlertTriangle } from 'lucide-react';
+import { analyzeMedia, generateCoachingFeedback } from '../services/geminiService';
 import { dbService } from '../services/dbService';
 // @ts-ignore
 import mpPose from '@mediapipe/pose';
@@ -18,7 +19,77 @@ interface Props {
   user: User | null;
 }
 
-// --- ADVANCED BOARD TRACKER (ROI + PCA + PHYSICS) ---
+// --- OBSTACLE TRACKER (Cones/Ledges) ---
+class ObstacleTracker {
+    detectedObstacles: { type: string, x: number, y: number, w: number, h: number }[] = [];
+    frameCount = 0;
+
+    scan(ctx: CanvasRenderingContext2D, width: number, height: number) {
+        // Run scan only every 15 frames to save performance
+        if (this.frameCount % 15 !== 0) {
+            this.frameCount++;
+            return this.detectedObstacles;
+        }
+
+        const roiH = height * 0.4; // Only scan bottom 40%
+        const startY = height - roiH;
+        
+        try {
+            const frame = ctx.getImageData(0, startY, width, roiH);
+            const data = frame.data;
+            const obstacles = [];
+
+            // Simple Color-based Detection for Orange Traffic Cones
+            // HSV-like heuristic in RGB: High Red, Med Green, Low Blue
+            let orangePixelsX = 0;
+            let orangePixelsY = 0;
+            let orangeCount = 0;
+            let minX = width, maxX = 0, minY = height, maxY = 0;
+
+            for (let i = 0; i < data.length; i += 16) { // Skip pixels for speed
+                const r = data[i];
+                const g = data[i + 1];
+                const b = data[i + 2];
+
+                // Orange-ish / Red-ish check
+                if (r > 150 && g > 50 && g < 180 && b < 100 && r > g + 40) {
+                    const idx = i / 4;
+                    const x = idx % width;
+                    const y = startY + Math.floor(idx / width);
+
+                    orangePixelsX += x;
+                    orangePixelsY += y;
+                    orangeCount++;
+
+                    if (x < minX) minX = x;
+                    if (x > maxX) maxX = x;
+                    if (y < minY) minY = y;
+                    if (y > maxY) maxY = y;
+                }
+            }
+
+            if (orangeCount > 100) { // Threshold size
+                obstacles.push({
+                    type: 'Cone',
+                    x: minX,
+                    y: minY,
+                    w: maxX - minX,
+                    h: maxY - minY
+                });
+            }
+            
+            this.detectedObstacles = obstacles;
+
+        } catch (e) {
+            console.error("Obstacle scan failed", e);
+        }
+        
+        this.frameCount++;
+        return this.detectedObstacles;
+    }
+}
+
+// --- ADVANCED BOARD TRACKER (OBB + PHYSICS) ---
 class BoardTracker {
     colorMean: [number, number, number] = [0, 0, 0];
     isCalibrated = false;
@@ -28,8 +99,22 @@ class BoardTracker {
     velocity: { x: number, y: number } = { x: 0, y: 0 };
     angle: number = 0;
     
-    // History for smoothing
+    // OBB (Oriented Bounding Box) Dimensions
+    dimensions = { length: 100, width: 30 }; // default pixels
+    
+    // History for smoothing path
     history: { x: number, y: number }[] = [];
+
+    // --- PHYSICS METRICS FOR AI ---
+    // We track min/max dimensions during airtime to detect flips/shuvits
+    metrics = {
+        minWidth: Infinity,
+        maxWidth: 0,
+        minLength: Infinity,
+        maxLength: 0,
+        maxAngleChange: 0,
+        airTimeFrames: 0
+    };
 
     constructor() {
         this.reset();
@@ -41,9 +126,16 @@ class BoardTracker {
         this.pos = { x: 0, y: 0 };
         this.velocity = { x: 0, y: 0 };
         this.angle = 0;
+        this.dimensions = { length: 100, width: 30 };
         this.history = [];
+        this.metrics = {
+            minWidth: Infinity, maxWidth: 0,
+            minLength: Infinity, maxLength: 0,
+            maxAngleChange: 0, airTimeFrames: 0
+        };
     }
 
+    // 1. Calibration: Learn the board color from between the feet
     calibrate(ctx: CanvasRenderingContext2D, width: number, height: number, leftFoot: any, rightFoot: any) {
         if (!leftFoot || !rightFoot) return;
         
@@ -58,7 +150,15 @@ class BoardTracker {
         const sampleSize = 40; // 40x40 pixel box
 
         try {
-            const frame = ctx.getImageData(centerX - sampleSize/2, centerY - sampleSize/2, sampleSize, sampleSize);
+            // Check bounds
+            if (centerX < 0 || centerX > width || centerY < 0 || centerY > height) return;
+
+            const frame = ctx.getImageData(
+                Math.max(0, centerX - sampleSize/2), 
+                Math.max(0, centerY - sampleSize/2), 
+                sampleSize, 
+                sampleSize
+            );
             const data = frame.data;
             let r = 0, g = 0, b = 0, count = 0;
 
@@ -69,142 +169,163 @@ class BoardTracker {
                 count++;
             }
             
-            this.colorMean = [r / count, g / count, b / count];
-            this.isCalibrated = true;
-            this.pos = { x: centerX, y: centerY };
+            if (count > 0) {
+                this.colorMean = [r / count, g / count, b / count];
+                this.isCalibrated = true;
+                this.pos = { x: centerX, y: centerY };
+                // Reset metrics on calibration
+                this.metrics = {
+                    minWidth: Infinity, maxWidth: 0,
+                    minLength: Infinity, maxLength: 0,
+                    maxAngleChange: 0, airTimeFrames: 0
+                };
+            }
         } catch (e) {
             console.error("Calibration failed", e);
         }
     }
 
-    track(ctx: CanvasRenderingContext2D, width: number, height: number, leftAnkle: any, rightAnkle: any): { x: number, y: number, angle: number, confidence: number } | null {
+    // 2. Tracking: Find the board in the frame
+    track(ctx: CanvasRenderingContext2D, width: number, height: number, leftAnkle: any, rightAnkle: any) {
         if (!this.isCalibrated) return null;
 
+        // Calculate Feet Center (Gravity Anchor)
         let feetCenter = null;
         if (leftAnkle && rightAnkle && leftAnkle.visibility > 0.5 && rightAnkle.visibility > 0.5) {
              const fx = ((leftAnkle.x + rightAnkle.x) / 2) * width;
              const fy = ((leftAnkle.y + rightAnkle.y) / 2) * height;
-             // Board is usually just below the midpoint of feet
              feetCenter = { x: fx, y: fy + (height * 0.04) };
         }
 
-        // 1. Prediction & ROI
+        // Define Region of Interest (ROI)
         let roiX = this.pos.x + this.velocity.x;
         let roiY = this.pos.y + this.velocity.y;
         
-        // HEURISTIC: If feet are clear, bias the search heavily towards feet
-        // This ensures "track near person" behavior
         if (feetCenter) {
-             // 70% physics, 30% feet pull (keeps it tethered)
-             roiX = roiX * 0.7 + feetCenter.x * 0.3;
-             roiY = roiY * 0.7 + feetCenter.y * 0.3;
+             const distToFeet = Math.hypot(roiX - feetCenter.x, roiY - feetCenter.y);
+             if (distToFeet < width * 0.3) {
+                 roiX = roiX * 0.8 + feetCenter.x * 0.2;
+                 roiY = roiY * 0.8 + feetCenter.y * 0.2;
+             }
         }
 
-        const roiW = 160; // Tighter search window
-        const roiH = 120;
-        
+        const roiW = 200; // Search window size
+        const roiH = 150;
         const startX = Math.max(0, Math.min(width - roiW, roiX - roiW / 2));
         const startY = Math.max(0, Math.min(height - roiH, roiY - roiH / 2));
-
         const frame = ctx.getImageData(startX, startY, roiW, roiH);
         const data = frame.data;
         
-        // PCA Variables
         let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0, sumY2 = 0;
         let pixelCount = 0;
-        const threshold = 50; // slightly wider color tolerance
-
+        const pixels: {x: number, y: number}[] = [];
+        const threshold = 45;
         const [Tr, Tg, Tb] = this.colorMean;
+        const step = 2;
 
-        // Efficient Scan
-        for (let y = 0; y < roiH; y += 4) { 
-            for (let x = 0; x < roiW; x += 4) {
+        for (let y = 0; y < roiH; y += step) { 
+            for (let x = 0; x < roiW; x += step) {
                 const idx = (y * roiW + x) * 4;
                 const r = data[idx];
                 const g = data[idx + 1];
                 const b = data[idx + 2];
+                const dist = Math.abs(r - Tr) + Math.abs(g - Tg) + Math.abs(b - Tb);
 
-                const dist = Math.sqrt((r - Tr) ** 2 + (g - Tg) ** 2 + (b - Tb) ** 2);
-
-                if (dist < threshold) {
+                if (dist < threshold * 3) {
                     const absX = startX + x;
                     const absY = startY + y;
-                    
-                    sumX += absX;
-                    sumY += absY;
-                    sumX2 += absX * absX;
-                    sumY2 += absY * absY;
+                    sumX += absX; sumY += absY;
+                    sumX2 += absX * absX; sumY2 += absY * absY;
                     sumXY += absX * absY;
+                    pixels.push({x: absX, y: absY});
                     pixelCount++;
                 }
             }
         }
 
-        // 2. Update Logic
-        if (pixelCount > 8) {
-            // Found candidate position
+        if (pixelCount > 20) {
             const meanX = sumX / pixelCount;
             const meanY = sumY / pixelCount;
 
-            // SAFETY CHECK: Maximum Velocity Constraint
-            // If the board "teleports" more than 10% of screen width in 1 frame, ignore it.
-            const jumpDist = Math.sqrt(Math.pow(meanX - this.pos.x, 2) + Math.pow(meanY - this.pos.y, 2));
-            const maxJump = width * 0.15;
+            this.velocity = {
+                x: (meanX - this.pos.x) * 0.7 + this.velocity.x * 0.3,
+                y: (meanY - this.pos.y) * 0.7 + this.velocity.y * 0.3
+            };
+            this.pos = { x: meanX, y: meanY };
 
-            if (jumpDist < maxJump) {
-                // Update Velocity (Current - Last)
-                this.velocity = {
-                    x: (meanX - this.pos.x) * 0.8, // Smoothing velocity
-                    y: (meanY - this.pos.y) * 0.8
-                };
+            // PCA for Angle
+            const varX = (sumX2 / pixelCount) - (meanX * meanX);
+            const varY = (sumY2 / pixelCount) - (meanY * meanY);
+            const covXY = (sumXY / pixelCount) - (meanX * meanY);
+            const rawAngle = 0.5 * Math.atan2(2 * covXY, varX - varY);
+            
+            let deltaAngle = rawAngle - this.angle;
+            while (deltaAngle <= -Math.PI/2) deltaAngle += Math.PI;
+            while (deltaAngle > Math.PI/2) deltaAngle -= Math.PI;
+            this.angle += deltaAngle * 0.5;
 
-                this.pos = { x: meanX, y: meanY };
+            // OBB Calculation
+            let minU = Infinity, maxU = -Infinity; // Length
+            let minV = Infinity, maxV = -Infinity; // Width (Thickness)
+            const cos = Math.cos(-this.angle);
+            const sin = Math.sin(-this.angle);
 
-                // PCA for Rotation
-                const varX = (sumX2 / pixelCount) - (meanX * meanX);
-                const varY = (sumY2 / pixelCount) - (meanY * meanY);
-                const covXY = (sumXY / pixelCount) - (meanX * meanY);
-                
-                // Calculate angle
-                const newAngle = 0.5 * Math.atan2(2 * covXY, varX - varY);
-                // Stronger smoothing on angle
-                this.angle = this.angle * 0.6 + newAngle * 0.4;
-            } else {
-                 // Detected jump was too huge, ignore this frame, use momentum
-                 this.pos.x += this.velocity.x;
-                 this.pos.y += this.velocity.y;
+            for (let p of pixels) {
+                const dx = p.x - meanX;
+                const dy = p.y - meanY;
+                const u = dx * cos - dy * sin;
+                const v = dx * sin + dy * cos;
+                if (u < minU) minU = u; if (u > maxU) maxU = u;
+                if (v < minV) minV = v; if (v > maxV) maxV = v;
+            }
+
+            const measuredLength = (maxU - minU) || 100;
+            const measuredWidth = (maxV - minV) || 30;
+            
+            this.dimensions.length = this.dimensions.length * 0.8 + measuredLength * 0.2;
+            this.dimensions.width = this.dimensions.width * 0.8 + measuredWidth * 0.2;
+
+            // --- COLLECT PHYSICS METRICS ---
+            // Only collect if the board is significantly off the ground (Airtime)
+            // (Assuming lower Y is higher up in canvas coords)
+            if (feetCenter && this.pos.y < (height * 0.9)) { 
+                this.metrics.airTimeFrames++;
+                if (measuredWidth > this.metrics.maxWidth) this.metrics.maxWidth = measuredWidth;
+                if (measuredWidth < this.metrics.minWidth) this.metrics.minWidth = measuredWidth;
+                if (measuredLength > this.metrics.maxLength) this.metrics.maxLength = measuredLength;
+                if (measuredLength < this.metrics.minLength) this.metrics.minLength = measuredLength;
             }
 
         } else {
-            // Lost Tracking -> FALLBACK LOGIC
-            
+            // LOST state handling
             if (feetCenter) {
-                // If we know where feet are, drift towards them!
-                // This forces the board to "re-attach" to the skater if tracking is lost mid-flip
-                const driftSpeed = 0.1;
-                this.pos.x = this.pos.x * (1 - driftSpeed) + feetCenter.x * driftSpeed;
-                this.pos.y = this.pos.y * (1 - driftSpeed) + feetCenter.y * driftSpeed;
-                
-                // Dampen velocity to prevent shooting off
+                const drift = 0.15;
+                this.pos.x = this.pos.x * (1 - drift) + feetCenter.x * drift;
+                this.pos.y = this.pos.y * (1 - drift) + feetCenter.y * drift;
                 this.velocity.x *= 0.8;
                 this.velocity.y *= 0.8;
             } else {
-                // Completely lost and no feet? Just friction stop.
-                this.velocity.x *= 0.9;
-                this.velocity.y *= 0.9;
+                this.velocity.x *= 0.95; 
+                this.velocity.y += 0.5; 
                 this.pos.x += this.velocity.x;
                 this.pos.y += this.velocity.y;
             }
         }
 
-        // Bounds Check
         this.pos.x = Math.max(0, Math.min(width, this.pos.x));
         this.pos.y = Math.max(0, Math.min(height, this.pos.y));
 
         this.history.push({ ...this.pos });
-        if (this.history.length > 40) this.history.shift();
+        if (this.history.length > 30) this.history.shift();
 
-        return { x: this.pos.x, y: this.pos.y, angle: this.angle, confidence: Math.min(1, pixelCount / 50) };
+        return { 
+            x: this.pos.x, 
+            y: this.pos.y, 
+            angle: this.angle,
+            length: this.dimensions.length,
+            width: this.dimensions.width,
+            confidence: Math.min(1, pixelCount / 30) 
+        };
     }
 }
 
@@ -217,15 +338,27 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
   const [error, setError] = useState<string | null>(null);
   
   const [userStance, setUserStance] = useState<'Regular' | 'Goofy'>('Regular');
+  const [userContext, setUserContext] = useState<string[]>([]);
   const [trickNameInput, setTrickNameInput] = useState("");
+  const [manualCorrection, setManualCorrection] = useState("");
+  const [detectedObstacleName, setDetectedObstacleName] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const poseRef = useRef<any>(null);
   const boardTrackerRef = useRef<BoardTracker>(new BoardTracker());
-  const requestRef = useRef<number>();
-  const statsRef = useRef({ maxHeight: 0, rotationAccumulator: 0, frameCount: 0 });
+  const obstacleTrackerRef = useRef<ObstacleTracker>(new ObstacleTracker());
+  const requestRef = useRef<number | null>(null);
+  const statsRef = useRef({ maxHeight: 0, frameCount: 0 });
+
+  useEffect(() => {
+      if (user) {
+          dbService.getUserFeedbacks(user.uid).then(ctx => {
+              setUserContext(ctx);
+          });
+      }
+  }, [user]);
 
   useEffect(() => {
     const initPose = async () => {
@@ -249,7 +382,9 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
     initPose();
     return () => {
         if (poseRef.current) poseRef.current.close();
-        cancelAnimationFrame(requestRef.current!);
+        if (requestRef.current !== null) {
+            cancelAnimationFrame(requestRef.current);
+        }
     };
   }, []);
 
@@ -265,8 +400,10 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
         setPreviewUrl(url);
         setResult(null);
         setError(null);
+        setDetectedObstacleName(null);
+        setTrickNameInput("");
         boardTrackerRef.current.reset();
-        statsRef.current = { maxHeight: 0, rotationAccumulator: 0, frameCount: 0 };
+        statsRef.current = { maxHeight: 0, frameCount: 0 };
     }
   };
 
@@ -274,6 +411,7 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
       if (!videoRef.current || !poseRef.current) return;
       setIsAnalyzing(true);
       setError(null);
+      boardTrackerRef.current.reset(); // Reset physics metrics
       
       const video = videoRef.current;
       video.currentTime = 0;
@@ -328,7 +466,14 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
           }
       }
 
-      // Track Board using ROI logic
+      const obstacles = obstacleTrackerRef.current.scan(ctx, width, height);
+      if (obstacles.length > 0) {
+          drawObstacles(ctx, obstacles);
+          if (!detectedObstacleName) {
+              setDetectedObstacleName(obstacles[0].type);
+          }
+      }
+
       const board = boardTrackerRef.current.track(ctx, width, height, leftAnkle, rightAnkle);
       if (board) {
           drawBoardVisuals(ctx, board);
@@ -340,8 +485,8 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
 
   const drawSkeleton = (ctx: CanvasRenderingContext2D, landmarks: any[], w: number, h: number) => {
       ctx.lineWidth = 3;
-      ctx.strokeStyle = '#E3FF37'; 
-      ctx.fillStyle = '#FFFFFF';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)'; 
+      ctx.fillStyle = '#E3FF37';
 
       POSE_CONNECTIONS.forEach(([i, j]) => {
           const p1 = landmarks[i];
@@ -357,58 +502,74 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
       landmarks.forEach((lm) => {
           if (lm.visibility > 0.5) {
               ctx.beginPath();
-              ctx.arc(lm.x * w, lm.y * h, 4, 0, 2 * Math.PI);
+              ctx.arc(lm.x * w, lm.y * h, 3, 0, 2 * Math.PI);
               ctx.fill();
           }
       });
   };
 
-  const drawBoardVisuals = (ctx: CanvasRenderingContext2D, board: {x: number, y: number, angle: number}) => {
+  const drawObstacles = (ctx: CanvasRenderingContext2D, obstacles: any[]) => {
+      obstacles.forEach(obs => {
+          ctx.strokeStyle = '#FF6B00';
+          ctx.lineWidth = 2;
+          ctx.setLineDash([5, 5]);
+          ctx.strokeRect(obs.x, obs.y, obs.w, obs.h);
+          ctx.setLineDash([]);
+          
+          ctx.fillStyle = '#FF6B00';
+          ctx.font = 'bold 12px sans-serif';
+          ctx.fillText(obs.type, obs.x, obs.y - 5);
+      });
+  };
+
+  const drawBoardVisuals = (ctx: CanvasRenderingContext2D, board: {x: number, y: number, angle: number, length: number, width: number}) => {
       ctx.save();
       ctx.translate(board.x, board.y);
       ctx.rotate(board.angle);
 
-      // --- IMPROVED VISUALS: DECK + WHEELS ---
+      const deckLen = Math.max(80, board.length); 
+      const deckWid = Math.max(25, board.width);
       
-      const deckLen = 120; // Length pixels
-      const deckWid = 32;  // Width pixels
-      
-      // 1. Deck (Rect)
-      ctx.fillStyle = 'rgba(0, 255, 255, 0.2)'; // Cyan transparent fill
-      ctx.strokeStyle = '#00FFFF'; // Cyan border
-      ctx.lineWidth = 3;
+      ctx.fillStyle = 'rgba(227, 255, 55, 0.15)';
+      ctx.strokeStyle = '#E3FF37';
+      ctx.lineWidth = 2;
       
       ctx.beginPath();
-      ctx.roundRect(-deckLen/2, -deckWid/2, deckLen, deckWid, 10);
+      ctx.roundRect(-deckLen/2, -deckWid/2, deckLen, deckWid, 8);
       ctx.fill();
       ctx.stroke();
 
-      // 2. Trucks & Wheels
-      const truckX = deckLen * 0.3; // Distance from center
-      const wheelOut = deckWid * 0.7; // Width out from center
+      const truckOffset = deckLen * 0.35;
+      const wheelOffset = deckWid * 0.6;
+      const wheelR = Math.max(3, deckWid * 0.15);
 
-      ctx.fillStyle = '#FFFFFF'; // White Wheels
-      const wheelR = 6;
+      ctx.fillStyle = '#FFFFFF';
+      const wheelPositions = [
+          { x: truckOffset, y: -wheelOffset },
+          { x: truckOffset, y: wheelOffset },
+          { x: -truckOffset, y: -wheelOffset },
+          { x: -truckOffset, y: wheelOffset }
+      ];
 
-      // Draw 4 Wheels
-      // Front Left
-      ctx.beginPath(); ctx.arc(truckX, -wheelOut, wheelR, 0, Math.PI*2); ctx.fill();
-      // Front Right
-      ctx.beginPath(); ctx.arc(truckX, wheelOut, wheelR, 0, Math.PI*2); ctx.fill();
-      // Back Left
-      ctx.beginPath(); ctx.arc(-truckX, -wheelOut, wheelR, 0, Math.PI*2); ctx.fill();
-      // Back Right
-      ctx.beginPath(); ctx.arc(-truckX, wheelOut, wheelR, 0, Math.PI*2); ctx.fill();
+      wheelPositions.forEach(p => {
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, wheelR, 0, Math.PI*2);
+          ctx.fill();
+      });
 
-      // 3. Nose/Tail Indicators
-      ctx.fillStyle = '#FF00FF'; // Magenta dot for nose/tail
-      ctx.beginPath(); ctx.arc(deckLen/2, 0, 4, 0, Math.PI*2); ctx.fill(); // Front
-      ctx.beginPath(); ctx.arc(-deckLen/2, 0, 4, 0, Math.PI*2); ctx.fill(); // Back
+      ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+      ctx.lineWidth = 1;
+      
+      ctx.beginPath(); ctx.moveTo(truckOffset, -wheelOffset); ctx.lineTo(truckOffset, wheelOffset); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-truckOffset, -wheelOffset); ctx.lineTo(-truckOffset, wheelOffset); ctx.stroke();
+
+      ctx.fillStyle = '#FF00FF';
+      ctx.beginPath(); ctx.arc(deckLen/2, 0, 3, 0, Math.PI*2); ctx.fill(); 
+      ctx.beginPath(); ctx.arc(-deckLen/2, 0, 3, 0, Math.PI*2); ctx.fill();
 
       ctx.restore();
 
-      // 4. Trajectory Path
-      ctx.strokeStyle = 'rgba(255, 100, 0, 0.6)';
+      ctx.strokeStyle = 'rgba(227, 255, 55, 0.4)';
       ctx.lineWidth = 2;
       ctx.beginPath();
       boardTrackerRef.current.history.forEach((pt, i) => {
@@ -421,35 +582,71 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
   const completeAnalysis = async () => {
       setIsAnalyzing(false);
       
-      const estimatedHeightM = Math.max(0, (statsRef.current.maxHeight - 0.4) * 2).toFixed(2);
+      if (!file) return;
+
+      const localEstHeight = Math.max(0, (statsRef.current.maxHeight - 0.4) * 1.8).toFixed(2);
       
-      const analysisData: VisionAnalysis = {
-          id: Date.now().toString(),
-          timestamp: new Date().toISOString(),
-          trickName: trickNameInput || "Ollie (Detected)",
-          isLanded: true, 
-          confidence: 0.85,
-          score: Math.min(100, Math.floor(statsRef.current.maxHeight * 150)), 
-          heightMeters: parseFloat(estimatedHeightM),
-          rotationDegrees: 0,
-          feedbackText: "",
-          improvementTip: ""
-      };
+      // GENERATE PHYSICS CONTEXT FOR AI
+      const m = boardTrackerRef.current.metrics;
+      // Flip Ratio: How much thicker did the board get? (> 2.0 usually means flip)
+      const flipRatio = m.maxWidth > 0 && m.minWidth > 0 ? (m.maxWidth / m.minWidth).toFixed(1) : "Unknown";
+      // Shuvit Ratio: How much shorter did the board get? (< 0.6 usually means shuvit/90deg turn)
+      const shuvitRatio = m.maxLength > 0 && m.minLength > 0 ? (m.minLength / m.maxLength).toFixed(1) : "Unknown";
+      
+      const physicsContext = `
+        Side-View Physics Data:
+        - Board Thickness Change (Flip Indicator): ${flipRatio} (High ratio > 2.0 implies Kickflip/Heelflip. Low ratio ~1.0 implies Ollie).
+        - Board Length Change (Spin Indicator): ${shuvitRatio} (Low ratio < 0.6 implies Shuvit/Rotation. High ratio ~1.0 implies no spin).
+        - Obstacle Present: ${detectedObstacleName || "None"}.
+      `;
 
-      const feedback = await generateCoachingFeedback(analysisData, language);
-      analysisData.feedbackText = feedback.feedback;
-      analysisData.improvementTip = feedback.tips;
+      const finalContext = [physicsContext, ...userContext];
 
-      setResult(analysisData);
+      // Pass the manual trick name hint to the AI
+      const aiResult = await analyzeMedia(file, language, finalContext, trickNameInput);
+      
+      let finalResult: VisionAnalysis;
+
+      if (aiResult) {
+          finalResult = {
+              ...aiResult,
+              heightMeters: aiResult.heightMeters || parseFloat(localEstHeight),
+              score: aiResult.score || Math.min(100, Math.floor(statsRef.current.maxHeight * 150))
+          };
+      } else {
+          finalResult = {
+              id: Date.now().toString(),
+              timestamp: new Date().toISOString(),
+              trickName: "UNKNOWN",
+              isLanded: false,
+              confidence: 0,
+              score: Math.min(100, Math.floor(statsRef.current.maxHeight * 150)), 
+              heightMeters: parseFloat(localEstHeight),
+              rotationDegrees: 0,
+              feedbackText: "AI could not identify the trick. Please verify the video format.",
+              improvementTip: ""
+          };
+      }
+
+      setResult(finalResult);
 
       if (user) {
-          await dbService.saveAnalysisResult(user.uid, analysisData);
+          await dbService.saveAnalysisResult(user.uid, finalResult);
       }
   };
 
   const handleFeedbackSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
+      if (user && manualCorrection) {
+         await dbService.saveVisionFeedback(user.uid, {
+             analysisId: result?.id,
+             correction: "User reported inaccuracy",
+             actualTrickName: manualCorrection
+         });
+         setUserContext(prev => [...prev, manualCorrection]);
+      }
       alert(t.FEEDBACK_THANKS);
+      setManualCorrection("");
   };
 
   return (
@@ -467,24 +664,47 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
         </div>
 
         {!previewUrl ? (
-            <div 
-                onClick={() => fileInputRef.current?.click()}
-                className="flex-1 min-h-[300px] border-2 border-dashed border-white/20 rounded-3xl flex flex-col items-center justify-center p-6 bg-white/5 hover:bg-white/10 transition-colors cursor-pointer group"
-            >
-                <input 
-                    type="file" 
-                    ref={fileInputRef} 
-                    onChange={handleFileChange} 
-                    accept="video/*" 
-                    className="hidden" 
-                />
-                <div className="w-20 h-20 rounded-full bg-skate-neon/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                    <FileVideo className="w-8 h-8 text-skate-neon" />
+            <div className="space-y-4">
+                <div className="glass-card p-5 rounded-2xl border border-white/5 bg-gradient-to-br from-white/5 to-transparent">
+                     <div className="flex items-center space-x-2 mb-3">
+                         <Info className="w-4 h-4 text-skate-neon" />
+                         <span className="text-[10px] font-bold uppercase tracking-widest text-gray-300">{t.UPLOAD_GUIDE}</span>
+                     </div>
+                     <div className="grid grid-cols-3 gap-2">
+                         <div className="bg-black/40 p-3 rounded-xl flex flex-col items-center text-center">
+                             <Camera className="w-5 h-5 text-gray-400 mb-2" />
+                             <span className="text-[10px] font-bold text-gray-300 leading-tight">{t.GUIDE_1}</span>
+                         </div>
+                         <div className="bg-black/40 p-3 rounded-xl flex flex-col items-center text-center">
+                             <Video className="w-5 h-5 text-gray-400 mb-2" />
+                             <span className="text-[10px] font-bold text-gray-300 leading-tight">{t.GUIDE_2}</span>
+                         </div>
+                         <div className="bg-black/40 p-3 rounded-xl flex flex-col items-center text-center">
+                             <Box className="w-5 h-5 text-gray-400 mb-2" />
+                             <span className="text-[10px] font-bold text-gray-300 leading-tight">{t.GUIDE_3}</span>
+                         </div>
+                     </div>
                 </div>
-                <p className="text-white font-bold uppercase tracking-wider mb-2">{t.UPLOAD_MEDIA}</p>
-                <p className="text-gray-500 text-xs text-center max-w-[200px]">
-                    Select a video clip (Max 50MB). Side view is best.
-                </p>
+
+                <div 
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex-1 min-h-[250px] border-2 border-dashed border-white/20 rounded-3xl flex flex-col items-center justify-center p-6 bg-white/5 hover:bg-white/10 transition-colors cursor-pointer group"
+                >
+                    <input 
+                        type="file" 
+                        ref={fileInputRef} 
+                        onChange={handleFileChange} 
+                        accept="video/*" 
+                        className="hidden" 
+                    />
+                    <div className="w-20 h-20 rounded-full bg-skate-neon/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                        <FileVideo className="w-8 h-8 text-skate-neon" />
+                    </div>
+                    <p className="text-white font-bold uppercase tracking-wider mb-2">{t.UPLOAD_MEDIA}</p>
+                    <p className="text-gray-500 text-xs text-center max-w-[200px]">
+                        Select a video clip (Max 50MB).
+                    </p>
+                </div>
             </div>
         ) : (
             <div className="flex flex-col space-y-6">
@@ -514,6 +734,13 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
                         ref={canvasRef}
                         className="absolute inset-0 w-full h-full object-contain bg-black"
                     />
+                    
+                    {detectedObstacleName && isAnalyzing && (
+                        <div className="absolute top-4 left-4 z-20 bg-skate-neon/90 text-black px-3 py-1 rounded-full flex items-center space-x-2 shadow-lg animate-pulse">
+                            <AlertTriangle className="w-3 h-3" />
+                            <span className="text-[10px] font-bold uppercase tracking-wide">{t.TRACKING_OBSTACLE} {detectedObstacleName}</span>
+                        </div>
+                    )}
 
                     {!isAnalyzing && !result && (
                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -543,13 +770,13 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
                         <div>
                              <label className="text-gray-400 text-[10px] font-bold uppercase tracking-widest mb-2 block">{t.ENTER_TRICK_NAME}</label>
                              <input 
-                                type="text"
-                                value={trickNameInput}
-                                onChange={(e) => setTrickNameInput(e.target.value)}
-                                placeholder="e.g. Kickflip"
-                                className="w-full bg-black/50 border border-white/10 rounded-xl p-3 text-white text-sm focus:border-skate-neon outline-none"
+                                 type="text" 
+                                 value={trickNameInput}
+                                 onChange={(e) => setTrickNameInput(e.target.value)}
+                                 className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white focus:border-skate-neon outline-none mb-1"
+                                 placeholder="e.g. Kickflip"
                              />
-                             <p className="text-[10px] text-gray-500 mt-1">{t.TRICK_NAME_DESC}</p>
+                             <p className="text-[10px] text-gray-500">{t.TRICK_NAME_DESC}</p>
                         </div>
 
                         <button 
@@ -578,7 +805,9 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
                                     <span className="text-skate-neon text-[10px] font-bold uppercase tracking-[0.2em] block">AI ANALYSIS</span>
                                     <span className="bg-green-500/20 text-green-400 text-xs font-bold px-2 py-1 rounded-lg border border-green-500/30">SUCCESS</span>
                                 </div>
-                                <h3 className="text-4xl font-display font-bold text-white mb-4">{result.trickName}</h3>
+                                <h3 className="text-4xl font-display font-bold text-white mb-4">
+                                    {result.trickName === "UNKNOWN" ? <span className="text-gray-500">Unknown Trick</span> : result.trickName}
+                                </h3>
                                 
                                 <div className="grid grid-cols-2 gap-3">
                                     <div className="bg-white/5 px-4 py-3 rounded-xl border border-white/5">
@@ -620,7 +849,13 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
                         <div className="p-4 rounded-2xl bg-white/5">
                             <h4 className="text-gray-400 text-[10px] font-bold uppercase tracking-widest mb-3">{t.WRONG_ANALYSIS}</h4>
                             <form onSubmit={handleFeedbackSubmit} className="space-y-3">
-                                <input type="text" placeholder={t.ACTUAL_TRICK_NAME} className="w-full bg-black border border-white/10 rounded-lg p-2 text-xs text-white" />
+                                <input 
+                                    type="text" 
+                                    placeholder={t.ACTUAL_TRICK_NAME} 
+                                    value={manualCorrection}
+                                    onChange={(e) => setManualCorrection(e.target.value)}
+                                    className="w-full bg-black border border-white/10 rounded-lg p-2 text-xs text-white focus:border-skate-neon outline-none" 
+                                />
                                 <button type="submit" className="w-full py-2 bg-white/10 text-white rounded-lg text-xs font-bold hover:bg-white/20 transition-colors">
                                     {t.SEND_FEEDBACK}
                                 </button>
