@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { TRANSLATIONS } from '../constants';
 import { ResponsiveContainer, AreaChart, Area, Tooltip } from 'recharts';
@@ -105,6 +104,13 @@ const Dashboard: React.FC<Props> = ({
                 SKATE<br/>
                 <span className="text-skate-neon text-glow">SOLO</span>
             </h1>
+            
+            {/* Instagram ID Sub-header */}
+            <a href="https://instagram.com/osteoclasts_" target="_blank" rel="noopener noreferrer" className="flex items-center space-x-1 mt-1 opacity-60 hover:opacity-100 transition-opacity">
+                <Instagram className="w-3 h-3 text-skate-neon" />
+                <span className="text-xs font-bold text-gray-400 tracking-wider">@OSTEOCLASTS_</span>
+            </a>
+
             <div className="flex items-center mt-3">
                  <button 
                     onClick={() => setIsEditingDate(true)}
@@ -246,7 +252,7 @@ const Dashboard: React.FC<Props> = ({
       </div>
 
       {/* Footer / Credits */}
-      <div className="flex justify-center mt-4 pb-4">
+      <div className="flex flex-col items-center justify-center mt-4 pb-4 space-y-2">
         <a 
           href="https://instagram.com/osteoclasts_" 
           target="_blank" 
@@ -258,6 +264,7 @@ const Dashboard: React.FC<Props> = ({
             DESIGNED BY <span className="font-bold text-gray-300">@OSTEOCLASTS_</span>
           </span>
         </a>
+        <span className="text-[10px] text-gray-600 font-mono tracking-widest">v1.2.0</span>
       </div>
     </div>
   );

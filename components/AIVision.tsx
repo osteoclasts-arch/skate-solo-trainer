@@ -2,8 +2,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Language, User, VisionAnalysis } from '../types';
 import { TRANSLATIONS } from '../constants';
-import { Upload, Zap, Play, X, Eye, Video, FileVideo, Activity, Info, Camera, Box, AlertTriangle } from 'lucide-react';
-import { analyzeMedia, generateCoachingFeedback } from '../services/geminiService';
+import { Upload, Zap, Play, Pause, X, Eye, Video, FileVideo, Activity, Info, Camera, Box, AlertTriangle, Clock, FastForward, Rewind } from 'lucide-react';
+import { analyzeMedia } from '../services/geminiService';
 import { dbService } from '../services/dbService';
 // @ts-ignore
 import mpPose from '@mediapipe/pose';
@@ -40,7 +40,6 @@ class ObstacleTracker {
             const obstacles = [];
 
             // Simple Color-based Detection for Orange Traffic Cones
-            // HSV-like heuristic in RGB: High Red, Med Green, Low Blue
             let orangePixelsX = 0;
             let orangePixelsY = 0;
             let orangeCount = 0;
@@ -106,7 +105,6 @@ class BoardTracker {
     history: { x: number, y: number }[] = [];
 
     // --- PHYSICS METRICS FOR AI ---
-    // We track min/max dimensions during airtime to detect flips/shuvits
     metrics = {
         minWidth: Infinity,
         maxWidth: 0,
@@ -203,9 +201,10 @@ class BoardTracker {
         
         if (feetCenter) {
              const distToFeet = Math.hypot(roiX - feetCenter.x, roiY - feetCenter.y);
+             // Tighter constraint: Board rarely flies > 30% of screen width away from feet
              if (distToFeet < width * 0.3) {
-                 roiX = roiX * 0.8 + feetCenter.x * 0.2;
-                 roiY = roiY * 0.8 + feetCenter.y * 0.2;
+                 roiX = roiX * 0.7 + feetCenter.x * 0.3;
+                 roiY = roiY * 0.7 + feetCenter.y * 0.3;
              }
         }
 
@@ -287,7 +286,6 @@ class BoardTracker {
 
             // --- COLLECT PHYSICS METRICS ---
             // Only collect if the board is significantly off the ground (Airtime)
-            // (Assuming lower Y is higher up in canvas coords)
             if (feetCenter && this.pos.y < (height * 0.9)) { 
                 this.metrics.airTimeFrames++;
                 if (measuredWidth > this.metrics.maxWidth) this.metrics.maxWidth = measuredWidth;
@@ -299,19 +297,21 @@ class BoardTracker {
         } else {
             // LOST state handling
             if (feetCenter) {
-                const drift = 0.15;
+                // If lost, pull towards feet strongly
+                const drift = 0.2;
                 this.pos.x = this.pos.x * (1 - drift) + feetCenter.x * drift;
                 this.pos.y = this.pos.y * (1 - drift) + feetCenter.y * drift;
-                this.velocity.x *= 0.8;
-                this.velocity.y *= 0.8;
+                this.velocity.x *= 0.5;
+                this.velocity.y *= 0.5;
             } else {
-                this.velocity.x *= 0.95; 
-                this.velocity.y += 0.5; 
+                this.velocity.x *= 0.9; 
+                this.velocity.y += 0.5; // Gravity
                 this.pos.x += this.velocity.x;
                 this.pos.y += this.velocity.y;
             }
         }
 
+        // Clamp to screen
         this.pos.x = Math.max(0, Math.min(width, this.pos.x));
         this.pos.y = Math.max(0, Math.min(height, this.pos.y));
 
@@ -324,7 +324,7 @@ class BoardTracker {
             angle: this.angle,
             length: this.dimensions.length,
             width: this.dimensions.width,
-            confidence: Math.min(1, pixelCount / 30) 
+            confidence: Math.min(1, pixelCount / 20) 
         };
     }
 }
@@ -337,6 +337,12 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
   const [result, setResult] = useState<VisionAnalysis | null>(null);
   const [error, setError] = useState<string | null>(null);
   
+  // Video Controls State
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [playbackSpeed, setPlaybackSpeed] = useState(0.5); // Default slow motion for analysis
+
   const [userStance, setUserStance] = useState<'Regular' | 'Goofy'>('Regular');
   const [userContext, setUserContext] = useState<string[]>([]);
   const [trickNameInput, setTrickNameInput] = useState("");
@@ -402,6 +408,8 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
         setError(null);
         setDetectedObstacleName(null);
         setTrickNameInput("");
+        setIsPlaying(false);
+        setProgress(0);
         boardTrackerRef.current.reset();
         statsRef.current = { maxHeight: 0, frameCount: 0 };
     }
@@ -415,23 +423,75 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
       
       const video = videoRef.current;
       video.currentTime = 0;
-      video.playbackRate = 0.5;
+      video.playbackRate = playbackSpeed;
       video.play();
+      setIsPlaying(true);
       
       processFrame();
   };
 
+  // Main Tracking Loop
   const processFrame = async () => {
       if (!videoRef.current || !canvasRef.current || !poseRef.current) return;
       const video = videoRef.current;
       
       if (video.paused || video.ended) {
-          if (video.ended) completeAnalysis();
+          setIsPlaying(false);
+          if (video.ended && isAnalyzing) completeAnalysis();
           return;
       }
 
       await poseRef.current.send({ image: video });
       requestRef.current = requestAnimationFrame(processFrame);
+  };
+
+  // Called manually when scrubbing
+  const processSingleFrame = async () => {
+    if (!videoRef.current || !poseRef.current) return;
+    await poseRef.current.send({ image: videoRef.current });
+  }
+
+  const togglePlay = () => {
+      if (!videoRef.current) return;
+      if (isPlaying) {
+          videoRef.current.pause();
+          setIsPlaying(false);
+      } else {
+          videoRef.current.play();
+          setIsPlaying(true);
+          processFrame();
+      }
+  };
+
+  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (!videoRef.current) return;
+      const time = parseFloat(e.target.value);
+      videoRef.current.currentTime = time;
+      setProgress(time);
+      processSingleFrame(); // Update canvas instantly
+  };
+
+  const handleSpeedChange = (speed: number) => {
+      setPlaybackSpeed(speed);
+      if (videoRef.current) {
+          videoRef.current.playbackRate = speed;
+      }
+  };
+
+  const onTimeUpdate = () => {
+      if (videoRef.current) {
+          setProgress(videoRef.current.currentTime);
+      }
+  };
+
+  const onLoadedMetadata = () => {
+      if (videoRef.current) {
+          setDuration(videoRef.current.duration);
+          if (canvasRef.current) {
+              canvasRef.current.width = videoRef.current.videoWidth;
+              canvasRef.current.height = videoRef.current.videoHeight;
+          }
+      }
   };
 
   const onPoseResults = (results: any) => {
@@ -455,7 +515,8 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
           leftAnkle = results.poseLandmarks[27];
           rightAnkle = results.poseLandmarks[28];
 
-          if (!boardTrackerRef.current.isCalibrated && statsRef.current.frameCount < 15) {
+          // Calibrate on first few frames if feet are found
+          if (!boardTrackerRef.current.isCalibrated && statsRef.current.frameCount < 30) {
              boardTrackerRef.current.calibrate(ctx, width, height, leftAnkle, rightAnkle);
           }
 
@@ -480,7 +541,7 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
       }
 
       ctx.restore();
-      statsRef.current.frameCount++;
+      if(isAnalyzing) statsRef.current.frameCount++;
   };
 
   const drawSkeleton = (ctx: CanvasRenderingContext2D, landmarks: any[], w: number, h: number) => {
@@ -708,7 +769,7 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
             </div>
         ) : (
             <div className="flex flex-col space-y-6">
-                <div className="relative rounded-3xl overflow-hidden border border-white/10 shadow-2xl bg-black aspect-video">
+                <div className="relative rounded-3xl overflow-hidden border border-white/10 shadow-2xl bg-black aspect-video group">
                     <button 
                         onClick={() => { setPreviewUrl(null); setResult(null); }}
                         className="absolute top-4 right-4 z-30 bg-black/50 p-2 rounded-full hover:bg-black/80 text-white"
@@ -723,12 +784,8 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
                         muted
                         playsInline
                         crossOrigin="anonymous"
-                        onLoadedMetadata={() => {
-                            if(canvasRef.current && videoRef.current) {
-                                canvasRef.current.width = videoRef.current.videoWidth;
-                                canvasRef.current.height = videoRef.current.videoHeight;
-                            }
-                        }}
+                        onTimeUpdate={onTimeUpdate}
+                        onLoadedMetadata={onLoadedMetadata}
                     />
                     <canvas 
                         ref={canvasRef}
@@ -741,12 +798,51 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
                             <span className="text-[10px] font-bold uppercase tracking-wide">{t.TRACKING_OBSTACLE} {detectedObstacleName}</span>
                         </div>
                     )}
-
-                    {!isAnalyzing && !result && (
-                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                            <Play className="w-16 h-16 text-white/50" />
+                    
+                    {!isAnalyzing && !result && !isPlaying && (
+                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+                            <Play className="w-16 h-16 text-white/80 fill-white/20" />
                          </div>
                     )}
+
+                    {/* VIDEO CONTROLS OVERLAY */}
+                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-4 transition-opacity opacity-0 group-hover:opacity-100 flex flex-col space-y-2 z-30">
+                        {/* Progress Bar */}
+                        <input 
+                            type="range" 
+                            min="0" 
+                            max={duration} 
+                            step="0.01" 
+                            value={progress} 
+                            onChange={handleSeek}
+                            className="w-full h-1 bg-white/20 rounded-full appearance-none cursor-pointer accent-skate-neon hover:h-2 transition-all"
+                        />
+                        
+                        <div className="flex justify-between items-center">
+                            <div className="flex items-center space-x-4">
+                                <button onClick={togglePlay} className="text-white hover:text-skate-neon">
+                                    {isPlaying ? <Pause className="w-6 h-6 fill-current" /> : <Play className="w-6 h-6 fill-current" />}
+                                </button>
+                                <span className="text-xs font-mono text-gray-300">
+                                    {progress.toFixed(1)}s / {duration.toFixed(1)}s
+                                </span>
+                            </div>
+
+                            {/* Speed Control */}
+                            <div className="flex items-center space-x-1 bg-black/40 rounded-full p-1 border border-white/10">
+                                <Clock className="w-3 h-3 text-gray-400 ml-1" />
+                                {[0.1, 0.5, 1.0].map(s => (
+                                    <button 
+                                        key={s}
+                                        onClick={() => handleSpeedChange(s)}
+                                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${playbackSpeed === s ? 'bg-skate-neon text-black' : 'text-gray-400 hover:text-white'}`}
+                                    >
+                                        {s}x
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 {!result && !isAnalyzing && (
