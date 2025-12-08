@@ -207,8 +207,20 @@ const App: React.FC = () => {
   const renderView = () => {
     if (isAuthChecking) {
         return (
-            <div className="flex h-screen items-center justify-center bg-black">
-                <div className="animate-spin h-8 w-8 border-4 border-skate-neon rounded-full border-t-transparent"></div>
+            <div className="flex h-screen flex-col items-center justify-center bg-black space-y-8 animate-fade-in">
+                <div className="text-center">
+                    <h1 className="text-7xl font-display font-bold text-white tracking-tighter leading-none mb-4">
+                        SKATE<br/>
+                        <span className="text-skate-neon text-glow">SOLO</span>
+                    </h1>
+                    <div className="animate-spin h-6 w-6 border-2 border-skate-neon rounded-full border-t-transparent mx-auto"></div>
+                </div>
+                
+                <div className="absolute bottom-12 flex items-center space-x-2 opacity-60">
+                    <span className="text-[10px] font-mono text-gray-500 tracking-[0.2em] uppercase">
+                        Designed by <span className="text-white font-bold hover:text-skate-neon transition-colors cursor-default">@OSTEOCLASTS_</span>
+                    </span>
+                </div>
             </div>
         );
     }

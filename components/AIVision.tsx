@@ -31,6 +31,19 @@ class BoardTracker {
     // History for smoothing
     history: { x: number, y: number }[] = [];
 
+    constructor() {
+        this.reset();
+    }
+
+    reset() {
+        this.colorMean = [0, 0, 0];
+        this.isCalibrated = false;
+        this.pos = { x: 0, y: 0 };
+        this.velocity = { x: 0, y: 0 };
+        this.angle = 0;
+        this.history = [];
+    }
+
     calibrate(ctx: CanvasRenderingContext2D, width: number, height: number, leftFoot: any, rightFoot: any) {
         if (!leftFoot || !rightFoot) return;
         
@@ -67,33 +80,28 @@ class BoardTracker {
     track(ctx: CanvasRenderingContext2D, width: number, height: number, leftAnkle: any, rightAnkle: any): { x: number, y: number, angle: number, confidence: number } | null {
         if (!this.isCalibrated) return null;
 
-        // 1. Define Search ROI (Region of Interest)
-        // We look specifically UNDER the skater.
-        // If we have foot landmarks, bias search there. If not (mid-air), use physics prediction.
-        
-        let roiX = this.pos.x;
-        let roiY = this.pos.y;
-        
-        // If feet are visible, pull the search window towards them, but allow it to detach (gravity)
-        if (leftAnkle && rightAnkle && leftAnkle.visibility > 0.5) {
-             const feetX = ((leftAnkle.x + rightAnkle.x) / 2) * width;
-             const feetY = ((leftAnkle.y + rightAnkle.y) / 2) * height;
-             
-             // Board is usually below ankles
-             const expectedBoardY = feetY + (height * 0.05); 
-             
-             // Weighting: 40% Physics Prediction, 60% Feet Location
-             // This keeps it attached on ground, but allows separation in air
-             roiX = (this.pos.x + this.velocity.x) * 0.4 + feetX * 0.6;
-             roiY = (this.pos.y + this.velocity.y) * 0.4 + expectedBoardY * 0.6;
-        } else {
-             // Freefall physics prediction
-             roiX = this.pos.x + this.velocity.x;
-             roiY = this.pos.y + this.velocity.y;
+        let feetCenter = null;
+        if (leftAnkle && rightAnkle && leftAnkle.visibility > 0.5 && rightAnkle.visibility > 0.5) {
+             const fx = ((leftAnkle.x + rightAnkle.x) / 2) * width;
+             const fy = ((leftAnkle.y + rightAnkle.y) / 2) * height;
+             // Board is usually just below the midpoint of feet
+             feetCenter = { x: fx, y: fy + (height * 0.04) };
         }
 
-        const roiW = 200; // Search window width
-        const roiH = 150; // Search window height
+        // 1. Prediction & ROI
+        let roiX = this.pos.x + this.velocity.x;
+        let roiY = this.pos.y + this.velocity.y;
+        
+        // HEURISTIC: If feet are clear, bias the search heavily towards feet
+        // This ensures "track near person" behavior
+        if (feetCenter) {
+             // 70% physics, 30% feet pull (keeps it tethered)
+             roiX = roiX * 0.7 + feetCenter.x * 0.3;
+             roiY = roiY * 0.7 + feetCenter.y * 0.3;
+        }
+
+        const roiW = 160; // Tighter search window
+        const roiH = 120;
         
         const startX = Math.max(0, Math.min(width - roiW, roiX - roiW / 2));
         const startY = Math.max(0, Math.min(height - roiH, roiY - roiH / 2));
@@ -104,7 +112,7 @@ class BoardTracker {
         // PCA Variables
         let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0, sumY2 = 0;
         let pixelCount = 0;
-        const threshold = 45; // Similarity threshold
+        const threshold = 50; // slightly wider color tolerance
 
         const [Tr, Tg, Tb] = this.colorMean;
 
@@ -133,39 +141,60 @@ class BoardTracker {
         }
 
         // 2. Update Logic
-        if (pixelCount > 10) {
-            // Found the board!
+        if (pixelCount > 8) {
+            // Found candidate position
             const meanX = sumX / pixelCount;
             const meanY = sumY / pixelCount;
 
-            // Update Velocity (Current - Last)
-            this.velocity = {
-                x: meanX - this.pos.x,
-                y: meanY - this.pos.y
-            };
+            // SAFETY CHECK: Maximum Velocity Constraint
+            // If the board "teleports" more than 10% of screen width in 1 frame, ignore it.
+            const jumpDist = Math.sqrt(Math.pow(meanX - this.pos.x, 2) + Math.pow(meanY - this.pos.y, 2));
+            const maxJump = width * 0.15;
 
-            this.pos = { x: meanX, y: meanY };
+            if (jumpDist < maxJump) {
+                // Update Velocity (Current - Last)
+                this.velocity = {
+                    x: (meanX - this.pos.x) * 0.8, // Smoothing velocity
+                    y: (meanY - this.pos.y) * 0.8
+                };
 
-            // PCA for Rotation
-            const varX = (sumX2 / pixelCount) - (meanX * meanX);
-            const varY = (sumY2 / pixelCount) - (meanY * meanY);
-            const covXY = (sumXY / pixelCount) - (meanX * meanY);
-            
-            // Calculate angle
-            const newAngle = 0.5 * Math.atan2(2 * covXY, varX - varY);
-            // Smooth angle to reduce jitter
-            this.angle = this.angle * 0.7 + newAngle * 0.3;
+                this.pos = { x: meanX, y: meanY };
+
+                // PCA for Rotation
+                const varX = (sumX2 / pixelCount) - (meanX * meanX);
+                const varY = (sumY2 / pixelCount) - (meanY * meanY);
+                const covXY = (sumXY / pixelCount) - (meanX * meanY);
+                
+                // Calculate angle
+                const newAngle = 0.5 * Math.atan2(2 * covXY, varX - varY);
+                // Stronger smoothing on angle
+                this.angle = this.angle * 0.6 + newAngle * 0.4;
+            } else {
+                 // Detected jump was too huge, ignore this frame, use momentum
+                 this.pos.x += this.velocity.x;
+                 this.pos.y += this.velocity.y;
+            }
 
         } else {
-            // Lost Tracking -> Use Physics Fallback
-            // Apply Gravity
-            this.velocity.y += 0.5; // Pseudo gravity
-            this.velocity.x *= 0.95; // Air resistance
-
-            this.pos.x += this.velocity.x;
-            this.pos.y += this.velocity.y;
+            // Lost Tracking -> FALLBACK LOGIC
             
-            // Keep previous angle
+            if (feetCenter) {
+                // If we know where feet are, drift towards them!
+                // This forces the board to "re-attach" to the skater if tracking is lost mid-flip
+                const driftSpeed = 0.1;
+                this.pos.x = this.pos.x * (1 - driftSpeed) + feetCenter.x * driftSpeed;
+                this.pos.y = this.pos.y * (1 - driftSpeed) + feetCenter.y * driftSpeed;
+                
+                // Dampen velocity to prevent shooting off
+                this.velocity.x *= 0.8;
+                this.velocity.y *= 0.8;
+            } else {
+                // Completely lost and no feet? Just friction stop.
+                this.velocity.x *= 0.9;
+                this.velocity.y *= 0.9;
+                this.pos.x += this.velocity.x;
+                this.pos.y += this.velocity.y;
+            }
         }
 
         // Bounds Check
@@ -173,7 +202,7 @@ class BoardTracker {
         this.pos.y = Math.max(0, Math.min(height, this.pos.y));
 
         this.history.push({ ...this.pos });
-        if (this.history.length > 50) this.history.shift();
+        if (this.history.length > 40) this.history.shift();
 
         return { x: this.pos.x, y: this.pos.y, angle: this.angle, confidence: Math.min(1, pixelCount / 50) };
     }
@@ -236,7 +265,7 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
         setPreviewUrl(url);
         setResult(null);
         setError(null);
-        boardTrackerRef.current = new BoardTracker();
+        boardTrackerRef.current.reset();
         statsRef.current = { maxHeight: 0, rotationAccumulator: 0, frameCount: 0 };
     }
   };
