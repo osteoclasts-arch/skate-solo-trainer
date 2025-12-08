@@ -1,9 +1,20 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Language, VisionAnalysis } from '../types';
 import { TRANSLATIONS } from '../constants';
-import { Upload, Camera, Zap, AlertTriangle, Play, X, Eye } from 'lucide-react';
+import { Upload, Camera, Zap, AlertTriangle, Play, X, Eye, Rewind, FastForward } from 'lucide-react';
 import { analyzeMedia } from '../services/geminiService';
+import mpPose from '@mediapipe/pose';
+import * as drawingUtils from '@mediapipe/drawing_utils';
+
+// Manually define POSE_CONNECTIONS to avoid import issues with CDN builds
+const POSE_CONNECTIONS: [number, number][] = [
+  [0, 1], [1, 2], [2, 3], [3, 7], [0, 4], [4, 5], [5, 6], [6, 8], [9, 10],
+  [11, 12], [11, 13], [13, 15], [15, 17], [15, 19], [15, 21], [17, 19],
+  [12, 14], [14, 16], [16, 18], [16, 20], [16, 22], [18, 20],
+  [11, 23], [12, 24], [23, 24], [23, 25], [24, 26], [25, 27], [26, 28],
+  [27, 29], [27, 31], [29, 31], [28, 30], [28, 32], [30, 32]
+];
 
 interface Props {
   language: Language;
@@ -17,6 +28,100 @@ const AIVision: React.FC<Props> = ({ language }) => {
   const [result, setResult] = useState<VisionAnalysis | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Video & Motion Tracking Refs
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [playbackRate, setPlaybackRate] = useState(1.0);
+  const [pose, setPose] = useState<any>(null); // Use any to avoid type issues with the dynamic import
+  const requestRef = useRef<number>(0);
+
+  useEffect(() => {
+    // Initialize MediaPipe Pose
+    // @ts-ignore
+    const PoseClass = mpPose.Pose || mpPose;
+    const poseInstance = new PoseClass({
+        locateFile: (file: string) => {
+            return `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`;
+        }
+    });
+
+    poseInstance.setOptions({
+        modelComplexity: 1,
+        smoothLandmarks: true,
+        enableSegmentation: false,
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5
+    });
+
+    // Use onResults callback
+    poseInstance.onResults(onResults);
+    setPose(poseInstance);
+
+    return () => {
+        if (requestRef.current) cancelAnimationFrame(requestRef.current);
+        poseInstance.close();
+    };
+  }, []);
+
+  const onResults = (results: any) => {
+      const canvas = canvasRef.current;
+      const video = videoRef.current;
+      if (!canvas || !video) return;
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      // Match canvas size to video display size
+      canvas.width = video.clientWidth;
+      canvas.height = video.clientHeight;
+
+      ctx.save();
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      // Draw Skeleton
+      if (results.poseLandmarks) {
+          // Customize drawing style
+          // Connectors
+          if (drawingUtils && drawingUtils.drawConnectors) {
+            drawingUtils.drawConnectors(ctx, results.poseLandmarks, POSE_CONNECTIONS, { 
+                color: '#E3FF37', // Skate Neon
+                lineWidth: 2 
+            });
+          }
+          // Landmarks (Joints)
+          if (drawingUtils && drawingUtils.drawLandmarks) {
+            drawingUtils.drawLandmarks(ctx, results.poseLandmarks, { 
+                color: '#FFFFFF', 
+                lineWidth: 1,
+                radius: 3
+            });
+          }
+      }
+      ctx.restore();
+  };
+
+  const processVideoFrame = async () => {
+      if (videoRef.current && pose && !videoRef.current.paused && !videoRef.current.ended) {
+          await pose.send({ image: videoRef.current });
+          requestRef.current = requestAnimationFrame(processVideoFrame);
+      }
+  };
+
+  const handleVideoPlay = () => {
+      processVideoFrame();
+  };
+
+  const handleVideoPause = () => {
+      if (requestRef.current) cancelAnimationFrame(requestRef.current);
+  };
+
+  const changePlaybackRate = (rate: number) => {
+      if (videoRef.current) {
+          videoRef.current.playbackRate = rate;
+          setPlaybackRate(rate);
+      }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -29,6 +134,7 @@ const AIVision: React.FC<Props> = ({ language }) => {
         setPreviewUrl(URL.createObjectURL(selectedFile));
         setResult(null);
         setError(null);
+        setPlaybackRate(1.0);
     }
   };
 
@@ -58,6 +164,7 @@ const AIVision: React.FC<Props> = ({ language }) => {
       setResult(null);
       setError(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
+      if (requestRef.current) cancelAnimationFrame(requestRef.current);
   };
 
   return (
@@ -107,15 +214,39 @@ const AIVision: React.FC<Props> = ({ language }) => {
                         <X className="w-5 h-5" />
                     </button>
                     
-                    {file?.type.startsWith('video') ? (
-                        <video src={previewUrl} controls className="w-full max-h-[400px] object-contain" />
-                    ) : (
-                        <img src={previewUrl} alt="Preview" className="w-full max-h-[400px] object-contain" />
-                    )}
+                    <div className="relative w-full aspect-video bg-black flex items-center justify-center">
+                        {file?.type.startsWith('video') ? (
+                            <>
+                                <video 
+                                    ref={videoRef}
+                                    src={previewUrl} 
+                                    controls={false} // Custom controls below
+                                    className="absolute inset-0 w-full h-full object-contain" 
+                                    onPlay={handleVideoPlay}
+                                    onPause={handleVideoPause}
+                                    loop
+                                    playsInline
+                                    crossOrigin="anonymous"
+                                />
+                                <canvas 
+                                    ref={canvasRef}
+                                    className="absolute inset-0 w-full h-full pointer-events-none z-10"
+                                />
+                                {/* Play Button Overlay */}
+                                <div className="absolute bottom-4 left-0 right-0 flex justify-center space-x-4 z-20 pointer-events-auto">
+                                    <button onClick={() => { if(videoRef.current) videoRef.current.paused ? videoRef.current.play() : videoRef.current.pause() }} className="p-3 bg-black/60 rounded-full text-white hover:bg-skate-neon hover:text-black transition-colors">
+                                        <Play className="w-5 h-5 fill-current" />
+                                    </button>
+                                </div>
+                            </>
+                        ) : (
+                            <img src={previewUrl} alt="Preview" className="w-full max-h-[400px] object-contain" />
+                        )}
+                    </div>
 
                     {/* Analyzing Overlay */}
                     {isAnalyzing && (
-                        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center z-10">
+                        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center z-30">
                             <div className="relative mb-4">
                                 <div className="absolute inset-0 bg-skate-neon/50 blur-xl rounded-full animate-pulse"></div>
                                 <Zap className="w-12 h-12 text-skate-neon relative z-10 animate-bounce" />
@@ -126,6 +257,25 @@ const AIVision: React.FC<Props> = ({ language }) => {
                         </div>
                     )}
                 </div>
+
+                {/* Video Controls (Speed) */}
+                {file?.type.startsWith('video') && (
+                    <div className="flex justify-center space-x-2">
+                        {[0.25, 0.5, 1.0].map(rate => (
+                            <button
+                                key={rate}
+                                onClick={() => changePlaybackRate(rate)}
+                                className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider border transition-all ${
+                                    playbackRate === rate 
+                                    ? 'bg-skate-neon text-black border-skate-neon' 
+                                    : 'bg-white/5 text-gray-400 border-white/5 hover:bg-white/10'
+                                }`}
+                            >
+                                {rate}x
+                            </button>
+                        ))}
+                    </div>
+                )}
 
                 {/* Error Message */}
                 {error && (

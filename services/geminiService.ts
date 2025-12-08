@@ -1,5 +1,3 @@
-
-
 declare var process: {
   env: {
     API_KEY: string;
@@ -8,7 +6,7 @@ declare var process: {
 
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { Trick, SessionSettings, Difficulty, TrickCategory, SessionResult, TrickTip, Language, AnalyticsInsight, VisionAnalysis } from "../types";
-import { TRICK_TIPS_DB } from "../constants";
+import { TRICK_TIPS_DB, BASE_TRICKS } from "../constants";
 
 const apiKey = process.env.API_KEY || '';
 
@@ -266,34 +264,43 @@ export const analyzeMedia = async (file: File, language: Language): Promise<Visi
     }
 
     const mediaPart = await fileToPart(file);
+    const availableTricks = BASE_TRICKS.map(t => t.name).join(", ");
     
     const analysisSchema: Schema = {
         type: Type.OBJECT,
         properties: {
-            trickName: { type: Type.STRING },
+            trickName: { type: Type.STRING, description: "Correct name of the trick (e.g. Fakie Kickflip, Half Cab)" },
             confidence: { type: Type.NUMBER, description: "0 to 100" },
             formScore: { type: Type.NUMBER, description: "0 to 10" },
-            heightEstimate: { type: Type.STRING, description: "e.g. '30cm' or 'Low/Medium/High'" },
-            postureAnalysis: { type: Type.STRING },
-            landingAnalysis: { type: Type.STRING },
-            improvementTip: { type: Type.STRING }
+            heightEstimate: { type: Type.STRING, description: "e.g. '50cm' or '20cm'. Be specific." },
+            postureAnalysis: { type: Type.STRING, description: "Details on shoulders, feet, weight distribution" },
+            landingAnalysis: { type: Type.STRING, description: "Cleanliness, toe drag, wheel bite" },
+            improvementTip: { type: Type.STRING, description: "Actionable advice" }
         },
         required: ["trickName", "confidence", "formScore", "heightEstimate", "postureAnalysis", "landingAnalysis", "improvementTip"]
     };
 
     const prompt = `
         You are an expert AI Skateboarding Coach.
-        Analyze this image or video clip of a skateboard trick.
+        Analyze this image or video clip frame-by-frame if possible.
         Language: ${language === 'KR' ? 'Korean (Hangul)' : 'English'}.
+        
+        Reference Trick List: ${availableTricks}
 
-        Identify:
-        1. What trick is being performed?
-        2. How confident are you?
-        3. Rate the form (0-10).
-        4. Estimate the pop height.
-        5. Analyze the body posture (shoulders, feet position, balance).
-        6. Analyze the landing (clean, sketchy, toe drag).
-        7. Provide one specific pro tip to improve this trick.
+        Steps:
+        1. Identify the Stance (Regular, Fakie, Nollie, Switch). Look at foot positioning and movement direction.
+        2. Identify the Board Rotation (Shuvit, 180, 360) and Body Rotation.
+        3. Identify the Flip (Kickflip, Heelflip, etc).
+        4. Combine them to name the trick correctly (e.g., "Half Cab Flip", "Nollie Tre Flip").
+        5. Estimate the maximum height of the board in CM (centimeters). Be realistic.
+        
+        Tasks:
+        - Name the trick exactly.
+        - Rate form 0-10.
+        - Estimate Pop Height in CM.
+        - Analyze Posture.
+        - Analyze Landing.
+        - Give 1 Pro Tip.
 
         Respond in JSON format.
     `;
