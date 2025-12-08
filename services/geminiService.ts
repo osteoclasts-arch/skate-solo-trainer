@@ -320,7 +320,7 @@ export const analyzeMedia = async (
         const response = await ai.models.generateContent({
             model: "gemini-2.5-flash",
             contents: {
-                parts: [videoPart.inlineData, { text: prompt }]
+                parts: [videoPart, { text: prompt }]
             },
             config: {
                 responseMimeType: "application/json",
