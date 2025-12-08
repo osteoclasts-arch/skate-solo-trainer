@@ -274,11 +274,12 @@ export const analyzeMedia = async (file: File, language: Language, trickHint?: s
             confidence: { type: Type.NUMBER, description: "0 to 100" },
             formScore: { type: Type.NUMBER, description: "0 to 100 (Integer)" },
             heightEstimate: { type: Type.STRING, description: "e.g. '30cm'. Must be 0-50cm." },
+            physicsReasoning: { type: Type.STRING, description: "Detailed check: Did board flip? Did board spin? Did body rotate? WHY is it this trick?" },
             postureAnalysis: { type: Type.STRING, description: "Analysis of knees, shoulders, and landing stability" },
             landingAnalysis: { type: Type.STRING, description: "Cleanliness of landing (bolts, toe drag, etc)" },
             improvementTip: { type: Type.STRING, description: "Strict corrective advice" }
         },
-        required: ["trickName", "confidence", "formScore", "heightEstimate", "postureAnalysis", "landingAnalysis", "improvementTip"]
+        required: ["trickName", "confidence", "formScore", "heightEstimate", "physicsReasoning", "postureAnalysis", "landingAnalysis", "improvementTip"]
     };
 
     let hintInstruction = "";
@@ -297,74 +298,46 @@ export const analyzeMedia = async (file: File, language: Language, trickHint?: s
         ${hintInstruction}
 
         ===================================================
-        GOLD STANDARD BENCHMARKS (REFERENCE)
+        CRITICAL: OLLIE VS KICKFLIP DISTINCTION
         ===================================================
-        1. PERFECT GOOFY OLLIE (Score: 90+, Height: 40cm+):
-           - Rider pops with Left Foot (Back), slides Right Foot (Front).
-           - Board stays strictly vertical under feet (NO flip, NO rotation).
-           - High pop, board sticks to feet at peak.
+        Common Error: Mistaking a stylish Ollie (where the rider kicks their foot out) for a Kickflip.
         
-        2. PERFECT GOOFY KICKFLIP (Score: 90+, Height: 30cm+):
-           - Rider pops with Left Foot.
-           - Right Foot (Front) flicks off the TOE side edge.
-           - Board rotates 360 degrees along the long axis (heel over toe).
-           - Catch happens in the air.
+        1. OLLIE CHECKLIST (MUST MEET ALL):
+           - [ ] The board stays relatively flat (grip tape up) or goes vertical (rocket).
+           - [ ] The board NEVER flips upside down.
+           - [ ] The board NEVER reveals its graphic side to the sky during the peak.
+           - [ ] Board rotation on Roll axis = 0 degrees.
+        
+        2. KICKFLIP CHECKLIST (MUST MEET ALL):
+           - [ ] The board rotates 360 degrees on its Roll axis.
+           - [ ] You MUST see the graphic (bottom) of the board facing up at some point.
+           - [ ] If you do not clearly see the graphic side, IT IS NOT A FLIP. It is an Ollie.
 
         ===================================================
-        JUDGING RULES (FOLLOW STRICTLY)
+        TRICK DEFINITIONS
         ===================================================
-        
-        [TRICK DEFINITIONS]
-        1. OLLIE:
-           - Board & Rider jump up.
-           - NO lateral flip.
-           - NO vertical axis rotation (< 10 deg allowed).
-           - Body rotation < 90 deg.
-        
-        2. KICKFLIP:
-           - Board flips laterally (Toe-side flick).
-           - Full 360 flip rotation required.
-        
-        3. HEELFLIP:
-           - Board flips laterally (Heel-side flick).
-           - Full 360 flip rotation required.
-        
-        4. POP_SHOVE_IT:
-           - Board rotates ~180 degrees on vertical axis (Spin).
-           - NO lateral flip.
-           - Body does NOT rotate.
-        
-        5. FS_180_OLLIE:
-           - Board does NOT spin independently.
-           - Rider + Board rotate together ~180 degrees Frontside (Chest forward).
-        
-        6. BS_180_OLLIE:
-           - Board does NOT spin independently.
-           - Rider + Board rotate together ~180 degrees Backside (Back forward).
+        1. OLLIE: Jump with board. No flip. No spin.
+        2. KICKFLIP: Full 360 lateral flip (Toe-side).
+        3. HEELFLIP: Full 360 lateral flip (Heel-side).
+        4. POP_SHOVE_IT: 180 vertical spin. No flip.
+        5. FS_180_OLLIE: Body + Board rotate 180 Frontside.
+        6. BS_180_OLLIE: Body + Board rotate 180 Backside.
 
         [SCORING RUBRIC]
-        
-        1. jump_height_cm (Conservative Estimate):
-           - Range: 0 - 50 cm.
-           - 0-10cm: Low (POOR)
-           - 10-30cm: Medium (AVERAGE)
-           - 30-50cm: High (PRO)
-           - Do not exaggerate. If barely off ground, say 5cm.
-
-        2. posture_score (0-100):
-           - 0-40 (Bad): Heavy stumble, toe drag, fall, or very low height.
-           - 40-70 (Average): Landed but sketchy, stiff knees, hunchback.
-           - 70-100 (Good): Bolt landing, deep knee bend, no wobble, high style.
+        1. jump_height_cm: Conservative 0-50cm.
+        2. posture_score: 0-100 based on style/stability.
 
         ===================================================
-        ANALYSIS STEPS
+        ANALYSIS PROCEDURE (CHAIN OF THOUGHT)
         ===================================================
-        1. Determine Stance Context (Normal vs Fakie/Nollie/Switch) based on ${userStance} and movement direction.
-        2. Analyze Board Physics: Did it Flip? Did it Spin? Did Body Rotate?
-        3. Match to [TRICK DEFINITIONS].
-        4. Estimate Height conservatively (0-50cm).
-        5. Judge Posture (0-100).
-        
+        1. **Board Identification**: Locate the skateboard.
+        2. **Physics Verification**:
+           - Did the board rotate on the Y-axis (Spin)?
+           - Did the board rotate on the X-axis (Flip)? -> IF NO FLIP DETECTED, IT IS AN OLLIE.
+        3. **Body Verification**: Did the rider's chest/back rotate 180?
+        4. **Classify**: Assign trick name based on physics.
+        5. **Report**: Fill 'physicsReasoning' with your findings (e.g., "Board lifted but did not rotate X-axis. Grip tape remained visible. Classified as Ollie.").
+
         Output JSON only.
     `;
 
