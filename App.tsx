@@ -22,6 +22,7 @@ const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
+  const [showSplash, setShowSplash] = useState(true);
 
   // Initialize session history from localStorage (Default for Guest)
   const [sessionHistory, setSessionHistory] = useState<SessionResult[]>(() => {
@@ -44,6 +45,14 @@ const App: React.FC = () => {
   const [startDate, setStartDate] = useState<string>(() => {
       return localStorage.getItem('skate_start_date') || new Date().toISOString().split('T')[0];
   });
+
+  // Minimum Splash Screen Duration
+  useEffect(() => {
+    const timer = setTimeout(() => {
+        setShowSplash(false);
+    }, 2500);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Handle Authentication Persistence & Data Sync
   useEffect(() => {
@@ -205,13 +214,13 @@ const App: React.FC = () => {
   };
 
   const renderView = () => {
-    if (isAuthChecking) {
+    if (isAuthChecking || showSplash) {
         return (
             <div className="flex h-screen flex-col items-center justify-center bg-black space-y-12 animate-fade-in relative overflow-hidden">
                 {/* Background ambient glow */}
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-skate-neon/10 rounded-full blur-[100px] animate-pulse-slow"></div>
 
-                <div className="text-center relative z-10">
+                <div className="text-center relative z-10 scale-110">
                     <h1 className="text-[5rem] font-display font-bold text-white tracking-tighter leading-[0.85] mb-6">
                         SKATE<br/>
                         <span className="text-skate-neon text-glow drop-shadow-[0_0_15px_rgba(204,255,0,0.5)]">SOLO</span>
@@ -223,15 +232,15 @@ const App: React.FC = () => {
                     </div>
                 </div>
                 
-                <div className="absolute bottom-16 flex flex-col items-center space-y-2 opacity-80">
+                <div className="absolute bottom-16 flex flex-col items-center space-y-3 opacity-90">
                     <a 
                         href="https://instagram.com/osteoclasts_" 
                         target="_blank" 
                         rel="noopener noreferrer"
-                        className="flex items-center space-x-2 bg-white/5 px-4 py-2 rounded-full border border-white/5 hover:bg-white/10 transition-colors"
+                        className="flex items-center space-x-2 bg-white/5 px-6 py-3 rounded-full border border-white/5 hover:bg-white/10 transition-colors animate-slide-up"
                     >
-                        <Instagram className="w-4 h-4 text-gray-400" />
-                        <span className="text-xs font-bold text-gray-300 tracking-wider">
+                        <Instagram className="w-5 h-5 text-gray-300" />
+                        <span className="text-sm font-bold text-white tracking-widest font-display">
                             @OSTEOCLASTS_
                         </span>
                     </a>
@@ -312,7 +321,7 @@ const App: React.FC = () => {
       {renderView()}
 
       {/* Floating Island Navigation */}
-      {!isAuthChecking && (view === 'DASHBOARD' || view === 'ANALYTICS' || view === 'LEARNING' || view === 'SUMMARY' || view === 'AI_VISION') && (
+      {!isAuthChecking && !showSplash && (view === 'DASHBOARD' || view === 'ANALYTICS' || view === 'LEARNING' || view === 'SUMMARY' || view === 'AI_VISION') && (
          <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 w-[95%] max-w-md z-50">
             <nav className="glass-nav rounded-full px-6 py-4 flex justify-between items-center shadow-2xl">
                 <button 

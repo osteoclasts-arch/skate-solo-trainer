@@ -274,7 +274,7 @@ export const analyzeMedia = async (
         : "";
 
     const prompt = `
-        You are a strict Skateboard Competition Judge (Referee).
+        You are a strict Skateboard Competition Judge (Referee) and a helpful Coach.
         Analyze the video and side-view physics data to classify the trick.
 
         [STRICT SIDE-VIEW PHYSICS RULES]
@@ -309,6 +309,7 @@ export const analyzeMedia = async (
            - If unclear, return "UNKNOWN".
         2. Even if UNKNOWN, you MUST estimate jump height and score.
         3. Score (0-100) based on landing cleanliness and height.
+        4. **CRITICAL:** The 'feedbackText' and 'improvementTip' MUST be in ${language === 'KR' ? 'KOREAN (Hangul)' : 'ENGLISH'}. Do not ignore this language requirement.
 
         Output JSON format:
         {
@@ -317,8 +318,8 @@ export const analyzeMedia = async (
             "score": number,
             "heightMeters": number,
             "rotationDegrees": number,
-            "feedbackText": "string (${language === 'KR' ? 'Korean' : 'English'})",
-            "improvementTip": "string"
+            "feedbackText": "string (${language === 'KR' ? 'Must be Korean' : 'English'})",
+            "improvementTip": "string (${language === 'KR' ? 'Must be Korean' : 'English'})"
         }
     `;
 
