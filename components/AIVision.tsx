@@ -25,14 +25,12 @@ class ObstacleTracker {
     frameCount = 0;
 
     scan(ctx: CanvasRenderingContext2D, width: number, height: number) {
-        // Run scan only every 15 frames to save performance
         if (this.frameCount % 15 !== 0) {
             this.frameCount++;
             return this.detectedObstacles;
         }
 
-        const roiH = height * 0.4; // Only scan bottom 40%
-        // Guard against invalid dimensions
+        const roiH = height * 0.4;
         if (roiH <= 0 || width <= 0 || height <= 0) return this.detectedObstacles;
 
         const startY = height - roiH;
@@ -42,27 +40,20 @@ class ObstacleTracker {
             const data = frame.data;
             const obstacles = [];
 
-            // Simple Color-based Detection for Orange Traffic Cones
-            let orangePixelsX = 0;
-            let orangePixelsY = 0;
             let orangeCount = 0;
             let minX = width, maxX = 0, minY = height, maxY = 0;
 
-            for (let i = 0; i < data.length; i += 16) { // Skip pixels for speed
+            for (let i = 0; i < data.length; i += 16) {
                 const r = data[i];
                 const g = data[i + 1];
                 const b = data[i + 2];
 
-                // Orange-ish / Red-ish check
                 if (r > 150 && g > 50 && g < 180 && b < 100 && r > g + 40) {
                     const idx = i / 4;
                     const x = idx % width;
                     const y = startY + Math.floor(idx / width);
 
-                    orangePixelsX += x;
-                    orangePixelsY += y;
                     orangeCount++;
-
                     if (x < minX) minX = x;
                     if (x > maxX) maxX = x;
                     if (y < minY) minY = y;
@@ -70,7 +61,7 @@ class ObstacleTracker {
                 }
             }
 
-            if (orangeCount > 100) { // Threshold size
+            if (orangeCount > 100) {
                 obstacles.push({
                     type: 'Cone',
                     x: minX,
@@ -91,30 +82,22 @@ class ObstacleTracker {
     }
 }
 
-// --- ADVANCED BOARD TRACKER (OBB + PHYSICS) ---
+// --- ADVANCED BOARD TRACKER (OBB + PHYSICS + ANCHORING) ---
 class BoardTracker {
     colorMean: [number, number, number] = [0, 0, 0];
     isCalibrated = false;
     
-    // Physics State
     pos: { x: number, y: number } = { x: 0, y: 0 };
     velocity: { x: number, y: number } = { x: 0, y: 0 };
     angle: number = 0;
     
-    // OBB (Oriented Bounding Box) Dimensions
-    dimensions = { length: 100, width: 30 }; // default pixels
-    
-    // History for smoothing path
+    dimensions = { length: 120, width: 35 }; // Standard skate pixels
     history: { x: number, y: number }[] = [];
 
-    // --- PHYSICS METRICS FOR AI ---
     metrics = {
-        minWidth: Infinity,
-        maxWidth: 0,
-        minLength: Infinity,
-        maxLength: 0,
-        maxAngleChange: 0,
-        airTimeFrames: 0
+        minWidth: Infinity, maxWidth: 0,
+        minLength: Infinity, maxLength: 0,
+        maxAngleChange: 0, airTimeFrames: 0
     };
 
     constructor() {
@@ -127,7 +110,7 @@ class BoardTracker {
         this.pos = { x: 0, y: 0 };
         this.velocity = { x: 0, y: 0 };
         this.angle = 0;
-        this.dimensions = { length: 100, width: 30 };
+        this.dimensions = { length: 120, width: 35 };
         this.history = [];
         this.metrics = {
             minWidth: Infinity, maxWidth: 0,
@@ -136,31 +119,28 @@ class BoardTracker {
         };
     }
 
-    // 1. Calibration: Learn the board color from between the feet
     calibrate(ctx: CanvasRenderingContext2D, width: number, height: number, leftFoot: any, rightFoot: any) {
         if (!leftFoot || !rightFoot) return;
         
-        // Sample area strictly between feet + slight offset down
         const lx = leftFoot.x * width;
         const ly = leftFoot.y * height;
         const rx = rightFoot.x * width;
         const ry = rightFoot.y * height;
         
+        // Target: Center of feet, slightly down (Ground level)
         const centerX = (lx + rx) / 2;
-        const centerY = Math.max(ly, ry) + (height * 0.02); // Slightly below ankles
-        const sampleSize = 40; // 40x40 pixel box
+        const centerY = Math.max(ly, ry) + (height * 0.05); 
+        
+        const sampleW = Math.abs(rx - lx) * 0.8; 
+        const sampleH = 40; 
 
         try {
-            // Check bounds
             if (centerX < 0 || centerX > width || centerY < 0 || centerY > height) return;
-            if (sampleSize <= 0) return;
 
-            // Ensure we don't request pixels outside canvas
-            const sx = Math.max(0, centerX - sampleSize/2);
-            const sy = Math.max(0, centerY - sampleSize/2);
-            // safe width/height ensuring we don't go out of bounds
-            const sw = Math.min(sampleSize, width - sx);
-            const sh = Math.min(sampleSize, height - sy);
+            const sx = Math.max(0, centerX - sampleW/2);
+            const sy = Math.max(0, centerY - sampleH/2);
+            const sw = Math.min(sampleW, width - sx);
+            const sh = Math.min(sampleH, height - sy);
 
             if (sw <= 0 || sh <= 0) return;
 
@@ -169,183 +149,183 @@ class BoardTracker {
             let r = 0, g = 0, b = 0, count = 0;
 
             for (let i = 0; i < data.length; i += 4) {
-                r += data[i];
-                g += data[i + 1];
-                b += data[i + 2];
-                count++;
+                // Ignore very bright pixels (concrete highlights)
+                if (data[i] < 200 && data[i+1] < 200 && data[i+2] < 200) {
+                    r += data[i];
+                    g += data[i + 1];
+                    b += data[i + 2];
+                    count++;
+                }
             }
             
             if (count > 0) {
                 this.colorMean = [r / count, g / count, b / count];
                 this.isCalibrated = true;
                 this.pos = { x: centerX, y: centerY };
-                // Reset metrics on calibration
-                this.metrics = {
-                    minWidth: Infinity, maxWidth: 0,
-                    minLength: Infinity, maxLength: 0,
-                    maxAngleChange: 0, airTimeFrames: 0
-                };
+                this.resetMetrics();
             }
         } catch (e) {
             console.error("Calibration failed", e);
         }
     }
+    
+    resetMetrics() {
+        this.metrics = {
+            minWidth: Infinity, maxWidth: 0,
+            minLength: Infinity, maxLength: 0,
+            maxAngleChange: 0, airTimeFrames: 0
+        };
+    }
 
-    // 2. Tracking: Find the board in the frame
     track(ctx: CanvasRenderingContext2D, width: number, height: number, leftAnkle: any, rightAnkle: any) {
         if (!this.isCalibrated) return null;
 
-        // Calculate Feet Center (Gravity Anchor)
-        let feetCenter = null;
+        // 1. ANCHOR POINT: Gravity Center between feet
+        let anchor = null;
         if (leftAnkle && rightAnkle && leftAnkle.visibility > 0.5 && rightAnkle.visibility > 0.5) {
              const fx = ((leftAnkle.x + rightAnkle.x) / 2) * width;
              const fy = ((leftAnkle.y + rightAnkle.y) / 2) * height;
-             feetCenter = { x: fx, y: fy + (height * 0.04) };
+             // Board is usually 5-10% screen height below ankles
+             anchor = { x: fx, y: fy + (height * 0.05) };
         }
 
-        // Define Region of Interest (ROI)
+        // 2. DEFINE SEARCH REGION (ROI)
+        // Look around current pos, but strongly biased towards Anchor
         let roiX = this.pos.x + this.velocity.x;
         let roiY = this.pos.y + this.velocity.y;
         
-        if (feetCenter) {
-             const distToFeet = Math.hypot(roiX - feetCenter.x, roiY - feetCenter.y);
-             // Tighter constraint: Board rarely flies > 30% of screen width away from feet
-             if (distToFeet < width * 0.3) {
-                 roiX = roiX * 0.7 + feetCenter.x * 0.3;
-                 roiY = roiY * 0.7 + feetCenter.y * 0.3;
-             }
+        if (anchor) {
+             // Pull ROI towards feet anchor to prevent drift
+             roiX = (roiX * 0.4) + (anchor.x * 0.6);
+             roiY = (roiY * 0.4) + (anchor.y * 0.6);
         }
 
-        const roiW = 200; // Search window size
-        const roiH = 150;
-        const startX = Math.max(0, Math.min(width - roiW, roiX - roiW / 2));
-        const startY = Math.max(0, Math.min(height - roiH, roiY - roiH / 2));
+        const roiSize = 250; 
+        const startX = Math.max(0, Math.min(width - roiSize, roiX - roiSize / 2));
+        const startY = Math.max(0, Math.min(height - roiSize, roiY - roiSize / 2));
         
-        // Safety check for getImageData
-        if (roiW <= 0 || roiH <= 0 || startX < 0 || startY < 0 || startX + roiW > width || startY + roiH > height) {
-            // Skip tracking if ROI is invalid or out of bounds to avoid buffer error
-            return null;
-        }
+        if (roiSize <= 0 || startX < 0 || startY < 0) return null;
 
+        // 3. PIXEL SCANNING (Color Matching)
         let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0, sumY2 = 0;
         let pixelCount = 0;
-        const pixels: {x: number, y: number}[] = [];
+        const [Tr, Tg, Tb] = this.colorMean;
+        const threshold = 60; // Slightly looser threshold for shadows
 
         try {
-            const frame = ctx.getImageData(startX, startY, roiW, roiH);
+            const frame = ctx.getImageData(startX, startY, roiSize, roiSize);
             const data = frame.data;
             
-            const threshold = 45;
-            const [Tr, Tg, Tb] = this.colorMean;
-            const step = 2;
-
-            for (let y = 0; y < roiH; y += step) { 
-                for (let x = 0; x < roiW; x += step) {
-                    const idx = (y * roiW + x) * 4;
+            for (let y = 0; y < roiSize; y += 4) { 
+                for (let x = 0; x < roiSize; x += 4) {
+                    const idx = (y * roiSize + x) * 4;
                     const r = data[idx];
                     const g = data[idx + 1];
                     const b = data[idx + 2];
+                    
+                    // Color distance
                     const dist = Math.abs(r - Tr) + Math.abs(g - Tg) + Math.abs(b - Tb);
 
                     if (dist < threshold * 3) {
                         const absX = startX + x;
                         const absY = startY + y;
-                        sumX += absX; sumY += absY;
-                        sumX2 += absX * absX; sumY2 += absY * absY;
-                        sumXY += absX * absY;
-                        pixels.push({x: absX, y: absY});
-                        pixelCount++;
+                        
+                        // Distance weighting: Pixels closer to Anchor are more likely to be the board
+                        let weight = 1;
+                        if (anchor) {
+                            const dAnchor = Math.hypot(absX - anchor.x, absY - anchor.y);
+                            if (dAnchor > 150) weight = 0.1; // Ignore background noise
+                        }
+
+                        if (weight > 0.5) {
+                            sumX += absX; sumY += absY;
+                            sumX2 += absX * absX; sumY2 += absY * absY;
+                            sumXY += absX * absY;
+                            pixelCount++;
+                        }
                     }
                 }
             }
         } catch (e) {
-            // Fail silently on frame read error
             return null;
         }
 
-        if (pixelCount > 20) {
+        if (pixelCount > 30) {
             const meanX = sumX / pixelCount;
             const meanY = sumY / pixelCount;
 
+            // Apply Velocity
             this.velocity = {
-                x: (meanX - this.pos.x) * 0.7 + this.velocity.x * 0.3,
-                y: (meanY - this.pos.y) * 0.7 + this.velocity.y * 0.3
+                x: (meanX - this.pos.x) * 0.6 + this.velocity.x * 0.4,
+                y: (meanY - this.pos.y) * 0.6 + this.velocity.y * 0.4
             };
             this.pos = { x: meanX, y: meanY };
 
-            // PCA for Angle
+            // PCA for Rotation
             const varX = (sumX2 / pixelCount) - (meanX * meanX);
             const varY = (sumY2 / pixelCount) - (meanY * meanY);
             const covXY = (sumXY / pixelCount) - (meanX * meanY);
             const rawAngle = 0.5 * Math.atan2(2 * covXY, varX - varY);
             
+            // Smooth Angle
             let deltaAngle = rawAngle - this.angle;
+            // Handle angle wrap-around
             while (deltaAngle <= -Math.PI/2) deltaAngle += Math.PI;
             while (deltaAngle > Math.PI/2) deltaAngle -= Math.PI;
-            this.angle += deltaAngle * 0.5;
-
-            // OBB Calculation
-            let minU = Infinity, maxU = -Infinity; // Length
-            let minV = Infinity, maxV = -Infinity; // Width (Thickness)
-            const cos = Math.cos(-this.angle);
-            const sin = Math.sin(-this.angle);
-
-            for (let p of pixels) {
-                const dx = p.x - meanX;
-                const dy = p.y - meanY;
-                const u = dx * cos - dy * sin;
-                const v = dx * sin + dy * cos;
-                if (u < minU) minU = u; if (u > maxU) maxU = u;
-                if (v < minV) minV = v; if (v > maxV) maxV = v;
+            
+            // Only update angle if sufficient pixels (structure exists)
+            if (pixelCount > 50) {
+                this.angle += deltaAngle * 0.6;
             }
 
-            const measuredLength = (maxU - minU) || 100;
-            const measuredWidth = (maxV - minV) || 30;
+            // OBB Dimensions
+            const cos = Math.cos(-this.angle);
+            const sin = Math.sin(-this.angle);
+            
+            // Heuristic dimensions based on pixel spread (Standard deviation)
+            const spreadLen = Math.sqrt(Math.abs(varX * cos*cos + varY * sin*sin));
+            const spreadWid = Math.sqrt(Math.abs(varX * sin*sin + varY * cos*cos));
+            
+            // Map spread to realistic pixels (approx 4 sigma)
+            const measuredLength = Math.max(80, spreadLen * 4);
+            const measuredWidth = Math.max(20, spreadWid * 4);
             
             this.dimensions.length = this.dimensions.length * 0.8 + measuredLength * 0.2;
             this.dimensions.width = this.dimensions.width * 0.8 + measuredWidth * 0.2;
 
-            // --- COLLECT PHYSICS METRICS ---
-            // Only collect if the board is significantly off the ground (Airtime)
-            if (feetCenter && this.pos.y < (height * 0.9)) { 
+            // Update Metrics for AI
+            if (anchor && this.pos.y < (height * 0.85)) { 
                 this.metrics.airTimeFrames++;
-                if (measuredWidth > this.metrics.maxWidth) this.metrics.maxWidth = measuredWidth;
-                if (measuredWidth < this.metrics.minWidth) this.metrics.minWidth = measuredWidth;
-                if (measuredLength > this.metrics.maxLength) this.metrics.maxLength = measuredLength;
-                if (measuredLength < this.metrics.minLength) this.metrics.minLength = measuredLength;
+                if (this.dimensions.width > this.metrics.maxWidth) this.metrics.maxWidth = this.dimensions.width;
+                if (this.dimensions.width < this.metrics.minWidth) this.metrics.minWidth = this.dimensions.width;
+                if (this.dimensions.length > this.metrics.maxLength) this.metrics.maxLength = this.dimensions.length;
+                if (this.dimensions.length < this.metrics.minLength) this.metrics.minLength = this.dimensions.length;
             }
 
         } else {
-            // LOST state handling
-            if (feetCenter) {
-                // If lost, pull towards feet strongly
-                const drift = 0.2;
-                this.pos.x = this.pos.x * (1 - drift) + feetCenter.x * drift;
-                this.pos.y = this.pos.y * (1 - drift) + feetCenter.y * drift;
-                this.velocity.x *= 0.5;
-                this.velocity.y *= 0.5;
-            } else {
-                this.velocity.x *= 0.9; 
-                this.velocity.y += 0.5; // Gravity
-                this.pos.x += this.velocity.x;
-                this.pos.y += this.velocity.y;
+            // LOST TRACKING FALLBACK
+            if (anchor) {
+                // Snap to feet if lost
+                this.pos.x = this.pos.x * 0.8 + anchor.x * 0.2;
+                this.pos.y = this.pos.y * 0.8 + anchor.y * 0.2;
             }
+            this.velocity.x *= 0.9; 
+            this.velocity.y *= 0.9;
         }
 
-        // Clamp to screen
+        // Keep within screen
         this.pos.x = Math.max(0, Math.min(width, this.pos.x));
         this.pos.y = Math.max(0, Math.min(height, this.pos.y));
 
         this.history.push({ ...this.pos });
-        if (this.history.length > 30) this.history.shift();
+        if (this.history.length > 20) this.history.shift();
 
         return { 
             x: this.pos.x, 
             y: this.pos.y, 
             angle: this.angle,
             length: this.dimensions.length,
-            width: this.dimensions.width,
-            confidence: Math.min(1, pixelCount / 20) 
+            width: this.dimensions.width
         };
     }
 }
@@ -358,11 +338,10 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
   const [result, setResult] = useState<VisionAnalysis | null>(null);
   const [error, setError] = useState<string | null>(null);
   
-  // Video Controls State
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [playbackSpeed, setPlaybackSpeed] = useState(0.5); // Default slow motion for analysis
+  const [playbackSpeed, setPlaybackSpeed] = useState(0.5); 
 
   const [userStance, setUserStance] = useState<'Regular' | 'Goofy'>('Regular');
   const [userContext, setUserContext] = useState<string[]>([]);
@@ -403,7 +382,7 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
             poseRef.current = pose;
         } catch (e) {
             console.error("Failed to load Pose", e);
-            setError("Failed to load AI models. Please refresh.");
+            setError("AI 모델 로딩 실패. 새로고침 해주세요.");
         }
     };
     initPose();
@@ -431,34 +410,104 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
         setTrickNameInput("");
         setIsPlaying(false);
         setProgress(0);
+        
+        // Reset Logic
         boardTrackerRef.current.reset();
         statsRef.current = { maxHeight: 0, frameCount: 0 };
+        
+        // Don't auto play. Just load.
+        if (videoRef.current) {
+            videoRef.current.currentTime = 0;
+            videoRef.current.pause();
+        }
     }
   };
 
-  const startAnalysis = () => {
-      if (!videoRef.current || !poseRef.current) return;
+  const startAnalysis = async () => {
+      if (!videoRef.current || !poseRef.current || !file) return;
       setIsAnalyzing(true);
       setError(null);
-      boardTrackerRef.current.reset(); // Reset physics metrics
+      setResult(null);
+      boardTrackerRef.current.reset(); 
+      statsRef.current = { maxHeight: 0, frameCount: 0 };
       
       const video = videoRef.current;
       video.currentTime = 0;
-      video.playbackRate = playbackSpeed;
-      video.play();
-      setIsPlaying(true);
+      video.playbackRate = 1.5; // Fast forward for UX
       
-      processFrame();
+      try {
+          // 1. Start Video Playback + CV Visualization
+          await video.play();
+          setIsPlaying(true);
+          processFrame(); 
+
+          // 2. Start Gemini API Call in PARALLEL (Do not wait for video end)
+          performGeminiAnalysis();
+
+      } catch (err) {
+          console.error("Play failed", err);
+          setError("동영상 재생 실패. 다시 시도해주세요.");
+          setIsAnalyzing(false);
+      }
   };
 
-  // Main Tracking Loop
+  const performGeminiAnalysis = async () => {
+      if (!file) return;
+      
+      // Since we call this immediately, we won't have full CV physics data yet.
+      // We rely on Gemini 3 Pro's vision capabilities.
+      // We pass userContext (history) but physicsContext will be empty/initial.
+      const initialContext = [`User Stance: ${userStance}`, ...userContext];
+      
+      try {
+          const aiResult = await analyzeMedia(file, 'KR', initialContext, trickNameInput);
+          
+          let finalResult: VisionAnalysis;
+          
+          if (aiResult) {
+              finalResult = {
+                  ...aiResult,
+                  // If AI returned 0 height, use a default fallback, otherwise trust AI
+                  heightMeters: aiResult.heightMeters || 0.2, 
+                  score: aiResult.score || 50
+              };
+          } else {
+               finalResult = {
+                  id: Date.now().toString(),
+                  timestamp: new Date().toISOString(),
+                  trickName: "분석 실패 (UNKNOWN)",
+                  isLanded: false,
+                  confidence: 0,
+                  score: 50,
+                  heightMeters: 0,
+                  rotationDegrees: 0,
+                  feedbackText: "AI가 영상을 분석하지 못했습니다.",
+                  improvementTip: "다시 시도해주세요."
+              };
+          }
+          
+          setResult(finalResult);
+          setIsAnalyzing(false); // Stop loading spinner
+
+          // Reset playback speed to normal for viewing
+          if (videoRef.current) videoRef.current.playbackRate = 1.0; 
+
+          if (user) {
+              await dbService.saveAnalysisResult(user.uid, finalResult);
+          }
+      } catch (e) {
+          console.error("Analysis Error", e);
+          setIsAnalyzing(false);
+      }
+  };
+
   const processFrame = async () => {
       if (!videoRef.current || !canvasRef.current || !poseRef.current) return;
       const video = videoRef.current;
       
       if (video.paused || video.ended) {
           setIsPlaying(false);
-          if (video.ended && isAnalyzing) completeAnalysis();
+          // Note: We no longer trigger analysis on ended. It runs in parallel.
           return;
       }
 
@@ -466,7 +515,6 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
       requestRef.current = requestAnimationFrame(processFrame);
   };
 
-  // Called manually when scrubbing
   const processSingleFrame = async () => {
     if (!videoRef.current || !poseRef.current) return;
     await poseRef.current.send({ image: videoRef.current });
@@ -478,9 +526,10 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
           videoRef.current.pause();
           setIsPlaying(false);
       } else {
-          videoRef.current.play();
-          setIsPlaying(true);
-          processFrame();
+          videoRef.current.play().then(() => {
+              setIsPlaying(true);
+              processFrame();
+          });
       }
   };
 
@@ -489,7 +538,7 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
       const time = parseFloat(e.target.value);
       videoRef.current.currentTime = time;
       setProgress(time);
-      processSingleFrame(); // Update canvas instantly
+      processSingleFrame(); 
   };
 
   const handleSpeedChange = (speed: number) => {
@@ -512,6 +561,8 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
               canvasRef.current.width = videoRef.current.videoWidth;
               canvasRef.current.height = videoRef.current.videoHeight;
           }
+          // Process one frame to show preview
+          processSingleFrame();
       }
   };
 
@@ -522,8 +573,6 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
       
       const width = canvasRef.current.width;
       const height = canvasRef.current.height;
-
-      // Ensure valid dimensions to avoid buffer errors
       if (width <= 0 || height <= 0) return;
 
       ctx.save();
@@ -539,7 +588,7 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
           leftAnkle = results.poseLandmarks[27];
           rightAnkle = results.poseLandmarks[28];
 
-          // Calibrate on first few frames if feet are found
+          // Calibrate on first few frames if feet detected
           if (!boardTrackerRef.current.isCalibrated && statsRef.current.frameCount < 30) {
              boardTrackerRef.current.calibrate(ctx, width, height, leftAnkle, rightAnkle);
           }
@@ -583,14 +632,6 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
               ctx.stroke();
           }
       });
-
-      landmarks.forEach((lm) => {
-          if (lm.visibility > 0.5) {
-              ctx.beginPath();
-              ctx.arc(lm.x * w, lm.y * h, 3, 0, 2 * Math.PI);
-              ctx.fill();
-          }
-      });
   };
 
   const drawObstacles = (ctx: CanvasRenderingContext2D, obstacles: any[]) => {
@@ -600,10 +641,9 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
           ctx.setLineDash([5, 5]);
           ctx.strokeRect(obs.x, obs.y, obs.w, obs.h);
           ctx.setLineDash([]);
-          
           ctx.fillStyle = '#FF6B00';
           ctx.font = 'bold 12px sans-serif';
-          ctx.fillText(obs.type, obs.x, obs.y - 5);
+          ctx.fillText("OBSTACLE", obs.x, obs.y - 5);
       });
   };
 
@@ -612,10 +652,11 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
       ctx.translate(board.x, board.y);
       ctx.rotate(board.angle);
 
+      // Visuals: Deck
       const deckLen = Math.max(80, board.length); 
       const deckWid = Math.max(25, board.width);
       
-      ctx.fillStyle = 'rgba(227, 255, 55, 0.15)';
+      ctx.fillStyle = 'rgba(227, 255, 55, 0.2)'; // Neon see-through
       ctx.strokeStyle = '#E3FF37';
       ctx.lineWidth = 2;
       
@@ -624,6 +665,7 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
       ctx.fill();
       ctx.stroke();
 
+      // Visuals: Wheels (Simulated based on deck orientation)
       const truckOffset = deckLen * 0.35;
       const wheelOffset = deckWid * 0.6;
       const wheelR = Math.max(3, deckWid * 0.15);
@@ -642,18 +684,13 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
           ctx.fill();
       });
 
-      ctx.strokeStyle = 'rgba(255,255,255,0.5)';
-      ctx.lineWidth = 1;
-      
-      ctx.beginPath(); ctx.moveTo(truckOffset, -wheelOffset); ctx.lineTo(truckOffset, wheelOffset); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(-truckOffset, -wheelOffset); ctx.lineTo(-truckOffset, wheelOffset); ctx.stroke();
-
+      // Visuals: Center Indicator
       ctx.fillStyle = '#FF00FF';
-      ctx.beginPath(); ctx.arc(deckLen/2, 0, 3, 0, Math.PI*2); ctx.fill(); 
-      ctx.beginPath(); ctx.arc(-deckLen/2, 0, 3, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(0, 0, 3, 0, Math.PI*2); ctx.fill();
 
       ctx.restore();
 
+      // Trail
       ctx.strokeStyle = 'rgba(227, 255, 55, 0.4)';
       ctx.lineWidth = 2;
       ctx.beginPath();
@@ -662,62 +699,6 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
           else ctx.lineTo(pt.x, pt.y);
       });
       ctx.stroke();
-  };
-
-  const completeAnalysis = async () => {
-      setIsAnalyzing(false);
-      
-      if (!file) return;
-
-      const localEstHeight = Math.max(0, (statsRef.current.maxHeight - 0.4) * 1.8).toFixed(2);
-      
-      // GENERATE PHYSICS CONTEXT FOR AI
-      const m = boardTrackerRef.current.metrics;
-      // Flip Ratio: How much thicker did the board get? (> 1.5 might mean flip)
-      const flipRatio = m.maxWidth > 0 && m.minWidth > 0 ? (m.maxWidth / m.minWidth).toFixed(1) : "Unknown";
-      // Shuvit Ratio: How much shorter did the board get? (< 0.7 usually means shuvit/90deg turn)
-      const shuvitRatio = m.maxLength > 0 && m.minLength > 0 ? (m.minLength / m.maxLength).toFixed(1) : "Unknown";
-      
-      const physicsContext = `
-        Estimated CV Physics Data (May be noisy):
-        - Flip Indicator (Thickness Change): ${flipRatio} (Ratio > 1.5 often implies Kickflip/Heelflip).
-        - Spin Indicator (Length Change): ${shuvitRatio} (Ratio < 0.7 often implies Shuvit).
-        - Obstacle Present: ${detectedObstacleName || "None"}.
-      `;
-
-      const finalContext = [physicsContext, ...userContext];
-
-      // Pass the manual trick name hint to the AI
-      const aiResult = await analyzeMedia(file, language, finalContext, trickNameInput);
-      
-      let finalResult: VisionAnalysis;
-
-      if (aiResult) {
-          finalResult = {
-              ...aiResult,
-              heightMeters: aiResult.heightMeters || parseFloat(localEstHeight),
-              score: aiResult.score || Math.min(100, Math.floor(statsRef.current.maxHeight * 150))
-          };
-      } else {
-          finalResult = {
-              id: Date.now().toString(),
-              timestamp: new Date().toISOString(),
-              trickName: "UNKNOWN",
-              isLanded: false,
-              confidence: 0,
-              score: Math.min(100, Math.floor(statsRef.current.maxHeight * 150)), 
-              heightMeters: parseFloat(localEstHeight),
-              rotationDegrees: 0,
-              feedbackText: "AI could not identify the trick. Please verify the video format.",
-              improvementTip: ""
-          };
-      }
-
-      setResult(finalResult);
-
-      if (user) {
-          await dbService.saveAnalysisResult(user.uid, finalResult);
-      }
   };
 
   const handleFeedbackSubmit = async (e: React.FormEvent) => {
@@ -730,7 +711,7 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
          });
          setUserContext(prev => [...prev, manualCorrection]);
       }
-      alert(t.FEEDBACK_THANKS);
+      alert("피드백 감사합니다! 학습에 반영하겠습니다.");
       setManualCorrection("");
   };
 
@@ -829,9 +810,7 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
                          </div>
                     )}
 
-                    {/* VIDEO CONTROLS OVERLAY */}
                     <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-4 transition-opacity opacity-0 group-hover:opacity-100 flex flex-col space-y-2 z-30">
-                        {/* Progress Bar */}
                         <input 
                             type="range" 
                             min="0" 
@@ -852,7 +831,6 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
                                 </span>
                             </div>
 
-                            {/* Speed Control */}
                             <div className="flex items-center space-x-1 bg-black/40 rounded-full p-1 border border-white/10">
                                 <Clock className="w-3 h-3 text-gray-400 ml-1" />
                                 {[0.1, 0.5, 1.0].map(s => (
@@ -894,7 +872,7 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
                                  value={trickNameInput}
                                  onChange={(e) => setTrickNameInput(e.target.value)}
                                  className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white focus:border-skate-neon outline-none mb-1"
-                                 placeholder="e.g. Kickflip"
+                                 placeholder="예: 킥플립"
                              />
                              <p className="text-[10px] text-gray-500">{t.TRICK_NAME_DESC}</p>
                         </div>
@@ -926,7 +904,7 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
                                     <span className="bg-green-500/20 text-green-400 text-xs font-bold px-2 py-1 rounded-lg border border-green-500/30">SUCCESS</span>
                                 </div>
                                 <h3 className="text-4xl font-display font-bold text-white mb-4">
-                                    {result.trickName === "UNKNOWN" ? <span className="text-gray-500">Unknown Trick</span> : result.trickName}
+                                    {result.trickName === "UNKNOWN" ? <span className="text-gray-500">알 수 없음</span> : result.trickName}
                                 </h3>
                                 
                                 <div className="grid grid-cols-2 gap-3">

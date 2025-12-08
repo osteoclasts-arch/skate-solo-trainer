@@ -54,7 +54,7 @@ export const generateAISession = async (settings: SessionSettings): Promise<Tric
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3-pro-preview",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -93,7 +93,7 @@ export const getSessionAnalysis = async (result: SessionResult, language: Langua
   const failedNames = result.trickHistory.filter(t => !t.landed).map(t => `${t.trick.stance ? t.trick.stance + ' ' : ''}${t.trick.name}`).join(', ');
 
   const langInstruction = language === 'KR' 
-    ? "Respond in Korean. Use natural, encouraging coaching tone." 
+    ? "Respond in Korean (Hangul). Use natural, encouraging coaching tone." 
     : "Respond in English.";
 
   const prompt = `
@@ -107,7 +107,7 @@ export const getSessionAnalysis = async (result: SessionResult, language: Langua
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3-pro-preview",
       contents: prompt,
     });
     return response.text || fallbackMsg;
@@ -138,7 +138,7 @@ export const getTrickTip = async (trickName: string, language: Language): Promis
     const ai = getAI();
     try {
         const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-3-pro-preview",
             contents: `Give me one pro tip for landing a ${trickName} on a skateboard. Max 15 words. Speak like a pro. Return output in English and Korean. Format: EN|KR`,
         });
         const [en, kr] = (response.text || "").split("|");
@@ -173,11 +173,11 @@ export const getAnalyticsInsight = async (
     const insightSchema: Schema = {
         type: Type.OBJECT,
         properties: {
-            diagnosis: { type: Type.STRING, description: "One-line overall assessment title" },
-            summary: { type: Type.STRING, description: "2-3 sentences summarizing performance" },
-            weaknessAnalysis: { type: Type.STRING, description: "Comment on the specific weaknesses" },
-            improvementSuggestions: { type: Type.ARRAY, items: { type: Type.STRING }, description: "3 specific actionable tips" },
-            aiFeedback: { type: Type.STRING, description: "Motivating closing comment" }
+            diagnosis: { type: Type.STRING, description: "One-line overall assessment title (Korean)" },
+            summary: { type: Type.STRING, description: "2-3 sentences summarizing performance (Korean)" },
+            weaknessAnalysis: { type: Type.STRING, description: "Comment on the specific weaknesses (Korean)" },
+            improvementSuggestions: { type: Type.ARRAY, items: { type: Type.STRING }, description: "3 specific actionable tips (Korean)" },
+            aiFeedback: { type: Type.STRING, description: "Motivating closing comment (Korean)" }
         },
         required: ["diagnosis", "summary", "weaknessAnalysis", "improvementSuggestions", "aiFeedback"]
     };
@@ -195,7 +195,7 @@ export const getAnalyticsInsight = async (
 
     const prompt = `
         Act as a professional skateboard coach. Analyze this player's progression data.
-        Language: ${language === 'KR' ? 'Korean (Hangul)' : 'English'}.
+        Language: ${language === 'KR' ? 'Korean (Hangul) ONLY' : 'English'}.
         
         Context: ${experienceContext}
         Days Skating: ${daysSkating || 'Unknown'}.
@@ -216,7 +216,7 @@ export const getAnalyticsInsight = async (
 
     try {
         const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-3-pro-preview",
             contents: prompt,
             config: {
                 responseMimeType: "application/json",
@@ -283,7 +283,7 @@ export const analyzeMedia = async (
 
     const prompt = `
         You are a strict Skateboard Competition Judge (Referee) and a helpful Coach.
-        Analyze the video and side-view physics data to classify the trick.
+        Analyze the video to classify the trick.
 
         [STRICT SIDE-VIEW PHYSICS RULES]
         1. OLLIE:
@@ -293,19 +293,13 @@ export const analyzeMedia = async (
         2. KICKFLIP / HEELFLIP:
            - Board Thickness Change is HIGH (Spikes > 1.5x as the flat deck faces the camera).
            - Board Length Change is LOW (Does not point at camera).
+           - Visual Cue: FLICK OUTWARD vs DOWNWARD.
         3. SHUVIT / POP SHUVIT:
            - Board Thickness Change is LOW (Remains relatively flat).
            - Board Length Change is HIGH (Shortens significantly < 0.7x as it turns 90 degrees).
+           - Visual Cue: SCOOP BACKWARD.
         4. TRE FLIP / VARIAL:
            - BOTH Thickness (Flip) and Length (Spin) changes are HIGH.
-
-        [VISUAL BODY MOTION CUES - PRIORITY OVER PHYSICS]
-        **If Physics Data is ambiguous/noisy due to blur, trust these visual cues:**
-        
-        - KICKFLIP vs POP SHUVIT:
-          - KICKFLIP: Look for the front foot flicking OUTWARD/SIDEWAYS off the nose. The board rotates on its long axis.
-          - POP SHUVIT: Look for the back foot SCOOPING backwards. The board spins flat (horizontally). The front foot stays relatively still/hovers.
-          - **Correction Rule:** If the user claims it is a Kickflip, verify if there is a distinct toe flick. If yes, classify as Kickflip even if the board shape looks thin.
 
         [INPUT CONTEXT]
         User Hint (Self-reported): ${trickHint || "None"} (Use this as a strong prior).
@@ -317,7 +311,7 @@ export const analyzeMedia = async (
            - If unclear, return "UNKNOWN".
         2. Even if UNKNOWN, you MUST estimate jump height and score.
         3. Score (0-100) based on landing cleanliness and height.
-        4. **CRITICAL:** The 'feedbackText' and 'improvementTip' MUST be in ${language === 'KR' ? 'KOREAN (Hangul)' : 'ENGLISH'}. Do not ignore this language requirement.
+        4. **CRITICAL:** The 'feedbackText' and 'improvementTip' MUST be in KOREAN (Hangul).
 
         Output JSON format:
         {
@@ -326,8 +320,8 @@ export const analyzeMedia = async (
             "score": number,
             "heightMeters": number,
             "rotationDegrees": number,
-            "feedbackText": "string (${language === 'KR' ? 'Must be Korean' : 'English'})",
-            "improvementTip": "string (${language === 'KR' ? 'Must be Korean' : 'English'})"
+            "feedbackText": "string (MUST BE KOREAN)",
+            "improvementTip": "string (MUST BE KOREAN)"
         }
     `;
 
@@ -335,14 +329,15 @@ export const analyzeMedia = async (
         if (!file) throw new Error("No file provided");
         const videoPart = await fileToPart(file);
 
+        // Using gemini-3-pro-preview for higher reasoning capabilities
         const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-3-pro-preview", 
             contents: {
                 parts: [videoPart, { text: prompt }]
             },
             config: {
                 responseMimeType: "application/json",
-                temperature: 0 // Deterministic physics judgment
+                temperature: 0.1 // Low temperature for deterministic physics judgment
             }
         });
 
@@ -377,7 +372,7 @@ export const generateCoachingFeedback = async (
     }
     
     return { 
-        feedback: "Analysis complete.", 
-        tips: "Keep practicing." 
+        feedback: "분석 완료.", 
+        tips: "꾸준히 연습하세요." 
     };
 };
