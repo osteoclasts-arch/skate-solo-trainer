@@ -283,16 +283,24 @@ export const analyzeMedia = async (
            - Board Length Change is LOW (Does not shorten/spin).
            - Board does NOT flip or spin.
         2. KICKFLIP / HEELFLIP:
-           - Board Thickness Change is HIGH (Spikes > 2.0x as the flat deck faces the camera).
+           - Board Thickness Change is HIGH (Spikes > 1.5x as the flat deck faces the camera).
            - Board Length Change is LOW (Does not point at camera).
         3. SHUVIT / POP SHUVIT:
            - Board Thickness Change is LOW (Remains relatively flat).
-           - Board Length Change is HIGH (Shortens significantly < 0.6x as it turns 90 degrees).
+           - Board Length Change is HIGH (Shortens significantly < 0.7x as it turns 90 degrees).
         4. TRE FLIP / VARIAL:
            - BOTH Thickness (Flip) and Length (Spin) changes are HIGH.
 
+        [VISUAL BODY MOTION CUES - PRIORITY OVER PHYSICS]
+        **If Physics Data is ambiguous/noisy due to blur, trust these visual cues:**
+        
+        - KICKFLIP vs POP SHUVIT:
+          - KICKFLIP: Look for the front foot flicking OUTWARD/SIDEWAYS off the nose. The board rotates on its long axis.
+          - POP SHUVIT: Look for the back foot SCOOPING backwards. The board spins flat (horizontally). The front foot stays relatively still/hovers.
+          - **Correction Rule:** If the user claims it is a Kickflip, verify if there is a distinct toe flick. If yes, classify as Kickflip even if the board shape looks thin.
+
         [INPUT CONTEXT]
-        User Hint (Self-reported): ${trickHint || "None"} (If provided, verify if the video matches this trick name. If physics don't match, trust physics).
+        User Hint (Self-reported): ${trickHint || "None"} (Use this as a strong prior).
         User History: ${contextStr}
         Candidates: [${allTricks}]
 

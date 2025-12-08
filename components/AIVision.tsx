@@ -588,15 +588,15 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
       
       // GENERATE PHYSICS CONTEXT FOR AI
       const m = boardTrackerRef.current.metrics;
-      // Flip Ratio: How much thicker did the board get? (> 2.0 usually means flip)
+      // Flip Ratio: How much thicker did the board get? (> 1.5 might mean flip)
       const flipRatio = m.maxWidth > 0 && m.minWidth > 0 ? (m.maxWidth / m.minWidth).toFixed(1) : "Unknown";
-      // Shuvit Ratio: How much shorter did the board get? (< 0.6 usually means shuvit/90deg turn)
+      // Shuvit Ratio: How much shorter did the board get? (< 0.7 usually means shuvit/90deg turn)
       const shuvitRatio = m.maxLength > 0 && m.minLength > 0 ? (m.minLength / m.maxLength).toFixed(1) : "Unknown";
       
       const physicsContext = `
-        Side-View Physics Data:
-        - Board Thickness Change (Flip Indicator): ${flipRatio} (High ratio > 2.0 implies Kickflip/Heelflip. Low ratio ~1.0 implies Ollie).
-        - Board Length Change (Spin Indicator): ${shuvitRatio} (Low ratio < 0.6 implies Shuvit/Rotation. High ratio ~1.0 implies no spin).
+        Estimated CV Physics Data (May be noisy):
+        - Flip Indicator (Thickness Change): ${flipRatio} (Ratio > 1.5 often implies Kickflip/Heelflip).
+        - Spin Indicator (Length Change): ${shuvitRatio} (Ratio < 0.7 often implies Shuvit).
         - Obstacle Present: ${detectedObstacleName || "None"}.
       `;
 
