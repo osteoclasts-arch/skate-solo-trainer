@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Language, User, VisionAnalysis } from '../types';
 import { TRANSLATIONS } from '../constants';
-import { Upload, Zap, X, Eye, Info, BrainCircuit, Activity, Rotate3d, Compass, Scan, CheckCircle2, Scissors, Play, Pause, FastForward, Rewind } from 'lucide-react';
+import { Upload, Zap, X, Eye, Info, Activity, Rotate3d, Compass, Scissors, Play, Pause, HelpCircle, BrainCircuit } from 'lucide-react';
 import { analyzeMedia } from '../services/geminiService';
 import { dbService } from '../services/dbService';
 // @ts-ignore
@@ -40,6 +40,11 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
   const [trickNameHint, setTrickNameHint] = useState("");
   const [extractionProgress, setExtractionProgress] = useState(0);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+
+  // Timer & Info State
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const [showAlgoInfo, setShowAlgoInfo] = useState(false);
+  const analysisTimerRef = useRef<any>(null);
 
   // Result Playback State
   const [trackingData, setTrackingData] = useState<PoseFrame[]>([]);
@@ -226,6 +231,14 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
     setIsAnalyzing(true);
     setStatus("Analyzing...");
     setExtractionProgress(0);
+    setElapsedTime(0);
+
+    // Start Timer
+    const startTime = Date.now();
+    if (analysisTimerRef.current) clearInterval(analysisTimerRef.current);
+    analysisTimerRef.current = setInterval(() => {
+        setElapsedTime((Date.now() - startTime) / 1000);
+    }, 100);
             
     try {
         if (videoRef.current && videoRef.current.readyState >= 1) {
@@ -258,6 +271,7 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
         console.error("Analysis Error:", error);
         alert("An error occurred during analysis.");
     } finally {
+        if (analysisTimerRef.current) clearInterval(analysisTimerRef.current);
         setIsAnalyzing(false);
         setStatus("");
         setExtractionProgress(0);
@@ -387,7 +401,61 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
             <Eye className="text-skate-neon w-8 h-8" />
             <h2 className="text-4xl font-display font-bold uppercase tracking-wide text-white">{t.AI_VISION_TITLE}</h2>
         </div>
+        <button 
+            onClick={() => setShowAlgoInfo(true)}
+            className="flex items-center space-x-1 px-3 py-1.5 rounded-full border border-white/10 bg-white/5 text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+        >
+            <HelpCircle className="w-4 h-4" />
+            <span className="text-[10px] font-bold uppercase tracking-wider">
+                {language === 'KR' ? '기술 원리' : 'Algorithm'}
+            </span>
+        </button>
       </div>
+
+      {/* ALGORITHM MODAL */}
+      {showAlgoInfo && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-6 animate-fade-in">
+              <div className="glass-card p-6 rounded-3xl w-full max-w-sm relative">
+                  <button onClick={() => setShowAlgoInfo(false)} className="absolute top-4 right-4 text-gray-500 hover:text-white"><X className="w-6 h-6"/></button>
+                  <div className="flex items-center space-x-2 mb-6 text-skate-neon">
+                      <BrainCircuit className="w-6 h-6" />
+                      <h3 className="text-xl font-display font-bold uppercase">Hybrid AI Analysis</h3>
+                  </div>
+                  
+                  <div className="space-y-6">
+                      <div className="relative pl-6 border-l border-white/10">
+                          <span className="absolute -left-1.5 top-0 w-3 h-3 rounded-full bg-blue-400"></span>
+                          <h4 className="text-blue-400 font-bold uppercase text-xs tracking-widest mb-1">Step 1. Client-Side Tracking</h4>
+                          <p className="text-gray-300 text-sm leading-relaxed">
+                              {language === 'KR' 
+                                ? "브라우저에서 MediaPipe를 이용해 신체 관절과 보드 움직임을 0.03초 단위로 추적하여 물리 데이터(속도, 각도, 높이)를 추출합니다."
+                                : "Uses MediaPipe in-browser to track body joints and board physics every 0.03s, generating precise motion data."}
+                          </p>
+                      </div>
+                      
+                      <div className="relative pl-6 border-l border-white/10">
+                          <span className="absolute -left-1.5 top-0 w-3 h-3 rounded-full bg-purple-400"></span>
+                          <h4 className="text-purple-400 font-bold uppercase text-xs tracking-widest mb-1">Step 2. Multimodal AI</h4>
+                          <p className="text-gray-300 text-sm leading-relaxed">
+                              {language === 'KR'
+                                ? "구글 Gemini 3 Pro 모델에게 영상의 시각적 스타일과 1단계에서 추출한 물리 데이터를 동시에 전달하여 정밀 분석합니다."
+                                : "Feeds both the visual video context and the extracted physics data to Google's Gemini 3 Pro for deep analysis."}
+                          </p>
+                      </div>
+
+                      <div className="relative pl-6 border-l border-white/10">
+                           <span className="absolute -left-1.5 top-0 w-3 h-3 rounded-full bg-skate-neon"></span>
+                           <h4 className="text-skate-neon font-bold uppercase text-xs tracking-widest mb-1">Step 3. Cross-Validation</h4>
+                           <p className="text-gray-300 text-sm leading-relaxed">
+                               {language === 'KR'
+                                 ? "시각 정보와 수치 데이터를 교차 검증하여 트릭의 성공 여부와 정확한 기술명을 판정합니다."
+                                 : "Cross-validates visual evidence with numerical data to determine the exact trick name and success status."}
+                           </p>
+                      </div>
+                  </div>
+              </div>
+          </div>
+      )}
 
       {/* TIP BANNER */}
       {!analysisResult && (
@@ -517,8 +585,11 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
                     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/90 backdrop-blur-md transition-all">
                         <div className="w-20 h-20 border-4 border-skate-neon/30 border-t-skate-neon rounded-full animate-spin mb-6"></div>
                         <h3 className="text-2xl font-display font-bold text-white tracking-widest animate-pulse">
-                            ANALYZING {extractionProgress > 0 && `${extractionProgress}%`}
+                            ANALYZING {extractionProgress > 0 && extractionProgress < 100 && `${extractionProgress}%`}
                         </h3>
+                        <p className="text-skate-neon font-mono text-xl font-bold mt-2">
+                             {elapsedTime.toFixed(1)}s
+                        </p>
                         <p className="text-gray-400 text-xs font-mono uppercase tracking-wider mt-2">
                             {status}
                         </p>
