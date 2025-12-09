@@ -234,7 +234,7 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
           
           // 1. Pose Extraction
-          let feet = [];
+          let feet: { x: number; y: number }[] = [];
           let shoulderRot = 0;
           let leftAnkleY = 0;
           let rightAnkleY = 0;
