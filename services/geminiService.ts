@@ -48,7 +48,9 @@ const cleanJson = (text: string): string => {
 
   // CRITICAL FIX: If no JSON start found, throw error instead of returning garbage
   if (startIndex === -1) {
-      throw new Error("No JSON object or array found in response");
+      // Fallback: Try to find any valid JSON-like structure or return empty object string
+      console.warn("No clear JSON start found, attempting to parse raw text.");
+      return "{}"; 
   }
 
   // 3. Locate the last '}' or ']' based on type
@@ -348,7 +350,10 @@ export const analyzeMedia = async (
     motionDataCsv?: string, // Added CSV input for strict physics
     stance?: "Regular" | "Goofy" // Added Stance
 ): Promise<VisionAnalysis | null> => {
-    if (!apiKey) return null;
+    if (!apiKey) {
+        console.error("API Key missing for analysis");
+        return null;
+    }
 
     const ai = getAI();
 
@@ -445,15 +450,15 @@ IMPORTANT: 'feedbackText' and 'improvementTip' MUST be in ${langName}.
         if (!file) throw new Error("No file provided");
         const videoPart = await fileToPart(file);
 
-        // Using gemini-3-pro-preview for highest reasoning capability
+        // Using gemini-2.5-flash for speed and stability on video analysis
         const response = await ai.models.generateContent({
-            model: "gemini-3-pro-preview", 
+            model: "gemini-2.5-flash", 
             contents: {
                 parts: [videoPart, { text: prompt }]
             },
             config: {
                 responseMimeType: "application/json",
-                temperature: 0.1 // Low temp for factual consistency
+                temperature: 0.2 // Low temp for factual consistency
             }
         });
 

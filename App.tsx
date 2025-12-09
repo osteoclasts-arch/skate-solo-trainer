@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { ViewState, SessionSettings, Trick, SessionResult, Difficulty, Language, Stance, User } from './types';
 import Dashboard from './components/Dashboard';
@@ -9,9 +10,8 @@ import TrickLearning from './components/TrickLearning';
 import AIVision from './components/AIVision';
 import { BASE_TRICKS, TRANSLATIONS } from './constants';
 import { generateAISession } from './services/geminiService';
-import { signInWithGoogle, logout, getFirebaseAuth } from './services/authService';
+import { loginAsGuest, logout, checkLocalSession } from './services/authService';
 import { dbService } from './services/dbService';
-import { onAuthStateChanged } from 'firebase/auth';
 import { Home, BarChart2, BookOpen, Layers, Eye, Instagram } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -54,64 +54,75 @@ const App: React.FC = () => {
     return () => clearTimeout(timer);
   }, []);
 
-  // Handle Authentication Persistence & Data Sync
+  // Handle Authentication (Local Storage Version)
   useEffect(() => {
-    const auth = getFirebaseAuth();
-    if (auth) {
-      const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-        if (firebaseUser) {
-          // 1. Set User Basic Info
-          const newUser: User = {
-            uid: firebaseUser.uid,
-            name: firebaseUser.displayName || 'Skater',
-            email: firebaseUser.email || '',
-            photoURL: firebaseUser.photoURL || undefined
-          };
+    const initAuth = async () => {
+        const localUser = checkLocalSession();
+        if (localUser) {
+            setUser(localUser);
+            setIsLoadingData(true);
+            try {
+                // Load Profile
+                const profile = await dbService.getUserProfile(localUser.uid);
+                if (profile) {
+                    if (profile.startDate) {
+                        setStartDate(profile.startDate);
+                    }
+                    localUser.isPro = profile.isPro;
+                    localUser.proRequestStatus = profile.proRequestStatus;
+                    localUser.age = profile.age; // Load age
+                    setUser({ ...localUser }); // Update with profile data
+                }
 
-          // 2. Fetch Cloud Data
-          setIsLoadingData(true);
-          try {
-             // Load Profile (Start Date & Pro Status)
-             const profile = await dbService.getUserProfile(firebaseUser.uid);
-             if (profile) {
-                 if (profile.startDate) {
-                    setStartDate(profile.startDate);
-                    localStorage.setItem('skate_start_date', profile.startDate);
-                 }
-                 // Sync Pro Status
-                 newUser.isPro = profile.isPro;
-                 newUser.proRequestStatus = profile.proRequestStatus;
-             }
-
-             // Load History
-             const cloudSessions = await dbService.getUserSessions(firebaseUser.uid);
-             if (cloudSessions.length > 0) {
-                 setSessionHistory(cloudSessions);
-                 localStorage.setItem('skate_session_history', JSON.stringify(cloudSessions));
-             }
-          } catch (e) {
-             console.error("Error syncing data", e);
-          } finally {
-             setIsLoadingData(false);
-          }
-          
-          setUser(newUser);
-
-        } else {
-          setUser(null);
+                // Load History (Merge local history with DB history for seamlessness)
+                const cloudSessions = await dbService.getUserSessions(localUser.uid);
+                if (cloudSessions.length > 0) {
+                    setSessionHistory(cloudSessions);
+                    localStorage.setItem('skate_session_history', JSON.stringify(cloudSessions));
+                }
+            } catch (e) {
+                console.error("Error loading user data", e);
+            } finally {
+                setIsLoadingData(false);
+            }
         }
         setIsAuthChecking(false);
-      });
-      return () => unsubscribe();
-    } else {
-        setIsAuthChecking(false);
-    }
+    };
+
+    initAuth();
   }, []);
 
-  const handleLogin = async () => {
-    const loggedInUser = await signInWithGoogle();
+  const handleLogin = async (data?: { name: string; age: number; startDate: string }) => {
+    // If data provided (from Profile Setup), pass it to auth
+    const loggedInUser = await loginAsGuest(data?.name, data?.age);
     if (loggedInUser) {
       setUser(loggedInUser);
+      setIsLoadingData(true);
+      
+      // Update Start Date if provided
+      if (data?.startDate) {
+          await updateStartDate(data.startDate);
+      }
+      
+      // Also save profile to DB if new fields provided
+      if (data) {
+          await dbService.updateUserProfile(loggedInUser.uid, {
+              startDate: data.startDate,
+              age: data.age
+          });
+      }
+
+      // Load Profile
+      const profile = await dbService.getUserProfile(loggedInUser.uid);
+      if (profile && profile.startDate) {
+          setStartDate(profile.startDate);
+      }
+      
+      // Load Sessions
+      const sessions = await dbService.getUserSessions(loggedInUser.uid);
+      if (sessions.length > 0) setSessionHistory(sessions);
+      
+      setIsLoadingData(false);
     }
   };
 
@@ -205,7 +216,7 @@ const App: React.FC = () => {
     setLastResult(result);
     localStorage.setItem('skate_session_history', JSON.stringify(newHistory));
     
-    // Save to Cloud if logged in
+    // Save to Cloud (now Local DB) if logged in
     if (user) {
         await dbService.saveSession(user.uid, result);
     }
@@ -303,7 +314,12 @@ const App: React.FC = () => {
             language={language}
             daysSkating={calculateDaysSkating()}
             user={user}
-            onLogin={handleLogin}
+            onLogin={() => {
+                // For Analytics login, we can redirect to Dashboard or show a simple login
+                // For simplicity, let's just trigger the dashboard logic by switching view temporarily or passing the handler down
+                // Ideally analytics should have its own modal, but let's route to Dashboard for profile setup
+                setView('DASHBOARD');
+            }}
             onRequestPro={handleRequestPro}
           />
         );

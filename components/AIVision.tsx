@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Language, User, VisionAnalysis } from '../types';
 import { TRANSLATIONS } from '../constants';
@@ -263,78 +264,94 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
       });
 
       // Processing Loop
-      while (currentTime <= trimEnd) {
-          video.currentTime = currentTime;
-          
-          // Wait for seek to complete
-          await new Promise<void>(r => {
-              const onSeek = () => { video.removeEventListener('seeked', onSeek); r(); };
-              video.addEventListener('seeked', onSeek);
-          });
+      try {
+        while (currentTime <= trimEnd) {
+            video.currentTime = currentTime;
+            
+            // Wait for seek to complete
+            await new Promise<void>(r => {
+                const onSeek = () => { video.removeEventListener('seeked', onSeek); r(); };
+                video.addEventListener('seeked', onSeek);
+            });
 
-          // Draw video frame to canvas for MediaPipe
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          
-          // Wait for Pose Estimation
-          const results: any = await new Promise(resolve => {
-              frameResolver = resolve;
-              poseEstimator.current.send({image: canvas});
-          });
+            // Draw video frame to canvas for MediaPipe
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            // Wait for Pose Estimation with TIMEOUT to prevent hanging
+            // If MediaPipe hangs on a specific frame, we skip it or abort extraction
+            try {
+                const results: any = await Promise.race([
+                    new Promise(resolve => {
+                        frameResolver = resolve;
+                        poseEstimator.current.send({image: canvas});
+                    }),
+                    new Promise((_, reject) => setTimeout(() => reject(new Error("Pose timeout")), 3000)) // 3s timeout per frame
+                ]);
 
-          // Process Results
-          let landmarks = null;
-          let boardCenter = null;
-          let leftAnkleY = 0, rightAnkleY = 0, boardHeight = 0, boardAngle = 0, shoulderRot = 0;
+                // Process Results
+                let landmarks = null;
+                let boardCenter = null;
+                let leftAnkleY = 0, rightAnkleY = 0, boardHeight = 0, boardAngle = 0, shoulderRot = 0;
 
-          if (results.poseLandmarks) {
-              landmarks = results.poseLandmarks;
-              
-              // 28: Left Ankle, 27: Right Ankle (MediaPipe Pose)
-              const la = landmarks[28];
-              const ra = landmarks[27];
-              
-              if (la && ra) {
-                  leftAnkleY = la.y;
-                  rightAnkleY = ra.y;
-                  
-                  // Calculate Board Center (Midpoint of ankles, shifted slightly down)
-                  boardCenter = {
-                      x: (la.x + ra.x) / 2,
-                      y: (la.y + ra.y) / 2 + 0.02 // Offset slightly down to deck level
-                  };
+                if (results && results.poseLandmarks) {
+                    landmarks = results.poseLandmarks;
+                    
+                    // 28: Left Ankle, 27: Right Ankle (MediaPipe Pose)
+                    const la = landmarks[28];
+                    const ra = landmarks[27];
+                    
+                    if (la && ra) {
+                        leftAnkleY = la.y;
+                        rightAnkleY = ra.y;
+                        
+                        // Calculate Board Center (Midpoint of ankles, shifted slightly down)
+                        boardCenter = {
+                            x: (la.x + ra.x) / 2,
+                            y: (la.y + ra.y) / 2 + 0.02 // Offset slightly down to deck level
+                        };
 
-                  // Simple Physics Data for CSV
-                  boardHeight = 1 - boardCenter.y; // Inverted Y
-                  const dx = ra.x - la.x;
-                  const dy = ra.y - la.y;
-                  boardAngle = Math.atan2(dy, dx) * (180 / Math.PI);
-                  
-                  // Shoulders: 11 (Left), 12 (Right)
-                  const ls = landmarks[11];
-                  const rs = landmarks[12];
-                  if (ls && rs) {
-                      const sdx = rs.x - ls.x;
-                      const sdy = rs.y - ls.y;
-                      shoulderRot = Math.atan2(sdy, sdx) * (180 / Math.PI);
-                  }
-              }
-          }
+                        // Simple Physics Data for CSV
+                        boardHeight = 1 - boardCenter.y; // Inverted Y
+                        const dx = ra.x - la.x;
+                        const dy = ra.y - la.y;
+                        boardAngle = Math.atan2(dy, dx) * (180 / Math.PI);
+                        
+                        // Shoulders: 11 (Left), 12 (Right)
+                        const ls = landmarks[11];
+                        const rs = landmarks[12];
+                        if (ls && rs) {
+                            const sdx = rs.x - ls.x;
+                            const sdy = rs.y - ls.y;
+                            shoulderRot = Math.atan2(sdy, sdx) * (180 / Math.PI);
+                        }
+                    }
+                }
 
-          recordedFrames.push({
-              time: currentTime,
-              landmarks: landmarks,
-              boardCenter: boardCenter
-          });
+                recordedFrames.push({
+                    time: currentTime,
+                    landmarks: landmarks,
+                    boardCenter: boardCenter
+                });
 
-          csvLines.push(`${currentTime.toFixed(2)},${leftAnkleY.toFixed(3)},${rightAnkleY.toFixed(3)},${boardAngle.toFixed(1)},${boardHeight.toFixed(3)},${shoulderRot.toFixed(1)}`);
-          
-          currentTime += interval;
-          const progress = Math.min(100, Math.round(((currentTime - trimStart) / (trimEnd - trimStart)) * 100));
-          setExtractionProgress(progress);
+                csvLines.push(`${currentTime.toFixed(2)},${leftAnkleY.toFixed(3)},${rightAnkleY.toFixed(3)},${boardAngle.toFixed(1)},${boardHeight.toFixed(3)},${shoulderRot.toFixed(1)}`);
+            
+            } catch (e) {
+                console.warn("Frame analysis timed out or failed, skipping frame", e);
+                // Continue to next frame even if this one failed
+            }
+            
+            currentTime += interval;
+            const progress = Math.min(100, Math.round(((currentTime - trimStart) / (trimEnd - trimStart)) * 100));
+            setExtractionProgress(progress);
+        }
+
+        setTrackingData(recordedFrames);
+        return csvLines.join("\n");
+      } catch (globalError) {
+          console.error("Critical error during motion extraction:", globalError);
+          // Return empty string to trigger visual-only analysis fallback
+          return "";
       }
-
-      setTrackingData(recordedFrames);
-      return csvLines.join("\n");
   };
 
   const processVideo = async () => {
@@ -352,7 +369,13 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
             
     try {
         if (videoRef.current && videoRef.current.readyState >= 1) {
-             const csvData = await extractMotionData();
+             // Try to extract CSV, but if it fails, proceed with video only
+             let csvData = "";
+             try {
+                csvData = await extractMotionData();
+             } catch (e) {
+                console.warn("Motion extraction failed completely, proceeding with video only.", e);
+             }
              
              const userContext = user ? await dbService.getUserFeedbacks(user.uid) : [];
              
@@ -372,7 +395,9 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
                 setAnalysisResult(result);
                 if (user) await dbService.saveAnalysisResult(user.uid, result);
             } else {
-                alert("Analysis failed. Please try again.");
+                alert(language === 'KR' 
+                    ? "분석에 실패했습니다. AI가 응답하지 않거나 영상을 분석할 수 없습니다. 다시 시도해주세요."
+                    : "Analysis failed. Please try again or use a shorter video clip.");
             }
         } else {
             alert("Video not ready. Please wait a moment.");
@@ -540,8 +565,8 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
                           <h4 className="text-purple-400 font-bold uppercase text-xs tracking-widest mb-1">Step 2. Multimodal AI</h4>
                           <p className="text-gray-300 text-sm leading-relaxed">
                               {language === 'KR'
-                                ? "구글 Gemini 3 Pro 모델에게 영상의 시각적 스타일과 1단계에서 추출한 물리 데이터를 동시에 전달하여 정밀 분석합니다."
-                                : "Feeds both the visual video context and the extracted physics data to Google's Gemini 3 Pro for deep analysis."}
+                                ? "구글 Gemini 2.5 Flash 모델에게 영상의 시각적 스타일과 1단계에서 추출한 물리 데이터를 동시에 전달하여 정밀 분석합니다."
+                                : "Feeds both the visual video context and the extracted physics data to Google's Gemini 2.5 Flash for deep analysis."}
                           </p>
                       </div>
 

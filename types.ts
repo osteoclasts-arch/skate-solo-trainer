@@ -25,6 +25,7 @@ export interface User {
   name: string;
   email?: string;
   photoURL?: string;
+  age?: number; // Added age
   isPro?: boolean;
   proRequestStatus?: 'none' | 'pending' | 'rejected';
 }

@@ -1,151 +1,113 @@
 
-import { getFirestore, doc, setDoc, getDoc, collection, addDoc, getDocs, query, orderBy, Timestamp, limit } from "firebase/firestore";
-import { app } from "./authService";
 import { SessionResult, VisionAnalysis } from "../types";
-
-// Initialize Firestore only if app is initialized
-const db = app ? getFirestore(app) : null;
 
 export interface UserProfileData {
   startDate: string;
   lastLogin?: string;
   isPro?: boolean;
   proRequestStatus?: 'none' | 'pending' | 'rejected';
+  age?: number;
 }
+
+const STORAGE_KEYS = {
+    USERS: "skate_db_users",
+    SESSIONS: "skate_db_sessions",
+    VISION: "skate_db_vision",
+    ANALYSIS: "skate_db_analysis"
+};
+
+// Helper to simulate DB delay
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export const dbService = {
   /**
-   * Save the start date to the user's profile document
+   * Save the start date to the user's profile
    */
   async updateUserProfile(uid: string, data: Partial<UserProfileData>) {
-    if (!db) return;
-    try {
-      const userRef = doc(db, "users", uid);
-      await setDoc(userRef, { ...data }, { merge: true });
-    } catch (error) {
-      console.error("Error updating profile:", error);
-    }
+    await delay(50);
+    const users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || "{}");
+    users[uid] = { ...users[uid], ...data };
+    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
   },
 
   /**
    * Fetch user profile (start date, etc.)
    */
   async getUserProfile(uid: string): Promise<UserProfileData | null> {
-    if (!db) return null;
-    try {
-      const userRef = doc(db, "users", uid);
-      const snap = await getDoc(userRef);
-      if (snap.exists()) {
-        return snap.data() as UserProfileData;
-      }
-      return null;
-    } catch (error) {
-      console.error("Error fetching profile:", error);
-      return null;
-    }
+    await delay(50);
+    const users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || "{}");
+    return users[uid] || null;
   },
 
   /**
-   * Save a completed session to the user's 'sessions' subcollection
+   * Save a completed session
    */
   async saveSession(uid: string, session: SessionResult) {
-    if (!db) return;
-    try {
-      const sessionsRef = collection(db, "users", uid, "sessions");
-      await setDoc(doc(sessionsRef, session.id), session);
-    } catch (error) {
-      console.error("Error saving session:", error);
-    }
+    await delay(50);
+    const allSessions = JSON.parse(localStorage.getItem(STORAGE_KEYS.SESSIONS) || "{}");
+    const userSessions = allSessions[uid] || [];
+    userSessions.unshift(session); // Add to beginning
+    allSessions[uid] = userSessions;
+    localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(allSessions));
   },
 
   /**
-   * Load all sessions for a user, ordered by date
+   * Load all sessions for a user
    */
   async getUserSessions(uid: string): Promise<SessionResult[]> {
-    if (!db) return [];
-    try {
-      const sessionsRef = collection(db, "users", uid, "sessions");
-      const q = query(sessionsRef, orderBy("date", "desc")); // Newest first
-      const querySnapshot = await getDocs(q);
-      
-      const sessions: SessionResult[] = [];
-      querySnapshot.forEach((doc) => {
-        sessions.push(doc.data() as SessionResult);
-      });
-      return sessions;
-    } catch (error) {
-      console.error("Error loading sessions:", error);
-      return [];
-    }
+    await delay(50);
+    const allSessions = JSON.parse(localStorage.getItem(STORAGE_KEYS.SESSIONS) || "{}");
+    return allSessions[uid] || [];
   },
 
   async requestProVerification(uid: string) {
-    if (!db) return;
-    try {
-        const userRef = doc(db, "users", uid);
-        await setDoc(userRef, { 
-            proRequestStatus: 'pending',
-            proRequestDate: new Date().toISOString()
-        }, { merge: true });
-    } catch (error) {
-        console.error("Error requesting pro verification:", error);
+    await delay(50);
+    const users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || "{}");
+    if (users[uid]) {
+        users[uid].proRequestStatus = 'pending';
+        users[uid].proRequestDate = new Date().toISOString();
+        localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
     }
   },
 
   // --- VISION FEEDBACK & ANALYSIS ---
 
   async saveVisionFeedback(uid: string | null, feedback: any) {
-      if (!db) return;
-      try {
-          const collectionRef = uid 
-            ? collection(db, "users", uid, "vision_feedback")
-            : collection(db, "vision_feedback");
-
-          await addDoc(collectionRef, {
-              uid: uid || 'anonymous',
-              ...feedback,
-              timestamp: new Date().toISOString()
-          });
-      } catch (e) {
-          console.error("Error saving feedback", e);
-      }
+      const id = uid || "anonymous";
+      const allFeedback = JSON.parse(localStorage.getItem(STORAGE_KEYS.VISION) || "[]");
+      allFeedback.push({
+          uid: id,
+          ...feedback,
+          timestamp: new Date().toISOString()
+      });
+      localStorage.setItem(STORAGE_KEYS.VISION, JSON.stringify(allFeedback));
   },
 
   /**
    * Get user's past feedback to use as context for AI learning
    */
   async getUserFeedbacks(uid: string): Promise<string[]> {
-      if (!db) return [];
-      try {
-          const feedbackRef = collection(db, "users", uid, "vision_feedback");
-          const q = query(feedbackRef, orderBy("timestamp", "desc"), limit(10));
-          const snap = await getDocs(q);
-          
-          const contexts: string[] = [];
-          snap.forEach(d => {
-              const data = d.data();
-              if (data.actualTrickName) {
-                  contexts.push(data.actualTrickName);
-              }
-          });
-          // Return unique trick names the user has practiced/corrected
-          return [...new Set(contexts)];
-      } catch (e) {
-          console.error("Error getting feedbacks", e);
-          return [];
-      }
+      const allFeedback = JSON.parse(localStorage.getItem(STORAGE_KEYS.VISION) || "[]");
+      const userFeedback = allFeedback.filter((f: any) => f.uid === uid);
+      
+      const contexts: string[] = [];
+      userFeedback.forEach((data: any) => {
+          if (data.actualTrickName) {
+              contexts.push(data.actualTrickName);
+          }
+      });
+      // Return unique trick names
+      return [...new Set(contexts)];
   },
 
   /**
    * Save a full analysis result to the user's history
    */
   async saveAnalysisResult(uid: string, analysis: VisionAnalysis) {
-      if (!db) return;
-      try {
-          const collectionRef = collection(db, "users", uid, "analysis_history");
-          await setDoc(doc(collectionRef, analysis.id), analysis);
-      } catch (e) {
-          console.error("Error saving analysis result", e);
-      }
+      const allAnalysis = JSON.parse(localStorage.getItem(STORAGE_KEYS.ANALYSIS) || "{}");
+      const userAnalysis = allAnalysis[uid] || [];
+      userAnalysis.push(analysis);
+      allAnalysis[uid] = userAnalysis;
+      localStorage.setItem(STORAGE_KEYS.ANALYSIS, JSON.stringify(allAnalysis));
   }
 };
