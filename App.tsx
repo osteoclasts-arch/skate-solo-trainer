@@ -11,7 +11,7 @@ import { BASE_TRICKS, TRANSLATIONS } from './constants';
 import { generateAISession } from './services/geminiService';
 import { loginAsGuest, logout, checkLocalSession } from './services/authService';
 import { dbService } from './services/dbService';
-import { Home, BarChart2, BookOpen, Layers, Eye, Instagram } from 'lucide-react';
+import { Home, BarChart2, BookOpen, Eye, Instagram } from 'lucide-react';
 
 const App: React.FC = () => {
   const [view, setView] = useState<ViewState>('DASHBOARD');
@@ -226,34 +226,17 @@ const App: React.FC = () => {
   const renderView = () => {
     if (isAuthChecking || showSplash) {
         return (
-            <div className="flex h-screen flex-col items-center justify-center bg-black space-y-12 animate-fade-in relative overflow-hidden">
-                {/* Background ambient glow */}
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-skate-neon/10 rounded-full blur-[100px] animate-pulse-slow"></div>
-
+            <div className="flex h-screen flex-col items-center justify-center bg-skate-yellow space-y-8 animate-fade-in relative overflow-hidden">
                 <div className="text-center relative z-10 scale-110">
-                    <h1 className="text-[5rem] font-display font-bold text-white tracking-tighter leading-[0.85] mb-6">
-                        보드<br/>
-                        <span className="text-skate-neon text-glow drop-shadow-[0_0_15px_rgba(204,255,0,0.5)]">탈래말래</span>
+                    <h1 className="text-[4rem] font-display font-black text-skate-black tracking-tight leading-[0.9] mb-4">
+                        SKATE<br/>
+                        <span className="text-white">TRAINER</span>
                     </h1>
                     <div className="flex items-center justify-center space-x-3">
-                        <div className="h-1 w-1 bg-gray-500 rounded-full animate-bounce"></div>
-                        <div className="h-1 w-1 bg-white rounded-full animate-bounce delay-75"></div>
-                        <div className="h-1 w-1 bg-skate-neon rounded-full animate-bounce delay-150"></div>
+                        <div className="h-3 w-3 bg-skate-black rounded-full animate-bounce"></div>
+                        <div className="h-3 w-3 bg-white rounded-full animate-bounce delay-75"></div>
+                        <div className="h-3 w-3 bg-skate-black rounded-full animate-bounce delay-150"></div>
                     </div>
-                </div>
-                
-                <div className="absolute bottom-16 flex flex-col items-center space-y-3 opacity-90">
-                    <a 
-                        href="https://instagram.com/osteoclasts_" 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="flex items-center space-x-2 bg-white/5 px-6 py-3 rounded-full border border-white/5 hover:bg-white/10 transition-colors animate-slide-up"
-                    >
-                        <Instagram className="w-5 h-5 text-gray-300" />
-                        <span className="text-sm font-bold text-white tracking-widest font-display">
-                            @OSTEOCLASTS_
-                        </span>
-                    </a>
                 </div>
             </div>
         );
@@ -314,9 +297,6 @@ const App: React.FC = () => {
             daysSkating={calculateDaysSkating()}
             user={user}
             onLogin={() => {
-                // For Analytics login, we can redirect to Dashboard or show a simple login
-                // For simplicity, let's just trigger the dashboard logic by switching view temporarily or passing the handler down
-                // Ideally analytics should have its own modal, but let's route to Dashboard for profile setup
                 setView('DASHBOARD');
             }}
             onRequestPro={handleRequestPro}
@@ -332,39 +312,36 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="h-screen w-full bg-black text-white overflow-hidden font-sans relative">
+    <div className="h-screen w-full bg-skate-bg text-skate-black overflow-hidden font-sans relative">
       {renderView()}
 
-      {/* Floating Island Navigation */}
+      {/* Floating Navigation - Black Pill Style */}
       {!isAuthChecking && !showSplash && (view === 'DASHBOARD' || view === 'ANALYTICS' || view === 'LEARNING' || view === 'SUMMARY' || view === 'AI_VISION') && (
-         <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 w-[95%] max-w-md z-50">
-            <nav className="glass-nav rounded-full px-6 py-4 flex justify-between items-center shadow-2xl">
+         <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 w-auto z-50">
+            <nav className="glass-nav rounded-full px-6 py-4 flex items-center gap-6 shadow-pop">
                 <button 
                     onClick={() => setView('DASHBOARD')}
-                    className={`flex flex-col items-center space-y-1 transition-all ${view === 'DASHBOARD' ? 'text-skate-neon scale-110' : 'text-gray-500 hover:text-white'}`}
+                    className={`transition-all duration-300 p-2 rounded-full ${view === 'DASHBOARD' ? 'bg-skate-yellow text-skate-black' : 'text-gray-400 hover:text-white'}`}
                 >
-                    <Home className={`w-5 h-5 ${view === 'DASHBOARD' && 'drop-shadow-[0_0_8px_rgba(204,255,0,0.5)]'}`} />
+                    <Home className="w-5 h-5" />
                 </button>
                 <button 
                     onClick={() => setView('LEARNING')}
-                    className={`flex flex-col items-center space-y-1 transition-all ${view === 'LEARNING' ? 'text-skate-neon scale-110' : 'text-gray-500 hover:text-white'}`}
+                    className={`transition-all duration-300 p-2 rounded-full ${view === 'LEARNING' ? 'bg-skate-yellow text-skate-black' : 'text-gray-400 hover:text-white'}`}
                 >
-                    <BookOpen className={`w-5 h-5 ${view === 'LEARNING' && 'drop-shadow-[0_0_8px_rgba(204,255,0,0.5)]'}`} />
+                    <BookOpen className="w-5 h-5" />
                 </button>
                  <button 
                     onClick={() => setView('AI_VISION')}
-                    className={`flex flex-col items-center space-y-1 transition-all ${view === 'AI_VISION' ? 'text-skate-neon scale-110' : 'text-gray-500 hover:text-white'}`}
+                    className={`transition-all duration-300 p-2 rounded-full ${view === 'AI_VISION' ? 'bg-skate-yellow text-skate-black' : 'text-gray-400 hover:text-white'}`}
                 >
-                    <div className="relative">
-                        {view === 'AI_VISION' && <div className="absolute inset-0 bg-skate-neon blur-md opacity-50 rounded-full"></div>}
-                        <Eye className={`w-6 h-6 relative z-10 ${view === 'AI_VISION' && 'fill-skate-neon text-black'}`} />
-                    </div>
+                    <Eye className="w-5 h-5" />
                 </button>
                 <button 
                     onClick={() => setView('ANALYTICS')}
-                    className={`flex flex-col items-center space-y-1 transition-all ${view === 'ANALYTICS' ? 'text-skate-neon scale-110' : 'text-gray-500 hover:text-white'}`}
+                    className={`transition-all duration-300 p-2 rounded-full ${view === 'ANALYTICS' ? 'bg-skate-yellow text-skate-black' : 'text-gray-400 hover:text-white'}`}
                 >
-                    <BarChart2 className={`w-5 h-5 ${view === 'ANALYTICS' && 'drop-shadow-[0_0_8px_rgba(204,255,0,0.5)]'}`} />
+                    <BarChart2 className="w-5 h-5" />
                 </button>
             </nav>
          </div>

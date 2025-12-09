@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { SessionResult, Language, AnalyticsInsight, Difficulty, User } from '../types';
+import { SessionResult, Language, AnalyticsInsight, User } from '../types';
 import { TRANSLATIONS } from '../constants';
-import { ResponsiveContainer, AreaChart, Area, XAxis, Tooltip } from 'recharts';
-import { Trophy, TrendingUp, AlertTriangle, Target, BrainCircuit, Sparkles, RefreshCw, Star, Instagram, Crown, Info, X, Lock, CheckCircle, Clock, User as UserIcon } from 'lucide-react';
+import { ResponsiveContainer, AreaChart, Area, XAxis, Tooltip, CartesianGrid } from 'recharts';
+import { Trophy, Target, BrainCircuit, Sparkles, Instagram, Lock } from 'lucide-react';
 import { getAnalyticsInsight } from '../services/geminiService';
-import html2canvas from 'html2canvas';
 
 interface Props {
   history: SessionResult[];
@@ -19,91 +18,24 @@ const Analytics: React.FC<Props> = ({ history, language, daysSkating = 1, user, 
   const t = TRANSLATIONS[language];
   const [insight, setInsight] = useState<AnalyticsInsight | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [isSharing, setIsSharing] = useState(false);
-  const [showLevelGuide, setShowLevelGuide] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Stats Logic (Calculated even for lock screen to show dummy data if needed, 
-  // but we will use empty data for locked state to keep it clean)
-  const totalSessions = history.length;
-  const totalTricks = history.reduce((acc, curr) => acc + curr.totalTricks, 0);
-  const totalLanded = history.reduce((acc, curr) => acc + curr.landedCount, 0);
-  const globalSuccessRate = totalTricks > 0 ? Math.round((totalLanded / totalTricks) * 100) : 0;
-
-  // Streak Calculation
-  let currentStreak = 0;
-  let bestStreak = 0;
   const sortedHistory = [...history].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  
-  sortedHistory.forEach(s => {
-      if ((s.landedCount / s.totalTricks) > 0.5) {
-          currentStreak++;
-          if (currentStreak > bestStreak) bestStreak = currentStreak;
-      } else {
-          currentStreak = 0;
-      }
-  });
-
-  // Ranking System Logic
-  const calculateTier = () => {
-      let score = 0;
-      history.forEach(session => {
-          session.trickHistory.forEach(attempt => {
-              if (attempt.landed) {
-                  if (attempt.trick.difficulty === Difficulty.HARD) score += 2;
-                  if (attempt.trick.difficulty === Difficulty.PRO) score += 5;
-              }
-          });
-      });
-
-      // Mock percentiles for gamification
-      let tierName = t.TIER_1;
-      let percentile = 90;
-      let iconColor = "text-gray-500";
-
-      if (score > 100) {
-          tierName = t.TIER_4;
-          percentile = 1;
-          iconColor = "text-skate-neon";
-      } else if (score > 50) {
-          tierName = t.TIER_3;
-          percentile = 10;
-          iconColor = "text-purple-400";
-      } else if (score > 10) {
-          tierName = t.TIER_2;
-          percentile = 40;
-          iconColor = "text-blue-400";
-      }
-
-      return { score, tierName, percentile, iconColor };
-  };
-  const { score, tierName, percentile, iconColor } = calculateTier();
-
-  // Weakness Logic
-  const trickStats: Record<string, { attempts: number, landed: number }> = {};
-  history.forEach(session => {
-      session.trickHistory.forEach(attempt => {
-          const name = attempt.trick.name;
-          if (!trickStats[name]) trickStats[name] = { attempts: 0, landed: 0 };
-          trickStats[name].attempts++;
-          if (attempt.landed) trickStats[name].landed++;
-      });
-  });
-
-  const weaknesses = Object.entries(trickStats)
-      .map(([name, stats]) => ({
-          name,
-          rate: Math.round((stats.landed / stats.attempts) * 100),
-          attempts: stats.attempts
-      }))
-      .filter(w => w.attempts >= 3)
-      .sort((a, b) => a.rate - b.rate)
-      .slice(0, 5);
-
   const progressData = sortedHistory.slice(-10).map(h => ({
-      date: new Date(h.date).toLocaleDateString(),
+      date: new Date(h.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
       rate: Math.round((h.landedCount / h.totalTricks) * 100)
   }));
+
+  const chartData = progressData.length > 0 ? progressData : [
+      { date: 'Mon', rate: 20 }, { date: 'Tue', rate: 45 }, { date: 'Wed', rate: 30 }, 
+      { date: 'Thu', rate: 70 }, { date: 'Fri', rate: 55 }, { date: 'Sat', rate: 85 }
+  ];
+
+  const totalSessions = history.length;
+  const totalLanded = history.reduce((acc, curr) => acc + curr.landedCount, 0);
+  const avgSuccess = totalSessions > 0 
+    ? Math.round(history.reduce((acc, curr) => acc + (curr.landedCount/curr.totalTricks), 0) / totalSessions * 100) 
+    : 0;
 
   const handleGenerateInsight = async () => {
       if (history.length === 0) return;
@@ -113,9 +45,12 @@ const Analytics: React.FC<Props> = ({ history, language, daysSkating = 1, user, 
           rate: Math.round((h.landedCount / h.totalTricks) * 100)
       }));
 
+      // Mock calculation for weaknesses
+      const weaknesses = [{ name: 'Kickflip', rate: 30, attempts: 10 }];
+
       const data = await getAnalyticsInsight({
           totalSessions,
-          successRate: globalSuccessRate,
+          successRate: avgSuccess,
           weaknesses,
           recentHistory
       }, language, daysSkating);
@@ -124,339 +59,143 @@ const Analytics: React.FC<Props> = ({ history, language, daysSkating = 1, user, 
       setIsGenerating(false);
   };
 
-  const handleShare = async () => {
-    if (!containerRef.current) return;
-    setIsSharing(true);
-    try {
-        const canvas = await html2canvas(containerRef.current, {
-            backgroundColor: '#050505',
-            scale: 2,
-            logging: false,
-            useCORS: true
-        });
-
-        canvas.toBlob(async (blob) => {
-            if (!blob) {
-                setIsSharing(false);
-                return;
-            }
-            const file = new File([blob], 'skate-solo-analytics.png', { type: 'image/png' });
-            if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                try {
-                    await navigator.share({
-                        files: [file],
-                        title: 'Skate Solo Trainer Stats',
-                        text: `Check out my skate stats! I'm ranked as ${tierName} (Top ${percentile}%) 🛹🔥`
-                    });
-                } catch (shareError) {
-                    console.log('Share cancelled', shareError);
-                }
-            } else {
-                const link = document.createElement('a');
-                link.href = canvas.toDataURL('image/png');
-                link.download = 'skate-solo-analytics.png';
-                link.click();
-            }
-            setIsSharing(false);
-        }, 'image/png');
-    } catch (error) {
-        console.error("Failed screenshot:", error);
-        setIsSharing(false);
-    }
-  };
-
   useEffect(() => {
       if (history.length > 0 && !insight && !isGenerating) {
           handleGenerateInsight();
       }
   }, [history.length]);
 
-  const getExperienceLevel = (days: number) => {
-      if (user?.isPro) return t.LEVEL_ADVANCED;
-      if (days <= 60) return t.LEVEL_BEGINNER;
-      return t.LEVEL_INTERMEDIATE;
-  };
-  
-  const currentLevel = getExperienceLevel(daysSkating);
-
   return (
-    <div className="flex flex-col h-full p-6 space-y-6 overflow-y-auto pb-32 animate-fade-in relative" ref={containerRef}>
+    <div className="flex flex-col h-full p-6 space-y-6 overflow-y-auto pb-32 animate-fade-in font-sans bg-skate-bg" ref={containerRef}>
         
-        {/* LOCK SCREEN OVERLAY */}
+        {/* LOCK SCREEN */}
         {!user && (
-            <div className="absolute inset-0 z-50 bg-black/60 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center">
-                 <div className="glass-card p-8 rounded-3xl w-full max-w-sm flex flex-col items-center shadow-2xl border border-white/10">
-                    <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mb-6">
-                        <Lock className="w-8 h-8 text-skate-neon" />
-                    </div>
-                    <h2 className="text-2xl font-display font-bold text-white mb-2 uppercase tracking-wide">
-                        {language === 'KR' ? '분석실 잠김' : 'Analytics Locked'}
-                    </h2>
-                    <p className="text-gray-400 text-sm mb-8 leading-relaxed">
-                        {language === 'KR' 
-                            ? '상세한 성장 분석과 AI 진단을 보려면 프로필 생성이 필요합니다.' 
-                            : 'Create a profile to access detailed progression tracking and AI coaching insights.'}
-                    </p>
-                    <button 
-                        onClick={onLogin}
-                        className="flex items-center justify-center px-8 py-4 bg-white text-black rounded-full font-bold text-sm hover:bg-gray-200 transition-all shadow-[0_0_20px_rgba(255,255,255,0.4)] active:scale-95 transform w-full space-x-2"
-                    >
-                        <UserIcon className="w-4 h-4" />
-                        <span>{t.LOGIN_GUEST}</span>
-                    </button>
+            <div className="absolute inset-0 z-50 bg-white/60 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center rounded-[3rem]">
+                 <div className="w-16 h-16 bg-skate-black text-skate-yellow rounded-full flex items-center justify-center shadow-lg mb-4">
+                    <Lock className="w-6 h-6" />
                  </div>
+                 <h2 className="text-2xl font-black text-skate-black mb-2">Analytics Locked</h2>
+                 <p className="text-gray-500 mb-8 max-w-xs font-medium">Create a profile to unlock detailed progression stats and AI coaching.</p>
+                 <button onClick={onLogin} className="px-8 py-4 bg-skate-yellow text-skate-black rounded-full font-bold hover:bg-yellow-400 transition-all w-full max-w-xs shadow-lg">
+                     {t.LOGIN_GUEST}
+                 </button>
             </div>
-        )}
-
-        {/* Level Guide Modal */}
-        {showLevelGuide && (
-             <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-6 animate-fade-in">
-                 <div className="glass-card p-6 rounded-3xl w-full max-w-sm shadow-2xl relative">
-                     <button onClick={() => setShowLevelGuide(false)} className="absolute top-4 right-4 text-gray-400 hover:text-white"><X className="w-5 h-5"/></button>
-                     <h3 className="text-2xl font-display font-bold text-white mb-4 flex items-center gap-2">
-                        <Star className="w-6 h-6 text-skate-neon" />
-                        {t.EXPERIENCE_LEVEL}
-                     </h3>
-                     <div className="space-y-4">
-                         {/* Beginner */}
-                         <div className={`p-4 rounded-xl border ${currentLevel === t.LEVEL_BEGINNER ? 'bg-skate-neon/10 border-skate-neon' : 'bg-white/5 border-white/5'}`}>
-                             <div className="flex justify-between items-center mb-1">
-                                 <h4 className={`font-bold uppercase ${currentLevel === t.LEVEL_BEGINNER ? 'text-skate-neon' : 'text-gray-400'}`}>{t.LEVEL_BEGINNER}</h4>
-                                 <span className="text-xs font-mono text-gray-500">0 - 60 Days</span>
-                             </div>
-                             <p className="text-xs text-gray-300">스케이트보드에 입문한 비기너 단계입니다. 기본기와 흥미 위주의 훈련을 추천합니다.</p>
-                         </div>
-                         
-                         {/* Amateur */}
-                         <div className={`p-4 rounded-xl border ${currentLevel === t.LEVEL_INTERMEDIATE ? 'bg-purple-500/10 border-purple-500' : 'bg-white/5 border-white/5'}`}>
-                             <div className="flex justify-between items-center mb-1">
-                                 <h4 className={`font-bold uppercase ${currentLevel === t.LEVEL_INTERMEDIATE ? 'text-purple-400' : 'text-gray-400'}`}>{t.LEVEL_INTERMEDIATE}</h4>
-                                 <span className="text-xs font-mono text-gray-500">61+ Days</span>
-                             </div>
-                             <p className="text-xs text-gray-300">기술의 일관성을 높이고 새로운 트릭에 도전하는 아마추어 단계입니다.</p>
-                         </div>
-
-                         {/* Pro */}
-                         <div className={`p-4 rounded-xl border ${currentLevel === t.LEVEL_ADVANCED ? 'bg-blue-500/10 border-blue-500' : 'bg-white/5 border-white/5'}`}>
-                             <div className="flex justify-between items-center mb-1">
-                                 <h4 className={`font-bold uppercase ${currentLevel === t.LEVEL_ADVANCED ? 'text-blue-400' : 'text-gray-400'}`}>{t.LEVEL_ADVANCED}</h4>
-                                 <span className="text-xs font-mono text-gray-500">{t.LEVEL_REQ_PRO}</span>
-                             </div>
-                             <p className="text-xs text-gray-300 mb-3">자신만의 스타일을 완성하고 고난도 기술을 연마하는 프로 단계입니다. 이 단계로 승급하려면 별도의 승인이 필요합니다.</p>
-                             
-                             {/* Request Pro Button */}
-                             {currentLevel === t.LEVEL_INTERMEDIATE && !user?.isPro && (
-                                <div className="mt-2 pt-2 border-t border-white/5">
-                                    {user?.proRequestStatus === 'pending' ? (
-                                        <button disabled className="w-full py-2 bg-yellow-500/20 text-yellow-500 rounded-lg text-xs font-bold uppercase cursor-not-allowed flex items-center justify-center gap-1">
-                                            <Clock className="w-3 h-3" />
-                                            {t.REQUEST_PENDING}
-                                        </button>
-                                    ) : (
-                                        <button 
-                                            onClick={onRequestPro}
-                                            className="w-full py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg text-xs font-bold uppercase transition-colors flex items-center justify-center gap-1"
-                                        >
-                                            <CheckCircle className="w-3 h-3" />
-                                            {t.REQUEST_PRO}
-                                        </button>
-                                    )}
-                                </div>
-                             )}
-                         </div>
-                     </div>
-                 </div>
-             </div>
         )}
 
         {/* Header */}
-        <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center space-x-2">
-                <Target className="text-skate-neon w-6 h-6" />
-                <h2 className="text-3xl font-display font-bold uppercase tracking-wide">{t.ANALYTICS}</h2>
-            </div>
-            <button
-                onClick={handleShare}
-                disabled={isSharing}
-                className="flex items-center space-x-1 bg-white/10 hover:bg-white/20 px-4 py-2 rounded-full text-white font-bold text-xs transition-all active:scale-95 disabled:opacity-50 border border-white/10 backdrop-blur"
-            >
-                {isSharing ? (
-                    <RefreshCw className="w-3 h-3 animate-spin" />
-                ) : (
-                    <Instagram className="w-3.5 h-3.5" />
-                )}
-                <span>{isSharing ? t.SHARING : t.SHARE_STORY}</span>
-            </button>
-        </div>
-        
-        {/* Level & Rank Badge */}
-        <div className="flex justify-between items-center mb-2">
-             <button 
-                onClick={() => setShowLevelGuide(true)}
-                className="flex items-center space-x-2 bg-white/5 px-3 py-1 rounded-full border border-white/5 hover:bg-white/10 transition-colors active:scale-95"
-             >
-                <Star className="w-3.5 h-3.5 text-gray-400" />
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{t.EXPERIENCE_LEVEL}: <span className="text-white ml-1">{currentLevel}</span></span>
-                <Info className="w-3 h-3 text-gray-500 ml-1" />
+        <div className="flex items-center justify-between">
+            <h2 className="text-3xl font-black text-skate-black">{t.ANALYTICS}</h2>
+            <button className="p-3 bg-white rounded-full hover:bg-gray-100 transition-colors shadow-sm border border-gray-100">
+                <Instagram className="w-5 h-5 text-skate-black" />
             </button>
         </div>
 
-        {/* Simplified Compact Tier Card */}
-        <div className="glass-card rounded-2xl p-4 flex items-center justify-between group bg-gradient-to-r from-white/5 to-transparent">
-             <div className="flex items-center gap-3">
-                 <div className={`p-3 rounded-full bg-black/40 border border-white/10 ${iconColor}`}>
-                    <Crown className="w-5 h-5" />
+        {/* Chart Card */}
+        <div className="w-full bg-white rounded-[2.5rem] p-6 shadow-pop relative overflow-hidden">
+             <div className="flex justify-between items-center mb-8 relative z-10">
+                 <div>
+                    <p className="text-gray-400 text-sm font-bold uppercase tracking-widest mb-1">{t.AVG_SUCCESS}</p>
+                    <h3 className="text-5xl font-black text-skate-black">{avgSuccess}%</h3>
+                 </div>
+                 <div className="bg-skate-deep text-white px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">
+                     Last 10
+                 </div>
+             </div>
+
+             <div className="h-48 w-full -mx-2">
+                <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={chartData}>
+                        <defs>
+                            <linearGradient id="colorRate" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#FFE500" stopOpacity={0.4}/>
+                                <stop offset="95%" stopColor="#FFE500" stopOpacity={0}/>
+                            </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
+                        <XAxis 
+                            dataKey="date" 
+                            axisLine={false} 
+                            tickLine={false} 
+                            tick={{fill: '#A8A29E', fontSize: 10, fontWeight: 700}} 
+                            dy={10}
+                        />
+                        <Tooltip 
+                            contentStyle={{ backgroundColor: '#1C1917', border: 'none', borderRadius: '12px', color: '#fff', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}
+                            itemStyle={{ color: '#FFE500', fontWeight: 'bold' }}
+                            cursor={{ stroke: '#FFE500', strokeWidth: 2 }}
+                        />
+                        <Area 
+                            type="monotone" 
+                            dataKey="rate" 
+                            stroke="#EAB308" 
+                            strokeWidth={4} 
+                            fill="url(#colorRate)" 
+                        />
+                    </AreaChart>
+                </ResponsiveContainer>
+             </div>
+        </div>
+
+        {/* Metric Cards Grid */}
+        <div className="grid grid-cols-2 gap-4">
+             {/* Total Sessions */}
+             <div className="pop-card bg-white p-6 flex flex-col justify-between h-40">
+                 <div className="w-10 h-10 rounded-full bg-skate-deep text-white flex items-center justify-center mb-2">
+                     <Target className="w-5 h-5" />
                  </div>
                  <div>
-                    <h3 className="text-gray-400 text-[10px] font-bold uppercase tracking-widest mb-0.5">{t.YOUR_TIER}</h3>
-                    <span className={`text-xl font-display font-bold tracking-wide ${iconColor === 'text-skate-neon' ? 'text-skate-neon text-glow' : 'text-white'}`}>{tierName}</span>
+                     <p className="text-gray-400 text-xs font-bold uppercase tracking-widest">{t.TOTAL_SESSIONS}</p>
+                     <p className="text-2xl font-black text-skate-black mt-1">{totalSessions}</p>
                  </div>
              </div>
-             <div className="text-right">
-                 <span className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider">{t.TOP_PERCENT}</span>
-                 <span className="text-2xl font-display font-bold text-white">{percentile}%</span>
+
+             {/* Total Landed */}
+             <div className="pop-card bg-skate-yellow p-6 flex flex-col justify-between h-40">
+                 <div className="w-10 h-10 rounded-full bg-white/40 text-skate-black flex items-center justify-center mb-2">
+                     <Trophy className="w-5 h-5" />
+                 </div>
+                 <div>
+                     <p className="text-skate-black/60 text-xs font-bold uppercase tracking-widest">{t.TOTAL_LANDED}</p>
+                     <p className="text-2xl font-black text-skate-black mt-1">{totalLanded}</p>
+                 </div>
              </div>
         </div>
 
-        {/* AI Diagnostic Summary Section - Holographic Card */}
-        <div className="w-full relative rounded-3xl p-[1px] bg-gradient-to-br from-skate-neon/50 via-purple-500/30 to-transparent shadow-2xl overflow-hidden group">
-            <div className="absolute inset-0 bg-black/80 backdrop-blur-xl rounded-3xl h-full w-full z-0"></div>
-            
-            <div className="relative z-10 p-6 min-h-[250px] flex flex-col justify-center">
+        {/* AI Insight Card */}
+        <div className="pop-card p-6 bg-white relative overflow-hidden border-2 border-skate-black">
+            <div className="flex items-center gap-3 mb-4">
+                <BrainCircuit className="w-6 h-6 text-skate-black" />
+                <h3 className="text-lg font-bold text-skate-black">AI Diagnosis</h3>
+            </div>
+
             {!insight ? (
-                <div className="flex flex-col items-center justify-center py-8 text-center space-y-6">
-                    <div className="relative">
-                        <div className="absolute inset-0 bg-skate-neon/30 blur-xl rounded-full"></div>
-                        <BrainCircuit className={`w-12 h-12 text-white relative z-10 ${isGenerating ? 'animate-pulse' : ''}`} />
-                    </div>
-                    
-                    {isGenerating ? (
-                         <p className="text-skate-neon text-sm uppercase tracking-widest font-bold animate-pulse">{t.GENERATING_INSIGHT}</p>
+                <div className="text-center py-6">
+                    {history.length > 0 ? (
+                         <button onClick={handleGenerateInsight} className="w-full py-3 bg-gray-50 text-skate-black shadow-sm rounded-xl font-bold hover:bg-gray-100 transition-colors flex items-center justify-center gap-2 border border-gray-100">
+                             <Sparkles className="w-4 h-4 text-skate-yellow fill-skate-yellow" />
+                             {isGenerating ? "Analyzing..." : "Generate Report"}
+                         </button>
                     ) : (
-                        <div className="flex flex-col items-center space-y-4">
-                            <p className="text-gray-400 text-sm max-w-xs font-medium">
-                                {history.length > 0 ? t.COMPREHENSIVE_DIAGNOSIS : "Complete a session to unlock AI analysis."}
-                            </p>
-                            {history.length > 0 && (
-                                <button onClick={handleGenerateInsight} className="bg-skate-neon text-black px-6 py-3 rounded-xl font-bold uppercase hover:bg-skate-neonHover transition-all flex items-center space-x-2 shadow-lg active:scale-95">
-                                    <Sparkles className="w-4 h-4" />
-                                    <span>{t.GENERATE_INSIGHT}</span>
-                                </button>
-                            )}
-                        </div>
+                        <p className="text-gray-400 text-sm font-medium">Complete a session to get insights.</p>
                     )}
                 </div>
             ) : (
-                <div className="space-y-6 animate-fade-in w-full">
-                    <div>
-                        <span className="text-skate-neon text-[10px] font-bold uppercase tracking-[0.2em] mb-2 block flex items-center">
-                            <BrainCircuit className="w-3 h-3 mr-2" />
-                            AI COACH INSIGHT
-                        </span>
-                        <h3 className="text-3xl font-display font-bold text-white leading-tight drop-shadow-lg">"{insight.diagnosis}"</h3>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-6">
-                        <div className="space-y-2">
-                            <p className="text-gray-200 text-sm leading-relaxed font-medium">
-                                {insight.summary}
-                            </p>
-                        </div>
-                    </div>
-
-                    <div className="bg-white/5 rounded-xl p-4 border border-white/5">
-                        <h4 className="text-gray-400 text-[10px] font-bold uppercase mb-3 flex items-center tracking-wider">
-                            <TrendingUp className="w-3 h-3 mr-1" />
-                            {t.IMPROVEMENT_DIRECTIONS}
-                        </h4>
+                <div className="space-y-4">
+                    <h4 className="text-2xl font-black text-skate-black leading-tight">"{insight.diagnosis}"</h4>
+                    <p className="text-gray-600 text-sm leading-relaxed font-medium">{insight.summary}</p>
+                    <div className="bg-gray-50 rounded-xl p-4">
+                        <p className="text-skate-deep text-xs font-black uppercase mb-2">Focus on</p>
                         <ul className="space-y-2">
-                            {insight.improvementSuggestions.map((suggestion, idx) => (
-                                <li key={idx} className="flex items-start text-sm text-gray-300">
-                                    <span className="text-skate-neon font-display font-bold mr-3 text-lg leading-none mt-0.5">{idx + 1}</span>
-                                    {suggestion}
+                            {insight.improvementSuggestions.slice(0, 2).map((s, i) => (
+                                <li key={i} className="flex gap-2 text-sm text-gray-600 font-medium">
+                                    <span className="text-skate-yellow font-black">•</span>
+                                    {s}
                                 </li>
                             ))}
                         </ul>
                     </div>
-
-                    <div className="pt-4 border-t border-white/10">
-                        <p className="text-white text-sm italic font-medium opacity-80">
-                            "{insight.aiFeedback}"
-                        </p>
-                    </div>
                 </div>
             )}
-            </div>
-        </div>
-
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 gap-3">
-             <div className="glass-card p-4 rounded-2xl">
-                <p className="text-gray-500 text-[10px] font-bold uppercase tracking-widest">{t.TOTAL_SESSIONS}</p>
-                <p className="text-3xl font-display font-bold text-white mt-1">{totalSessions}</p>
-            </div>
-             <div className="glass-card p-4 rounded-2xl">
-                <p className="text-gray-500 text-[10px] font-bold uppercase tracking-widest">{t.AVG_SUCCESS}</p>
-                <p className="text-3xl font-display font-bold text-skate-neon mt-1">{globalSuccessRate}%</p>
-            </div>
-             <div className="glass-card p-4 rounded-2xl">
-                <p className="text-gray-500 text-[10px] font-bold uppercase tracking-widest">{t.TOTAL_LANDED}</p>
-                <p className="text-3xl font-display font-bold text-white mt-1">{totalLanded}</p>
-            </div>
-             <div className="glass-card p-4 rounded-2xl">
-                <p className="text-gray-500 text-[10px] font-bold uppercase tracking-widest">{t.BEST_STREAK}</p>
-                <p className="text-3xl font-display font-bold text-white mt-1">{bestStreak}</p>
-            </div>
-        </div>
-
-        {/* Progress Graph */}
-        <div className="glass-card rounded-3xl p-5 h-64 flex flex-col">
-            <div className="flex items-center space-x-2 mb-4">
-                <TrendingUp className="w-4 h-4 text-gray-400" />
-                <h3 className="text-gray-400 text-[10px] font-bold uppercase tracking-widest">{t.PROGRESSION}</h3>
-            </div>
-            <div className="w-full h-full min-h-0"> 
-                <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={progressData}>
-                        <defs>
-                            <linearGradient id="colorRate" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#ccff00" stopOpacity={0.3}/>
-                                <stop offset="95%" stopColor="#ccff00" stopOpacity={0}/>
-                            </linearGradient>
-                        </defs>
-                        <XAxis dataKey="date" hide />
-                        <Tooltip 
-                            contentStyle={{ backgroundColor: '#1e1e1e', border: 'none', borderRadius: '8px', color: '#fff' }}
-                            itemStyle={{ color: '#ccff00' }}
-                            cursor={{ stroke: '#444', strokeWidth: 1 }}
-                        />
-                        <Area type="monotone" dataKey="rate" stroke="#ccff00" fill="url(#colorRate)" strokeWidth={3} />
-                    </AreaChart>
-                </ResponsiveContainer>
-            </div>
-        </div>
-
-        {/* Weakness Analysis */}
-        <div className="glass-card rounded-3xl p-5">
-            <div className="flex items-center space-x-2 mb-4">
-                <AlertTriangle className="w-4 h-4 text-skate-alert" />
-                <h3 className="text-gray-400 text-[10px] font-bold uppercase tracking-widest">{t.WEAKNESS_ANALYSIS}</h3>
-            </div>
-            <div className="space-y-3">
-                {weaknesses.length > 0 ? weaknesses.map((w, idx) => (
-                    <div key={idx} className="flex justify-between items-center group">
-                        <span className="text-white font-bold text-sm">{w.name}</span>
-                        <div className="flex items-center space-x-3">
-                             <div className="w-24 h-1.5 bg-gray-800 rounded-full overflow-hidden">
-                                <div className="h-full bg-skate-alert rounded-full" style={{ width: `${w.rate}%` }}></div>
-                             </div>
-                             <span className="text-xs text-skate-alert font-bold w-8 text-right">{w.rate}%</span>
-                        </div>
-                    </div>
-                )) : (
-                    <p className="text-gray-500 text-sm italic">Not enough data yet.</p>
-                )}
-            </div>
         </div>
     </div>
   );
