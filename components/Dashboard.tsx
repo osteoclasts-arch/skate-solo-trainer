@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { TRANSLATIONS } from '../constants';
 import { ResponsiveContainer, AreaChart, Area, Tooltip } from 'recharts';
@@ -188,8 +187,8 @@ const Dashboard: React.FC<Props> = ({
       <header className="flex justify-between items-start pt-2 shrink-0">
         <div className="flex flex-col">
             <h1 className="text-[3.5rem] font-display font-bold text-white leading-[0.85] tracking-tight">
-                SKATE<br/>
-                <span className="text-skate-neon text-glow">SOLO</span>
+                보드<br/>
+                <span className="text-skate-neon text-glow">탈래말래</span>
             </h1>
             
             {/* Instagram ID Sub-header */}

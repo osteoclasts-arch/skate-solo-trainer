@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { ViewState, SessionSettings, Trick, SessionResult, Difficulty, Language, Stance, User } from './types';
 import Dashboard from './components/Dashboard';
@@ -233,8 +232,8 @@ const App: React.FC = () => {
 
                 <div className="text-center relative z-10 scale-110">
                     <h1 className="text-[5rem] font-display font-bold text-white tracking-tighter leading-[0.85] mb-6">
-                        SKATE<br/>
-                        <span className="text-skate-neon text-glow drop-shadow-[0_0_15px_rgba(204,255,0,0.5)]">SOLO</span>
+                        보드<br/>
+                        <span className="text-skate-neon text-glow drop-shadow-[0_0_15px_rgba(204,255,0,0.5)]">탈래말래</span>
                     </h1>
                     <div className="flex items-center justify-center space-x-3">
                         <div className="h-1 w-1 bg-gray-500 rounded-full animate-bounce"></div>
