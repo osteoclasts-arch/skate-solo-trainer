@@ -68,6 +68,20 @@ const App: React.FC = () => {
                     localUser.level = profile.level;
                     localUser.xp = profile.xp;
                     localUser.dailyQuests = profile.dailyQuests;
+                    
+                    // Mark login quest as complete if exists
+                    if (localUser.dailyQuests) {
+                        const loginQuest = localUser.dailyQuests.find(q => q.type === 'login');
+                        if (loginQuest && !loginQuest.isCompleted) {
+                            // We just set progress to 1/1 here, user claims it in UI
+                             const questIdx = localUser.dailyQuests.indexOf(loginQuest);
+                             const newQuests = [...localUser.dailyQuests];
+                             newQuests[questIdx] = { ...loginQuest, progress: 1 };
+                             localUser.dailyQuests = newQuests;
+                             await dbService.updateUserProfile(localUser.uid, { dailyQuests: newQuests });
+                        }
+                    }
+
                     setUser({ ...localUser }); 
                 }
 
@@ -158,9 +172,15 @@ const App: React.FC = () => {
   const calculateDaysSkating = () => {
       const start = new Date(startDate);
       const now = new Date();
-      const diffTime = Math.abs(now.getTime() - start.getTime());
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      return diffDays;
+      // Normalize to midnight to ensure accurate day calculation based on calendar days
+      start.setHours(0, 0, 0, 0);
+      now.setHours(0, 0, 0, 0);
+      
+      const diffTime = now.getTime() - start.getTime();
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+      
+      // Add 1 so the first day is Day 1
+      return Math.max(1, diffDays + 1);
   };
 
   const startSession = async (settings: SessionSettings) => {
@@ -215,20 +235,43 @@ const App: React.FC = () => {
     setSessionHistory(newHistory);
     setLastResult(result);
     
-    // Save to DB
+    // Save to DB & Update Quests
     if (user) {
         await dbService.saveSession(user.uid, result);
         
-        // Update Quest Progress (Complete 1 Session)
+        // Update Daily Quests
         if (user.dailyQuests) {
-            const questIdx = user.dailyQuests.findIndex(q => q.type === 'session' && !q.isCompleted);
-            if (questIdx !== -1) {
-                // We don't auto-claim, but we could auto-update progress if needed.
-                // For now, the dashboard handles claiming.
+            let updatedQuests = [...user.dailyQuests];
+            let hasUpdates = false;
+
+            // 1. Session Count Quest
+            const sessionQuestIdx = updatedQuests.findIndex(q => q.type === 'session' && !q.isCompleted);
+            if (sessionQuestIdx !== -1) {
+                updatedQuests[sessionQuestIdx].progress += 1;
+                hasUpdates = true;
+            }
+
+            // 2. Land Tricks Quest
+            const landQuestIdx = updatedQuests.findIndex(q => q.type === 'land_tricks' && !q.isCompleted);
+            if (landQuestIdx !== -1) {
+                updatedQuests[landQuestIdx].progress += result.landedCount;
+                hasUpdates = true;
+            }
+
+            // 3. Perfect Session Quest
+            const perfectQuestIdx = updatedQuests.findIndex(q => q.type === 'perfect_session' && !q.isCompleted);
+            if (perfectQuestIdx !== -1 && result.letters === '') { // No letters = Clean sheet
+                updatedQuests[perfectQuestIdx].progress += 1;
+                hasUpdates = true;
+            }
+
+            if (hasUpdates) {
+                await dbService.updateUserProfile(user.uid, { dailyQuests: updatedQuests });
+                setUser(prev => prev ? ({ ...prev, dailyQuests: updatedQuests }) : null);
             }
         }
     } else {
-        // Fallback for purely local guest without UID (shouldn't happen with current flow, but safe to keep)
+        // Fallback for purely local guest without UID
         localStorage.setItem('skate_session_history', JSON.stringify(newHistory));
     }
 

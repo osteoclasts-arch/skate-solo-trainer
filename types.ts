@@ -23,10 +23,13 @@ export enum TrickCategory {
 
 export interface Quest {
   id: string;
-  title: string;
+  title: string; // Translation Key
+  description?: string; // Optional detailed description
   xp: number;
   isCompleted: boolean;
-  type: 'login' | 'session' | 'practice';
+  type: 'login' | 'session' | 'practice' | 'land_tricks' | 'perfect_session';
+  progress: number;
+  target: number;
 }
 
 export interface User {

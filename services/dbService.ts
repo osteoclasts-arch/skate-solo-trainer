@@ -25,12 +25,24 @@ const STORAGE_KEYS = {
 // Helper to simulate DB delay
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Generate default daily quests
-const generateDailyQuests = (): Quest[] => [
-    { id: 'q_login', title: 'QUEST_LOGIN', xp: 10, isCompleted: false, type: 'login' },
-    { id: 'q_session', title: 'QUEST_SESSION', xp: 50, isCompleted: false, type: 'session' },
-    { id: 'q_practice', title: 'QUEST_PRACTICE', xp: 30, isCompleted: false, type: 'practice' }
-];
+// Generate default daily quests with randomized targets
+const generateDailyQuests = (): Quest[] => {
+    const quests: Quest[] = [
+        // 1. Always Login Quest
+        { id: 'q_login', title: 'QUEST_LOGIN', xp: 20, isCompleted: false, type: 'login', progress: 0, target: 1 },
+        
+        // 2. Randomized Session or Practice Quest
+        Math.random() > 0.5 
+            ? { id: 'q_session', title: 'QUEST_SESSION', xp: 50, isCompleted: false, type: 'session', progress: 0, target: 1 }
+            : { id: 'q_practice', title: 'QUEST_PRACTICE', xp: 30, isCompleted: false, type: 'practice', progress: 0, target: 1 },
+
+        // 3. Challenge Quest
+        Math.random() > 0.5
+            ? { id: 'q_land_tricks', title: 'QUEST_LAND_TRICKS', xp: 100, isCompleted: false, type: 'land_tricks', progress: 0, target: 5 + Math.floor(Math.random() * 6) } // 5 to 10 tricks
+            : { id: 'q_perfect', title: 'QUEST_PERFECT', xp: 150, isCompleted: false, type: 'perfect_session', progress: 0, target: 1 }
+    ];
+    return quests;
+};
 
 export const dbService = {
   /**

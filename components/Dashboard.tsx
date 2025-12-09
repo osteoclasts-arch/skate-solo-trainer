@@ -48,8 +48,6 @@ const Dashboard: React.FC<Props> = ({
   // Gamification State
   const [dailyQuests, setDailyQuests] = useState<Quest[]>([]);
   const [xp, setXp] = useState(0);
-  const [level, setLevel] = useState(1);
-  const [showLevelUp, setShowLevelUp] = useState(false);
   const [showLevelModal, setShowLevelModal] = useState(false);
 
   // Load quests and stats from User prop on mount/update
@@ -57,14 +55,29 @@ const Dashboard: React.FC<Props> = ({
     if (user) {
         if (user.dailyQuests) setDailyQuests(user.dailyQuests);
         if (user.xp !== undefined) setXp(user.xp);
-        if (user.level !== undefined) setLevel(user.level);
     }
   }, [user]);
 
-  const XP_PER_LEVEL = 100;
-  const currentLevelProgress = Math.min(100, (xp % XP_PER_LEVEL) / XP_PER_LEVEL * 100);
+  // Determine Display Tier and Level based on Days
+  const getDisplayStatus = () => {
+      if (user?.isPro) {
+          return { title: 'PRO', sub: `Professional`, isSpecial: true };
+      }
+      if (daysSkating > 60) {
+          return { title: 'AMATEUR', sub: `Day ${daysSkating}`, isSpecial: true };
+      }
+      // For beginners (Day 1-60), Level = Days
+      return { title: `LV. ${daysSkating}`, sub: t.LEVEL_BEGINNER, isSpecial: false };
+  };
 
-  // Determine Current Tier
+  const status = getDisplayStatus();
+  
+  // Calculate Daily Progress (Quest Completion) instead of XP Level Progress
+  const completedQuestsCount = dailyQuests.filter(q => q.isCompleted).length;
+  const totalQuestsCount = Math.max(1, dailyQuests.length);
+  const dailyProgress = (completedQuestsCount / totalQuestsCount) * 100;
+
+  // Determine Current Tier for Modal Highlighting
   const getCurrentTier = () => {
       if (user?.isPro) return 'PRO';
       if (daysSkating > 60) return 'AMATEUR';
@@ -79,31 +92,28 @@ const Dashboard: React.FC<Props> = ({
       }
       
       const questIndex = dailyQuests.findIndex(q => q.id === questId);
-      if (questIndex === -1 || dailyQuests[questIndex].isCompleted) return;
-
+      if (questIndex === -1) return;
+      
       const quest = dailyQuests[questIndex];
+      // Only claim if progress met target and not already completed
+      if (quest.progress < quest.target || quest.isCompleted) return;
+
       const newQuests = [...dailyQuests];
       newQuests[questIndex] = { ...quest, isCompleted: true };
       
       const gainedXp = quest.xp;
       const newTotalXp = xp + gainedXp;
-      const newLevel = Math.floor(newTotalXp / XP_PER_LEVEL) + 1;
-
+      
       // Optimistic UI update
       setDailyQuests(newQuests);
       setXp(newTotalXp);
       
-      if (newLevel > level) {
-          setLevel(newLevel);
-          setShowLevelUp(true);
-          setTimeout(() => setShowLevelUp(false), 3000);
-      }
-
       // Persist
       await dbService.updateUserProfile(user.uid, {
           dailyQuests: newQuests,
           xp: newTotalXp,
-          level: newLevel
+          // We don't save 'level' based on XP anymore since it's time-based now, 
+          // but we keep XP for records.
       });
   };
 
@@ -130,17 +140,6 @@ const Dashboard: React.FC<Props> = ({
   return (
     <div className="flex flex-col h-full p-6 space-y-6 overflow-y-auto pb-32 relative animate-fade-in font-sans bg-skate-bg">
       
-      {/* Level Up Toast */}
-      {showLevelUp && (
-          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 animate-bounce">
-              <div className="bg-skate-yellow text-skate-black px-8 py-6 rounded-[2rem] shadow-2xl border-4 border-skate-black text-center">
-                  <h3 className="text-3xl font-black italic uppercase tracking-tighter">{t.LEVEL_UP}</h3>
-                  <p className="font-bold text-sm mt-1">{t.LEVEL_UP_DESC}</p>
-                  <p className="text-4xl font-black mt-2">LV. {level}</p>
-              </div>
-          </div>
-      )}
-
       {/* Level Info Modal */}
       {showLevelModal && (
           <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-6 animate-fade-in">
@@ -315,19 +314,21 @@ const Dashboard: React.FC<Props> = ({
              <div className="relative z-10 mt-2">
                 <div className="flex items-center gap-3 mb-2">
                     <Shield className="w-8 h-8 fill-skate-black text-skate-black" />
-                    <span className="text-4xl font-black text-skate-black tracking-tight">{t.LEVEL} {level}</span>
+                    <span className="text-4xl font-black text-skate-black tracking-tight">{status.title}</span>
                 </div>
+                <p className="text-sm font-bold text-skate-black/80 uppercase tracking-wide mb-4 pl-1">{status.sub}</p>
                 
-                {/* XP Bar */}
+                {/* Progress Bar (Daily Quests) */}
                 <div className="w-full max-w-[200px] h-4 bg-white/40 rounded-full overflow-hidden backdrop-blur-sm relative">
                     <div 
                         className="h-full bg-skate-black rounded-full transition-all duration-1000 ease-out"
-                        style={{ width: `${currentLevelProgress}%` }}
+                        style={{ width: `${dailyProgress}%` }}
                     ></div>
-                    {/* Striped pattern overlay */}
                     <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'linear-gradient(45deg, #000 25%, transparent 25%, transparent 50%, #000 50%, #000 75%, transparent 75%, transparent)', backgroundSize: '10px 10px' }}></div>
                 </div>
-                <p className="text-xs font-bold text-skate-black/60 mt-2 uppercase tracking-wide">{xp % XP_PER_LEVEL} / {XP_PER_LEVEL} XP</p>
+                <p className="text-[10px] font-bold text-skate-black/60 mt-1 uppercase tracking-wide">
+                    {language === 'KR' ? '오늘의 퀘스트' : 'Daily Quests'}: {Math.round(dailyProgress)}%
+                </p>
              </div>
 
              <div className="flex gap-2 relative z-10 mt-4">
@@ -351,35 +352,56 @@ const Dashboard: React.FC<Props> = ({
                   <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">{t.QUEST_REFRESH}</span>
               </div>
               
-              {user ? dailyQuests.map((quest) => (
-                  <div key={quest.id} className={`pop-card p-4 flex items-center justify-between transition-all ${quest.isCompleted ? 'bg-gray-100 opacity-60' : 'bg-white'}`}>
-                      <div className="flex items-center gap-4">
-                          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${quest.isCompleted ? 'bg-gray-200' : 'bg-skate-deep'}`}>
-                              {quest.type === 'login' && <CheckCircle className={`w-6 h-6 ${quest.isCompleted ? 'text-gray-400' : 'text-white'}`} />}
-                              {quest.type === 'session' && <Zap className={`w-6 h-6 ${quest.isCompleted ? 'text-gray-400' : 'text-white fill-white'}`} />}
-                              {quest.type === 'practice' && <BookOpen className={`w-6 h-6 ${quest.isCompleted ? 'text-gray-400' : 'text-white'}`} />}
-                          </div>
-                          <div>
-                              <p className={`font-bold text-sm ${quest.isCompleted ? 'text-gray-400 line-through' : 'text-skate-black'}`}>
-                                  {/* @ts-ignore */}
-                                  {t[quest.title] || quest.title}
-                              </p>
-                              <p className="text-[10px] font-black text-skate-yellow bg-skate-black inline-block px-1.5 py-0.5 rounded mt-1">+{quest.xp} XP</p>
-                          </div>
-                      </div>
-                      <button 
-                        onClick={() => handleClaimQuest(quest.id)}
-                        disabled={quest.isCompleted}
-                        className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wide transition-all ${
-                            quest.isCompleted 
-                            ? 'bg-transparent text-gray-400 border border-gray-200' 
-                            : 'bg-skate-yellow text-skate-black hover:bg-yellow-400 shadow-sm active:scale-95'
-                        }`}
-                      >
-                          {quest.isCompleted ? t.COMPLETED : t.CLAIM}
-                      </button>
-                  </div>
-              )) : (
+              {user ? dailyQuests.map((quest) => {
+                  const isReadyToClaim = quest.progress >= quest.target && !quest.isCompleted;
+                  const progressPercent = Math.min(100, (quest.progress / quest.target) * 100);
+
+                  return (
+                    <div key={quest.id} className={`pop-card p-4 relative overflow-hidden transition-all ${quest.isCompleted ? 'bg-gray-100 opacity-60' : 'bg-white'}`}>
+                        {/* Progress Bar Background */}
+                        {!quest.isCompleted && (
+                            <div className="absolute bottom-0 left-0 h-1 bg-gray-100 w-full">
+                                <div 
+                                    className="h-full bg-skate-yellow transition-all duration-1000 ease-out"
+                                    style={{ width: `${progressPercent}%` }}
+                                />
+                            </div>
+                        )}
+
+                        <div className="flex items-center justify-between relative z-10">
+                            <div className="flex items-center gap-4">
+                                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${quest.isCompleted ? 'bg-gray-200' : isReadyToClaim ? 'bg-skate-yellow animate-pulse' : 'bg-skate-black'}`}>
+                                    {quest.type === 'login' && <CheckCircle className={`w-6 h-6 ${quest.isCompleted ? 'text-gray-400' : isReadyToClaim ? 'text-skate-black' : 'text-white'}`} />}
+                                    {quest.type === 'session' && <Zap className={`w-6 h-6 ${quest.isCompleted ? 'text-gray-400' : isReadyToClaim ? 'text-skate-black' : 'text-white'}`} />}
+                                    {quest.type === 'practice' && <BookOpen className={`w-6 h-6 ${quest.isCompleted ? 'text-gray-400' : isReadyToClaim ? 'text-skate-black' : 'text-white'}`} />}
+                                    {quest.type === 'land_tricks' && <Target className={`w-6 h-6 ${quest.isCompleted ? 'text-gray-400' : isReadyToClaim ? 'text-skate-black' : 'text-white'}`} />}
+                                    {quest.type === 'perfect_session' && <Star className={`w-6 h-6 ${quest.isCompleted ? 'text-gray-400' : isReadyToClaim ? 'text-skate-black' : 'text-white'}`} />}
+                                </div>
+                                <div>
+                                    <p className={`font-bold text-sm ${quest.isCompleted ? 'text-gray-400 line-through' : 'text-skate-black'}`}>
+                                        {/* @ts-ignore */}
+                                        {t[quest.title] || quest.title} {quest.target > 1 ? `(${quest.progress}/${quest.target})` : ''}
+                                    </p>
+                                    <p className="text-[10px] font-black text-skate-yellow bg-skate-black inline-block px-1.5 py-0.5 rounded mt-1">+{quest.xp} XP</p>
+                                </div>
+                            </div>
+                            <button 
+                                onClick={() => handleClaimQuest(quest.id)}
+                                disabled={!isReadyToClaim}
+                                className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wide transition-all ${
+                                    quest.isCompleted 
+                                    ? 'bg-transparent text-gray-400 border border-gray-200' 
+                                    : isReadyToClaim 
+                                        ? 'bg-skate-yellow text-skate-black hover:bg-yellow-400 shadow-md active:scale-95 animate-bounce-slow'
+                                        : 'bg-gray-50 text-gray-300 border border-gray-100 cursor-not-allowed'
+                                }`}
+                            >
+                                {quest.isCompleted ? t.COMPLETED : t.CLAIM}
+                            </button>
+                        </div>
+                    </div>
+                  );
+              }) : (
                   <div className="bg-white p-6 rounded-[2rem] text-center shadow-pop">
                       <p className="text-gray-400 font-bold text-sm">Log in to view daily quests.</p>
                   </div>

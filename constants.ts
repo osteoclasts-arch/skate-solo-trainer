@@ -172,8 +172,10 @@ export const TRANSLATIONS = {
     XP: "XP",
     CLAIM: "Claim",
     QUEST_LOGIN: "Daily Check-in",
-    QUEST_SESSION: "Complete 1 Session",
-    QUEST_PRACTICE: "Practice 1 Trick in Guide",
+    QUEST_SESSION: "Complete Session",
+    QUEST_PRACTICE: "Practice in Guide",
+    QUEST_LAND_TRICKS: "Land Tricks",
+    QUEST_PERFECT: "Clean Sheet (No S.K.A.T.E)",
     LEVEL_UP: "LEVEL UP!",
     LEVEL_UP_DESC: "You are getting stronger.",
     QUEST_REFRESH: "Resets at midnight"
@@ -347,6 +349,8 @@ export const TRANSLATIONS = {
     QUEST_LOGIN: "매일 출석체크",
     QUEST_SESSION: "세션 1회 완료하기",
     QUEST_PRACTICE: "트릭 가이드에서 연습하기",
+    QUEST_LAND_TRICKS: "기술 성공하기",
+    QUEST_PERFECT: "퍼펙트 게임 (노 SKATE)",
     LEVEL_UP: "레벨 업!",
     LEVEL_UP_DESC: "점점 강해지고 있습니다.",
     QUEST_REFRESH: "매일 자정에 초기화"
