@@ -318,11 +318,15 @@ const fileToPart = (file: File): Promise<{ inlineData: { data: string; mimeType:
                 ? base64String.split(',')[1] 
                 : base64String;
             
+            // Map common container formats to standard mime types Gemini supports
+            let mimeType = file.type;
+            if (file.name.toLowerCase().endsWith('.mov')) mimeType = 'video/quicktime';
+            if (!mimeType || mimeType === '') mimeType = 'video/mp4'; // Fallback for iPhone sometimes missing type
+
             resolve({
                 inlineData: {
                     data: base64Data,
-                    // Provide fallback mimeType to prevent SDK errors if file.type is empty
-                    mimeType: file.type || 'video/mp4'
+                    mimeType: mimeType
                 }
             });
         };
@@ -341,7 +345,8 @@ export const analyzeMedia = async (
     startTime?: number,
     endTime?: number,
     trackingData?: TrackingDataPoint[],
-    motionDataCsv?: string // Added CSV input for strict physics
+    motionDataCsv?: string, // Added CSV input for strict physics
+    stance?: "Regular" | "Goofy" // Added Stance
 ): Promise<VisionAnalysis | null> => {
     if (!apiKey) return null;
 
@@ -359,19 +364,40 @@ export const analyzeMedia = async (
     const timeRangeStr = (startTime !== undefined && endTime !== undefined)
         ? `IMPORTANT: Analyze the video strictly between timestamp ${startTime}s and ${endTime}s. IGNORE any actions before ${startTime}s or after ${endTime}s.`
         : "";
+    
+    // Hint Logic
+    let hintStr = "";
+    if (trickHint) {
+        hintStr = `USER CLAIM: The user states this trick is a "${trickHint}".
+        INSTRUCTION: Treat "${trickHint}" as the Target Trick. 
+        Do not guess what the trick is. Assume the user is attempting "${trickHint}".
+        Your job is to judge IF they landed "${trickHint}" and provide feedback on their form for THIS specific trick.
+        Only if the visual evidence is COMPLETELY unrelated (e.g. user says Kickflip but does a manual), then correct them. Otherwise, respect the user's claim.`;
+    } else {
+        hintStr = "No trick name provided. Identify the trick from visual evidence.";
+    }
 
     // Language Logic
     const langName = language === 'KR' ? 'KOREAN (Hangul)' : 'ENGLISH';
     const langCode = language === 'KR' ? 'KOREAN' : 'ENGLISH';
+    
+    // Stance Logic
+    const stanceStr = stance ? `Rider Stance: ${stance}` : "Rider Stance: Unknown";
 
     // USER PROVIDED PROMPT FOR 2-STAGE ANALYSIS
     const prompt = `
-# SYSTEM INSTRUCTION: MULTI-MODAL ANALYSIS (VIDEO + CSV PHYSICS)
-You are an AI Skateboard Judge. You are provided with TWO sources of information:
-1. **The Video**: Visual context, style, body rotation, and obstacle interaction.
-2. **The Motion Data CSV**: A precise, frame-by-frame log of Board Angle, Height, and Pose.
+# SYSTEM INSTRUCTION: MULTI-MODAL SKATEBOARD ANALYSIS
+You are an AI Skateboard Judge. You are provided with:
+1. **The Video**: Visual context, style, body rotation.
+2. **Motion Data CSV**: Frame-by-frame physics (Ankle Y, Board Angle).
 
-**CRITICAL RULE:** The CSV data is the GROUND TRUTH for physics. If the video looks like a flip but the CSV says "BoardAngle" stayed near 0, it is NOT a flip.
+**User Context:**
+- ${stanceStr}
+- ${hintStr}
+
+**CRITICAL RULE:** 
+If the CSV says "BoardAngle" stayed near 0, it is NOT a flip, even if the video looks blurry.
+If the CSV shows BoardHeight change, it IS a pop.
 
 --- CSV DATA ANALYSIS ---
 ${motionDataCsv ? `Here is the Motion Data extracted by the physics engine:\n${motionDataCsv.substring(0, 3000)}... (truncated)` : "No CSV data provided, rely on visual analysis."}
@@ -391,11 +417,10 @@ Use the CSV to determine:
    - Does the rider rotate? (180, 360).
    - Same direction as board?
 
-3. **Identification:** Combine Physics + Body.
+3. **Identification:** Combine Physics + Body + User Claim.
 
 # Input Context
 Analysis Scope: ${timeRangeStr}
-User Hint: ${trickHint || "None"}
 User History: ${contextStr}
 Possible Candidates: [${allTricks}]
 
@@ -405,13 +430,13 @@ IMPORTANT: 'feedbackText' and 'improvementTip' MUST be in ${langName}.
 'board_physics_desc' MUST also be in ${langName}.
 
 {
-  "trickName": "String (The Final Trick Name)",
+  "trickName": "String (The Final Trick Name - Prioritize User Claim if plausible)",
   "confidence": 0.0 to 1.0,
   "rotation_axis": "String (ROLL, YAW, MIXED, NONE)",
   "board_physics_desc": "String (${langCode}: Explain the physics seen in CSV/Video)",
   "score": 0-100,
   "heightMeters": 0.0-2.0,
-  "feedbackText": "String (${langCode}: Detailed coaching feedback)",
+  "feedbackText": "String (${langCode}: Detailed coaching feedback. Explain WHY it is this trick and how to improve)",
   "improvementTip": "String (${langCode}: One specific tip)"
 }
     `;

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Language, User, VisionAnalysis } from '../types';
 import { TRANSLATIONS } from '../constants';
-import { Upload, Zap, X, Eye, Info, Activity, Rotate3d, Compass, Scissors, Play, Pause, HelpCircle, BrainCircuit, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react';
+import { Upload, Zap, X, Eye, Info, Activity, Rotate3d, Compass, Scissors, Play, Pause, HelpCircle, BrainCircuit, ChevronLeft, ChevronRight, RotateCcw, AlertCircle, Footprints } from 'lucide-react';
 import { analyzeMedia } from '../services/geminiService';
 import { dbService } from '../services/dbService';
 // @ts-ignore
@@ -28,18 +28,20 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [videoDuration, setVideoDuration] = useState(0);
+  const [isVideoError, setIsVideoError] = useState(false);
   
-  // Trimming State
+  // User Input State
   const [trimStart, setTrimStart] = useState(0);
   const [trimEnd, setTrimEnd] = useState(0);
-  const [currentTime, setCurrentTime] = useState(0); // Track playback for UI
+  const [currentTime, setCurrentTime] = useState(0);
   const [isDragging, setIsDragging] = useState<'start' | 'end' | 'playhead' | null>(null);
+  const [trickNameHint, setTrickNameHint] = useState("");
+  const [stance, setStance] = useState<"Regular" | "Goofy">("Regular");
   
   // Analysis State
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<VisionAnalysis | null>(null);
   const [status, setStatus] = useState<string>("");
-  const [trickNameHint, setTrickNameHint] = useState("");
   const [extractionProgress, setExtractionProgress] = useState(0);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
 
@@ -98,7 +100,15 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
     if (event.target.files && event.target.files[0]) {
       const selectedFile = event.target.files[0];
       
-      if (selectedFile.size > 100 * 1024 * 1024) { // Increased limit slightly
+      // Check for AVI explicitly as it is not supported by browsers
+      if (selectedFile.type.includes('avi') || selectedFile.name.toLowerCase().endsWith('.avi')) {
+          alert(language === 'KR' 
+            ? "AVI 파일은 브라우저에서 재생할 수 없습니다. MP4 또는 MOV(iPhone) 파일로 변환해 주세요." 
+            : "AVI files are not supported by browsers. Please convert to MP4 or MOV.");
+          return;
+      }
+
+      if (selectedFile.size > 200 * 1024 * 1024) { // Increased limit for longer videos
           alert(t.FILE_TOO_LARGE);
           return;
       }
@@ -109,6 +119,7 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
       setAnalysisResult(null);
       setTrackingData([]);
       setPlaybackSpeed(1.0);
+      setIsVideoError(false);
       
       // Reset trim when new file loads
       const vid = document.createElement('video');
@@ -118,6 +129,9 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
           setTrimStart(0);
           setTrimEnd(vid.duration);
       };
+      vid.onerror = () => {
+          setIsVideoError(true);
+      };
       vid.src = url;
     }
   };
@@ -126,6 +140,14 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
       const duration = e.currentTarget.duration;
       setVideoDuration(duration);
       if (trimEnd === 0) setTrimEnd(duration);
+      setIsVideoError(false);
+  };
+
+  const handleVideoError = () => {
+      setIsVideoError(true);
+      alert(language === 'KR' 
+        ? "영상을 불러올 수 없습니다. 파일 형식이 브라우저와 호환되지 않을 수 있습니다 (예: 일부 MKV, AVI)." 
+        : "Cannot play video. The format might be unsupported (e.g. AVI, MKV).");
   };
 
   const handleTimeUpdate = (e: React.SyntheticEvent<HTMLVideoElement>) => {
@@ -326,7 +348,8 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
                 trimStart,
                 trimEnd,
                 undefined,
-                csvData 
+                csvData,
+                stance // Pass stance to API
             );
     
             if (result) {
@@ -385,7 +408,6 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
                mpDrawing.drawLandmarks(ctx, currentFrameData.landmarks, {color: '#E3FF37', lineWidth: 1, radius: 2});
            }
       }
-      // Removed Board Marker drawing as requested
 
       requestRef.current = requestAnimationFrame(drawResultFrame);
   };
@@ -552,7 +574,7 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
                         type="file" 
                         ref={fileInputRef} 
                         onChange={handleFileChange} 
-                        accept="video/*" 
+                        accept="video/*,video/mp4,video/quicktime" 
                         className="hidden" 
                     />
                 </div>
@@ -562,6 +584,19 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
         {/* Video Preview & Trim Controls */}
         {previewUrl && !analysisResult && (
             <div className="space-y-6 animate-fade-in">
+                
+                {/* Error Banner */}
+                {isVideoError && (
+                     <div className="bg-red-900/20 border border-red-500/30 rounded-xl p-4 flex items-center space-x-3">
+                        <AlertCircle className="w-6 h-6 text-red-500" />
+                        <p className="text-sm text-red-200">
+                            {language === 'KR' 
+                            ? "이 영상 형식은 지원되지 않습니다. 아이폰 설정 > 카메라 > 포맷 > '높은 호환성'으로 설정하거나 MP4로 변환해주세요." 
+                            : "Video format not supported. Use MP4 or set iPhone Camera Format to 'Most Compatible'."}
+                        </p>
+                     </div>
+                )}
+
                 <div className="relative rounded-3xl overflow-hidden bg-black shadow-2xl border border-white/10 group">
                     <video 
                         ref={videoRef}
@@ -571,6 +606,7 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
                         muted={false}
                         onLoadedMetadata={handleMetadataLoaded}
                         onTimeUpdate={handleTimeUpdate}
+                        onError={handleVideoError}
                     />
                      <button 
                         onClick={() => {
@@ -714,6 +750,29 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
                 {/* Action Buttons */}
                 {!isAnalyzing && (
                     <div className="space-y-4">
+                        {/* Stance Selector */}
+                        <div className="glass-card p-4 rounded-2xl flex items-center justify-between">
+                             <div className="flex items-center space-x-2 text-gray-400">
+                                <Footprints className="w-5 h-5" />
+                                <span className="text-xs font-bold uppercase tracking-widest">{t.SELECT_YOUR_STANCE || "STANCE"}</span>
+                             </div>
+                             <div className="flex space-x-2 bg-black/40 rounded-lg p-1">
+                                <button 
+                                    onClick={() => setStance('Regular')}
+                                    className={`px-4 py-2 rounded-md text-xs font-bold transition-all ${stance === 'Regular' ? 'bg-skate-neon text-black' : 'text-gray-500 hover:text-white'}`}
+                                >
+                                    REGULAR
+                                </button>
+                                <button 
+                                    onClick={() => setStance('Goofy')}
+                                    className={`px-4 py-2 rounded-md text-xs font-bold transition-all ${stance === 'Goofy' ? 'bg-skate-neon text-black' : 'text-gray-500 hover:text-white'}`}
+                                >
+                                    GOOFY
+                                </button>
+                             </div>
+                        </div>
+
+                        {/* Trick Name Input */}
                         <div className="glass-card p-4 rounded-2xl flex items-center space-x-3">
                             <Info className="w-5 h-5 text-gray-400" />
                             <input 
@@ -724,9 +783,11 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
                                 className="bg-transparent border-none outline-none text-white placeholder-gray-600 flex-1 text-sm font-medium"
                             />
                         </div>
+                        
                         <button
                             onClick={processVideo}
-                            className="w-full py-5 bg-skate-neon hover:bg-skate-neonHover text-black font-display text-3xl font-bold uppercase rounded-[2rem] shadow-[0_0_20px_rgba(204,255,0,0.3)] transform active:scale-95 transition-all flex items-center justify-center space-x-3"
+                            disabled={isVideoError}
+                            className={`w-full py-5 bg-skate-neon hover:bg-skate-neonHover text-black font-display text-3xl font-bold uppercase rounded-[2rem] shadow-[0_0_20px_rgba(204,255,0,0.3)] transform active:scale-95 transition-all flex items-center justify-center space-x-3 ${isVideoError ? 'opacity-50 cursor-not-allowed grayscale' : ''}`}
                         >
                             <Zap className="w-6 h-6 fill-black" />
                             <span>{t.ANALYZE_TRICK}</span>
