@@ -1,8 +1,10 @@
 
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { TRANSLATIONS } from '../constants';
-import { Play, BookOpen, Eye, Edit2, LogOut, CheckCircle, Zap, UserPlus, Calendar, ArrowUpRight, TrendingUp } from 'lucide-react';
-import { SessionResult, Language, User as UserType } from '../types';
+import { Play, BookOpen, Eye, Edit2, LogOut, CheckCircle, Zap, UserPlus, Calendar, ArrowUpRight, TrendingUp, Target, Shield, Check, Star, X } from 'lucide-react';
+import { SessionResult, Language, User as UserType, Quest } from '../types';
+import { dbService } from '../services/dbService';
 
 interface Props {
   onStart: () => void;
@@ -16,6 +18,7 @@ interface Props {
   user: UserType | null;
   onLogin: (data?: { name: string; age: number; startDate: string }) => void;
   onLogout: () => void;
+  onRequestPro: () => void;
 }
 
 const Dashboard: React.FC<Props> = ({ 
@@ -29,7 +32,8 @@ const Dashboard: React.FC<Props> = ({
     onUpdateStartDate,
     user,
     onLogin,
-    onLogout
+    onLogout,
+    onRequestPro
 }) => {
   const t = TRANSLATIONS[language];
   const [isEditingDate, setIsEditingDate] = useState(false);
@@ -40,6 +44,68 @@ const Dashboard: React.FC<Props> = ({
   const [setupName, setSetupName] = useState("");
   const [setupAge, setSetupAge] = useState("");
   const [setupDate, setSetupDate] = useState(startDate);
+
+  // Gamification State
+  const [dailyQuests, setDailyQuests] = useState<Quest[]>([]);
+  const [xp, setXp] = useState(0);
+  const [level, setLevel] = useState(1);
+  const [showLevelUp, setShowLevelUp] = useState(false);
+  const [showLevelModal, setShowLevelModal] = useState(false);
+
+  // Load quests and stats from User prop on mount/update
+  useEffect(() => {
+    if (user) {
+        if (user.dailyQuests) setDailyQuests(user.dailyQuests);
+        if (user.xp !== undefined) setXp(user.xp);
+        if (user.level !== undefined) setLevel(user.level);
+    }
+  }, [user]);
+
+  const XP_PER_LEVEL = 100;
+  const currentLevelProgress = Math.min(100, (xp % XP_PER_LEVEL) / XP_PER_LEVEL * 100);
+
+  // Determine Current Tier
+  const getCurrentTier = () => {
+      if (user?.isPro) return 'PRO';
+      if (daysSkating > 60) return 'AMATEUR';
+      return 'BEGINNER';
+  };
+  const currentTier = getCurrentTier();
+
+  const handleClaimQuest = async (questId: string) => {
+      if (!user) {
+          alert("Please login to claim rewards.");
+          return;
+      }
+      
+      const questIndex = dailyQuests.findIndex(q => q.id === questId);
+      if (questIndex === -1 || dailyQuests[questIndex].isCompleted) return;
+
+      const quest = dailyQuests[questIndex];
+      const newQuests = [...dailyQuests];
+      newQuests[questIndex] = { ...quest, isCompleted: true };
+      
+      const gainedXp = quest.xp;
+      const newTotalXp = xp + gainedXp;
+      const newLevel = Math.floor(newTotalXp / XP_PER_LEVEL) + 1;
+
+      // Optimistic UI update
+      setDailyQuests(newQuests);
+      setXp(newTotalXp);
+      
+      if (newLevel > level) {
+          setLevel(newLevel);
+          setShowLevelUp(true);
+          setTimeout(() => setShowLevelUp(false), 3000);
+      }
+
+      // Persist
+      await dbService.updateUserProfile(user.uid, {
+          dailyQuests: newQuests,
+          xp: newTotalXp,
+          level: newLevel
+      });
+  };
 
   const handleSaveDate = () => {
       onUpdateStartDate(tempDate);
@@ -64,6 +130,75 @@ const Dashboard: React.FC<Props> = ({
   return (
     <div className="flex flex-col h-full p-6 space-y-6 overflow-y-auto pb-32 relative animate-fade-in font-sans bg-skate-bg">
       
+      {/* Level Up Toast */}
+      {showLevelUp && (
+          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 animate-bounce">
+              <div className="bg-skate-yellow text-skate-black px-8 py-6 rounded-[2rem] shadow-2xl border-4 border-skate-black text-center">
+                  <h3 className="text-3xl font-black italic uppercase tracking-tighter">{t.LEVEL_UP}</h3>
+                  <p className="font-bold text-sm mt-1">{t.LEVEL_UP_DESC}</p>
+                  <p className="text-4xl font-black mt-2">LV. {level}</p>
+              </div>
+          </div>
+      )}
+
+      {/* Level Info Modal */}
+      {showLevelModal && (
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-6 animate-fade-in">
+              <div className="bg-[#1C1917] w-full max-w-sm rounded-[2rem] p-6 text-white relative border border-gray-800 shadow-2xl">
+                  <div className="flex justify-between items-center mb-6">
+                      <h3 className="text-2xl font-black flex items-center gap-2">
+                         <Star className="text-skate-yellow fill-skate-yellow w-6 h-6" /> {t.LEVEL_INFO_TITLE}
+                      </h3>
+                      <button onClick={() => setShowLevelModal(false)} className="p-2 bg-gray-800 rounded-full hover:bg-gray-700"><X className="w-5 h-5" /></button>
+                  </div>
+
+                  <div className="space-y-4">
+                      {/* Beginner Card */}
+                      <div className={`p-5 rounded-2xl border transition-all ${currentTier === 'BEGINNER' ? 'bg-gray-800 border-gray-600' : 'bg-transparent border-gray-800 opacity-40'}`}>
+                         <div className="flex justify-between items-center mb-2">
+                            <span className={`font-bold text-lg ${currentTier === 'BEGINNER' ? 'text-white' : 'text-gray-500'}`}>{t.LEVEL_BEGINNER}</span>
+                            <span className="font-mono text-xs text-gray-400 font-bold tracking-wider">{t.LEVEL_BEGINNER_RANGE}</span>
+                         </div>
+                         <p className="text-sm text-gray-400 leading-relaxed">{t.LEVEL_BEGINNER_DESC}</p>
+                      </div>
+
+                      {/* Amateur Card */}
+                      <div className={`p-5 rounded-2xl border transition-all ${currentTier === 'AMATEUR' ? 'bg-[#2E1065] border-[#8B5CF6] shadow-[0_0_15px_rgba(139,92,246,0.3)]' : 'bg-transparent border-gray-800 opacity-40'}`}>
+                         <div className="flex justify-between items-center mb-2">
+                            <span className={`font-bold text-lg ${currentTier === 'AMATEUR' ? 'text-[#C4B5FD]' : 'text-gray-500'}`}>{t.LEVEL_INTERMEDIATE}</span>
+                            <span className="font-mono text-xs text-gray-400 font-bold tracking-wider">{t.LEVEL_AMATEUR_RANGE}</span>
+                         </div>
+                         <p className="text-sm text-gray-400 leading-relaxed">{t.LEVEL_AMATEUR_DESC}</p>
+                      </div>
+
+                      {/* Pro Card */}
+                      <div className={`p-5 rounded-2xl border transition-all ${currentTier === 'PRO' ? 'bg-skate-yellow text-skate-black border-skate-yellow' : 'bg-transparent border-gray-800 opacity-40'}`}>
+                         <div className="flex justify-between items-center mb-2">
+                            <span className={`font-bold text-lg ${currentTier === 'PRO' ? 'text-skate-black' : 'text-gray-500'}`}>{t.LEVEL_ADVANCED}</span>
+                            <span className="font-mono text-xs font-bold tracking-wider text-gray-400">{t.LEVEL_PRO_RANGE}</span>
+                         </div>
+                         <p className={`text-sm leading-relaxed mb-4 ${currentTier === 'PRO' ? 'text-skate-black/80' : 'text-gray-400'}`}>{t.LEVEL_PRO_DESC}</p>
+                         
+                         {currentTier !== 'PRO' && (
+                             <button 
+                                onClick={onRequestPro}
+                                disabled={user?.proRequestStatus === 'pending'}
+                                className={`w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+                                    user?.proRequestStatus === 'pending' 
+                                    ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
+                                    : 'bg-gray-800 text-white hover:bg-gray-700 border border-gray-700'
+                                }`}
+                             >
+                                 <CheckCircle className="w-4 h-4" />
+                                 {user?.proRequestStatus === 'pending' ? t.REQUEST_PENDING : t.PRO_BTN_TEXT}
+                             </button>
+                         )}
+                      </div>
+                  </div>
+              </div>
+          </div>
+      )}
+
       {/* Date Edit Modal */}
       {isEditingDate && (
           <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-6 animate-fade-in">
@@ -162,23 +297,37 @@ const Dashboard: React.FC<Props> = ({
       {/* Main Grid */}
       <div className="grid grid-cols-1 gap-6">
           
-          {/* Hero Card - YELLOW (Gen Z Vibe) */}
-          <div className="w-full p-7 rounded-[2.5rem] bg-skate-yellow relative overflow-hidden shadow-pop pop-card min-h-[220px] flex flex-col justify-between group cursor-pointer" onClick={() => setIsEditingDate(true)}>
-             <div className="absolute top-4 right-4 bg-white/30 backdrop-blur-md px-3 py-1 rounded-full">
-                <span className="text-xs font-black text-skate-black uppercase tracking-wider">{new Date().getFullYear()} / {new Date().getMonth() + 1}</span>
+          {/* Hero Card - PLAYER STATUS (Level & XP) */}
+          <div 
+            className="w-full p-7 rounded-[2.5rem] bg-skate-yellow relative overflow-hidden shadow-pop pop-card min-h-[220px] flex flex-col justify-between group cursor-pointer hover:shadow-xl transition-shadow" 
+            onClick={() => setShowLevelModal(true)}
+          >
+             <div 
+                className="absolute top-4 right-4 bg-white/30 backdrop-blur-md px-3 py-1 rounded-full cursor-pointer hover:bg-white/50 transition-colors z-20"
+                onClick={(e) => { e.stopPropagation(); setIsEditingDate(true); }}
+             >
+                <span className="text-xs font-black text-skate-black uppercase tracking-wider">{t.DAYS_SKATING}: {daysSkating}</span>
              </div>
              
-             {/* "Sticker" decorations */}
-             <div className="absolute -bottom-8 -right-8 w-40 h-40 bg-white/20 rounded-full blur-xl group-hover:scale-110 transition-transform duration-500"></div>
+             {/* Decor */}
+             <div className="absolute -bottom-10 -right-10 w-48 h-48 bg-white/20 rounded-full blur-xl group-hover:scale-110 transition-transform duration-500"></div>
              
-             <div className="relative z-10">
-                <p className="text-sm font-bold text-skate-black/60 uppercase tracking-widest mb-1">{t.DAYS_SKATING}</p>
-                <h2 className="text-5xl font-black text-skate-black tracking-tight leading-none">
-                   Skating with<br/>Passion
-                </h2>
-                <div className="flex items-center gap-2 mt-2">
-                    <span className="text-lg font-medium text-skate-black/80">{daysSkating} days streak</span>
+             <div className="relative z-10 mt-2">
+                <div className="flex items-center gap-3 mb-2">
+                    <Shield className="w-8 h-8 fill-skate-black text-skate-black" />
+                    <span className="text-4xl font-black text-skate-black tracking-tight">{t.LEVEL} {level}</span>
                 </div>
+                
+                {/* XP Bar */}
+                <div className="w-full max-w-[200px] h-4 bg-white/40 rounded-full overflow-hidden backdrop-blur-sm relative">
+                    <div 
+                        className="h-full bg-skate-black rounded-full transition-all duration-1000 ease-out"
+                        style={{ width: `${currentLevelProgress}%` }}
+                    ></div>
+                    {/* Striped pattern overlay */}
+                    <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'linear-gradient(45deg, #000 25%, transparent 25%, transparent 50%, #000 50%, #000 75%, transparent 75%, transparent)', backgroundSize: '10px 10px' }}></div>
+                </div>
+                <p className="text-xs font-bold text-skate-black/60 mt-2 uppercase tracking-wide">{xp % XP_PER_LEVEL} / {XP_PER_LEVEL} XP</p>
              </div>
 
              <div className="flex gap-2 relative z-10 mt-4">
@@ -188,13 +337,56 @@ const Dashboard: React.FC<Props> = ({
                  <div className="w-10 h-10 rounded-full bg-skate-black/10 flex items-center justify-center">
                      <TrendingUp className="w-5 h-5 text-skate-black" />
                  </div>
-                 <div className="w-10 h-10 rounded-full bg-skate-blue/30 flex items-center justify-center">
-                     <Zap className="w-5 h-5 text-skate-black" />
+                 <div className="ml-auto flex items-center gap-1 opacity-50 text-skate-black text-[10px] font-bold uppercase tracking-widest">
+                    <span>View Level Info</span>
+                    <ArrowUpRight className="w-3 h-3" />
                  </div>
              </div>
           </div>
 
-          {/* Action Row - "Start" is primary */}
+          {/* DAILY QUESTS */}
+          <div className="w-full space-y-3">
+              <div className="flex justify-between items-end px-2">
+                  <h3 className="text-xl font-black text-skate-black italic">{t.DAILY_QUESTS}</h3>
+                  <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">{t.QUEST_REFRESH}</span>
+              </div>
+              
+              {user ? dailyQuests.map((quest) => (
+                  <div key={quest.id} className={`pop-card p-4 flex items-center justify-between transition-all ${quest.isCompleted ? 'bg-gray-100 opacity-60' : 'bg-white'}`}>
+                      <div className="flex items-center gap-4">
+                          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${quest.isCompleted ? 'bg-gray-200' : 'bg-skate-deep'}`}>
+                              {quest.type === 'login' && <CheckCircle className={`w-6 h-6 ${quest.isCompleted ? 'text-gray-400' : 'text-white'}`} />}
+                              {quest.type === 'session' && <Zap className={`w-6 h-6 ${quest.isCompleted ? 'text-gray-400' : 'text-white fill-white'}`} />}
+                              {quest.type === 'practice' && <BookOpen className={`w-6 h-6 ${quest.isCompleted ? 'text-gray-400' : 'text-white'}`} />}
+                          </div>
+                          <div>
+                              <p className={`font-bold text-sm ${quest.isCompleted ? 'text-gray-400 line-through' : 'text-skate-black'}`}>
+                                  {/* @ts-ignore */}
+                                  {t[quest.title] || quest.title}
+                              </p>
+                              <p className="text-[10px] font-black text-skate-yellow bg-skate-black inline-block px-1.5 py-0.5 rounded mt-1">+{quest.xp} XP</p>
+                          </div>
+                      </div>
+                      <button 
+                        onClick={() => handleClaimQuest(quest.id)}
+                        disabled={quest.isCompleted}
+                        className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wide transition-all ${
+                            quest.isCompleted 
+                            ? 'bg-transparent text-gray-400 border border-gray-200' 
+                            : 'bg-skate-yellow text-skate-black hover:bg-yellow-400 shadow-sm active:scale-95'
+                        }`}
+                      >
+                          {quest.isCompleted ? t.COMPLETED : t.CLAIM}
+                      </button>
+                  </div>
+              )) : (
+                  <div className="bg-white p-6 rounded-[2rem] text-center shadow-pop">
+                      <p className="text-gray-400 font-bold text-sm">Log in to view daily quests.</p>
+                  </div>
+              )}
+          </div>
+
+          {/* Action Row */}
           <div className="flex gap-4 h-40">
               <button 
                 onClick={onStart}
@@ -225,9 +417,8 @@ const Dashboard: React.FC<Props> = ({
               </button>
           </div>
 
-          {/* Recent History - Brown Card style */}
+          {/* Recent History */}
           <div className="w-full bg-skate-deep rounded-[2.5rem] p-6 shadow-pop text-white relative overflow-hidden min-h-[200px]">
-              {/* Abstract CD/Vinyl decoration like in reference */}
               <div className="absolute -right-12 bottom-4 w-40 h-40 rounded-full border-[12px] border-white/5 opacity-50"></div>
               <div className="absolute -right-12 bottom-4 w-40 h-40 rounded-full border-[40px] border-black/20 opacity-30"></div>
 

@@ -20,14 +20,26 @@ export enum TrickCategory {
   TRANSITION = 'Transition'
 }
 
+export interface Quest {
+  id: string;
+  title: string;
+  xp: number;
+  isCompleted: boolean;
+  type: 'login' | 'session' | 'practice';
+}
+
 export interface User {
   uid: string;
   name: string;
   email?: string;
   photoURL?: string;
-  age?: number; // Added age
+  age?: number; 
   isPro?: boolean;
   proRequestStatus?: 'none' | 'pending' | 'rejected';
+  level?: number;
+  xp?: number;
+  dailyQuests?: Quest[];
+  lastQuestDate?: string;
 }
 
 export interface StanceContent {

@@ -1,4 +1,5 @@
 
+
 import { Difficulty, Stance, Trick, TrickCategory, TrickTip } from "./types";
 
 export const SKATE_LETTERS = ['S', 'K', 'A', 'T', 'E'];
@@ -88,6 +89,15 @@ export const TRANSLATIONS = {
     LEVEL_REQ_PRO: "Approval Required",
     REQUEST_PRO: "Request Pro Verification",
     REQUEST_PENDING: "Under Review",
+    // Level System Details
+    LEVEL_INFO_TITLE: "Level System",
+    LEVEL_BEGINNER_RANGE: "0 - 60 Days",
+    LEVEL_BEGINNER_DESC: "You are in the beginner stage. Focus on basics and having fun.",
+    LEVEL_AMATEUR_RANGE: "61+ Days",
+    LEVEL_AMATEUR_DESC: "Amateur stage where you build consistency and try new tricks.",
+    LEVEL_PRO_RANGE: "Pro Approval Required",
+    LEVEL_PRO_DESC: "The pro stage for mastering your style and advanced tricks. Approval required.",
+    PRO_BTN_TEXT: "Request Pro Verification",
     // Ranking
     GLOBAL_RANKING: "Global Ranking",
     YOUR_TIER: "Your Tier",
@@ -155,7 +165,18 @@ export const TRANSLATIONS = {
     FRAMING_GUIDE_TITLE: "How to Film for Best Results",
     FRAMING_TIP_1: "Use a tripod or static camera angle.",
     FRAMING_TIP_2: "Keep skater's whole body and board in frame.",
-    FRAMING_TIP_3: "Side view is best for trick recognition."
+    FRAMING_TIP_3: "Side view is best for trick recognition.",
+    // Quests
+    DAILY_QUESTS: "Daily Quests",
+    LEVEL: "Lv.",
+    XP: "XP",
+    CLAIM: "Claim",
+    QUEST_LOGIN: "Daily Check-in",
+    QUEST_SESSION: "Complete 1 Session",
+    QUEST_PRACTICE: "Practice 1 Trick in Guide",
+    LEVEL_UP: "LEVEL UP!",
+    LEVEL_UP_DESC: "You are getting stronger.",
+    QUEST_REFRESH: "Resets at midnight"
   },
   KR: {
     NEW_SESSION: "새로운 세션",
@@ -241,6 +262,15 @@ export const TRANSLATIONS = {
     LEVEL_REQ_PRO: "프로 승인 필요",
     REQUEST_PRO: "프로 승인 신청",
     REQUEST_PENDING: "심사 중",
+    // Level System Details
+    LEVEL_INFO_TITLE: "레벨",
+    LEVEL_BEGINNER_RANGE: "0 - 60 Days",
+    LEVEL_BEGINNER_DESC: "스케이트보드에 입문한 비기너 단계입니다. 기본기와 흥미 위주의 훈련을 추천합니다.",
+    LEVEL_AMATEUR_RANGE: "61+ Days",
+    LEVEL_AMATEUR_DESC: "기술의 일관성을 높이고 새로운 트릭에 도전하는 아마추어 단계입니다.",
+    LEVEL_PRO_RANGE: "프로 승인 필요",
+    LEVEL_PRO_DESC: "자신만의 스타일을 완성하고 고난도 기술을 연마하는 프로 단계입니다. 이 단계로 승급하려면 별도의 승인이 필요합니다.",
+    PRO_BTN_TEXT: "프로 승인 신청",
     // Ranking
     GLOBAL_RANKING: "글로벌 랭킹",
     YOUR_TIER: "현재 티어",
@@ -308,7 +338,18 @@ export const TRANSLATIONS = {
     FRAMING_GUIDE_TITLE: "정확한 분석을 위한 촬영 가이드",
     FRAMING_TIP_1: "카메라는 삼각대로 고정해주세요.",
     FRAMING_TIP_2: "스케이터의 전신과 보드가 모두 나와야 합니다.",
-    FRAMING_TIP_3: "측면(Side view)에서 촬영하면 가장 정확합니다."
+    FRAMING_TIP_3: "측면(Side view)에서 촬영하면 가장 정확합니다.",
+    // Quests
+    DAILY_QUESTS: "일일 퀘스트",
+    LEVEL: "Lv.",
+    XP: "XP",
+    CLAIM: "보상 받기",
+    QUEST_LOGIN: "매일 출석체크",
+    QUEST_SESSION: "세션 1회 완료하기",
+    QUEST_PRACTICE: "트릭 가이드에서 연습하기",
+    LEVEL_UP: "레벨 업!",
+    LEVEL_UP_DESC: "점점 강해지고 있습니다.",
+    QUEST_REFRESH: "매일 자정에 초기화"
   }
 };
 
@@ -383,5 +424,4 @@ export const TRICK_TIPS_DB: Record<string, TrickTip[]> = {
     { text: { EN: "Flick out, not down.", KR: "아래가 아니라 대각선 밖으로 플릭하세요." }, source: "Pro Coach" },
     { text: { EN: "Keep your shoulders parallel to the board.", KR: "어깨가 보드와 평행이 되도록 유지하세요." }, source: "Community" }
   ]
-  // ... (More tips can be added here)
 };

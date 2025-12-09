@@ -1,3 +1,5 @@
+
+
 import React, { useState, useEffect } from 'react';
 import { ViewState, SessionSettings, Trick, SessionResult, Difficulty, Language, Stance, User } from './types';
 import Dashboard from './components/Dashboard';
@@ -277,6 +279,7 @@ const App: React.FC = () => {
             user={user}
             onLogin={handleLogin}
             onLogout={handleLogout}
+            onRequestPro={handleRequestPro}
           />
         );
       case 'SETUP':
