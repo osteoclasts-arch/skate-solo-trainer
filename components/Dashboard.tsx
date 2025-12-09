@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { TRANSLATIONS } from '../constants';
 import { Play, BookOpen, Eye, Edit2, LogOut, CheckCircle, Zap, UserPlus, Calendar, ArrowUpRight, TrendingUp } from 'lucide-react';
@@ -137,7 +138,7 @@ const Dashboard: React.FC<Props> = ({
             </div>
             <h1 className="text-4xl font-display font-black text-skate-black leading-[0.9] tracking-tight">
                 {user ? user.name : "Skater"}'s<br />
-                <span className="text-gray-400">Daily Trace</span>
+                <span className="text-gray-400">Daily Skating</span>
                 <span className="text-skate-yellow ml-1 animate-pulse">✨</span>
             </h1>
         </div>
