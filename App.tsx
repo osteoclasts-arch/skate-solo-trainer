@@ -26,16 +26,8 @@ const App: React.FC = () => {
   const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [showSplash, setShowSplash] = useState(true);
 
-  // Initialize session history from localStorage (Default for Guest)
-  const [sessionHistory, setSessionHistory] = useState<SessionResult[]>(() => {
-    try {
-        const saved = localStorage.getItem('skate_session_history');
-        return saved ? JSON.parse(saved) : [];
-    } catch (e) {
-        console.error("Failed to load history", e);
-        return [];
-    }
-  });
+  // Initialize session history from localStorage (Default for Guest fallback)
+  const [sessionHistory, setSessionHistory] = useState<SessionResult[]>([]);
 
   const [lastResult, setLastResult] = useState<SessionResult | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -52,11 +44,11 @@ const App: React.FC = () => {
   useEffect(() => {
     const timer = setTimeout(() => {
         setShowSplash(false);
-    }, 2800); // Slightly longer for the animation to play out
+    }, 2800); 
     return () => clearTimeout(timer);
   }, []);
 
-  // Handle Authentication (Local Storage Version)
+  // Handle Authentication & Data Migration
   useEffect(() => {
     const initAuth = async () => {
         const localUser = checkLocalSession();
@@ -64,7 +56,7 @@ const App: React.FC = () => {
             setUser(localUser);
             setIsLoadingData(true);
             try {
-                // Load Profile
+                // 1. Load Profile
                 const profile = await dbService.getUserProfile(localUser.uid);
                 if (profile) {
                     if (profile.startDate) {
@@ -72,16 +64,21 @@ const App: React.FC = () => {
                     }
                     localUser.isPro = profile.isPro;
                     localUser.proRequestStatus = profile.proRequestStatus;
-                    localUser.age = profile.age; // Load age
-                    setUser({ ...localUser }); // Update with profile data
+                    localUser.age = profile.age; 
+                    localUser.level = profile.level;
+                    localUser.xp = profile.xp;
+                    localUser.dailyQuests = profile.dailyQuests;
+                    setUser({ ...localUser }); 
                 }
 
-                // Load History (Merge local history with DB history for seamlessness)
+                // 2. MIGRATE LEGACY DATA (Crucial for updates)
+                // This ensures if the user had data before the DB structure update, it gets moved to their UID
+                await dbService.migrateLegacySessions(localUser.uid);
+
+                // 3. Load Sessions (from DB)
                 const cloudSessions = await dbService.getUserSessions(localUser.uid);
-                if (cloudSessions.length > 0) {
-                    setSessionHistory(cloudSessions);
-                    localStorage.setItem('skate_session_history', JSON.stringify(cloudSessions));
-                }
+                setSessionHistory(cloudSessions);
+                
             } catch (e) {
                 console.error("Error loading user data", e);
             } finally {
@@ -95,7 +92,6 @@ const App: React.FC = () => {
   }, []);
 
   const handleLogin = async (data?: { name: string; age: number; startDate: string }) => {
-    // If data provided (from Profile Setup), pass it to auth
     const loggedInUser = await loginAsGuest(data?.name, data?.age);
     if (loggedInUser) {
       setUser(loggedInUser);
@@ -106,7 +102,7 @@ const App: React.FC = () => {
           await updateStartDate(data.startDate);
       }
       
-      // Also save profile to DB if new fields provided
+      // Save profile to DB
       if (data) {
           await dbService.updateUserProfile(loggedInUser.uid, {
               startDate: data.startDate,
@@ -114,21 +110,30 @@ const App: React.FC = () => {
           });
       }
 
-      // Load Profile
+      // Refresh Data
       const profile = await dbService.getUserProfile(loggedInUser.uid);
-      if (profile && profile.startDate) {
-          setStartDate(profile.startDate);
+      if (profile) {
+         if(profile.startDate) setStartDate(profile.startDate);
+         setUser(prev => prev ? ({...prev, level: profile.level, xp: profile.xp, dailyQuests: profile.dailyQuests}) : null);
       }
       
-      // Load Sessions
+      // Attempt migration just in case
+      await dbService.migrateLegacySessions(loggedInUser.uid);
+
       const sessions = await dbService.getUserSessions(loggedInUser.uid);
-      if (sessions.length > 0) setSessionHistory(sessions);
+      setSessionHistory(sessions);
       
       setIsLoadingData(false);
     }
   };
 
   const handleLogout = async () => {
+    // Note: logout() in authService clears localStorage keys. 
+    // If you want to PERSIST data even after "logout" (since it's a local app), 
+    // you might want to modify authService.logout to only clear the auth key, not the data keys.
+    // However, for privacy, usually logout implies clearing local access.
+    // Since this request is about preserving data across *updates*, explicit logout clearing is expected behavior.
+    
     await logout();
     setUser(null);
     window.location.reload(); 
@@ -170,7 +175,6 @@ const App: React.FC = () => {
        tricks = generateLocalTricks(settings);
     }
     
-    // Fallback if AI fails or returns empty
     if (tricks.length === 0) {
         tricks = generateLocalTricks(settings);
     }
@@ -181,34 +185,26 @@ const App: React.FC = () => {
   };
 
   const generateLocalTricks = (settings: SessionSettings): Trick[] => {
-      // 1. Filter by category
       let filtered = BASE_TRICKS.filter(t => settings.categories.includes(t.category));
-      
-      // 2. Filter by difficulty
       filtered = filtered.filter(t => t.difficulty === settings.difficulty);
       
       if (filtered.length === 0) {
-          // Fallback to all if too strict
           filtered = BASE_TRICKS;
       }
 
-      // 3. Shuffle and pick
       const shuffled = [...filtered].sort(() => 0.5 - Math.random());
       const selectedTricks = shuffled.slice(0, settings.trickCount);
 
-      // 4. If we need more tricks than available, cycle through
       while (selectedTricks.length < settings.trickCount) {
           const randomTrick = filtered[Math.floor(Math.random() * filtered.length)];
           selectedTricks.push(randomTrick);
       }
 
-      // 5. Apply Stances Mix
       return selectedTricks.map((trick, index) => {
-          // Randomly assign a stance from selectedStances
           const randomStance = settings.selectedStances[Math.floor(Math.random() * settings.selectedStances.length)];
           return {
               ...trick,
-              id: `${trick.id}-${index}-${Date.now()}`, // Unique ID for session
+              id: `${trick.id}-${index}-${Date.now()}`,
               stance: randomStance
           };
       });
@@ -218,11 +214,22 @@ const App: React.FC = () => {
     const newHistory = [result, ...sessionHistory];
     setSessionHistory(newHistory);
     setLastResult(result);
-    localStorage.setItem('skate_session_history', JSON.stringify(newHistory));
     
-    // Save to Cloud (now Local DB) if logged in
+    // Save to DB
     if (user) {
         await dbService.saveSession(user.uid, result);
+        
+        // Update Quest Progress (Complete 1 Session)
+        if (user.dailyQuests) {
+            const questIdx = user.dailyQuests.findIndex(q => q.type === 'session' && !q.isCompleted);
+            if (questIdx !== -1) {
+                // We don't auto-claim, but we could auto-update progress if needed.
+                // For now, the dashboard handles claiming.
+            }
+        }
+    } else {
+        // Fallback for purely local guest without UID (shouldn't happen with current flow, but safe to keep)
+        localStorage.setItem('skate_session_history', JSON.stringify(newHistory));
     }
 
     setView('SUMMARY');
@@ -232,17 +239,13 @@ const App: React.FC = () => {
     if (isAuthChecking || showSplash) {
         return (
             <div className="flex h-screen w-full flex-col items-center justify-center bg-[#E5E5E5] space-y-4 font-sans select-none overflow-hidden">
-                {/* 3D Keyboard Keys Aesthetic */}
                 <div className="grid grid-cols-2 gap-4">
-                    {/* Key: Do - Delays 0s */}
                     <div className="w-32 h-32 relative group animate-key-press" style={{ animationDelay: '0s' }}>
-                        <div className="absolute inset-x-0 bottom-0 h-full rounded-[2rem] bg-[#D1D5DB]"></div> {/* Shadow */}
+                        <div className="absolute inset-x-0 bottom-0 h-full rounded-[2rem] bg-[#D1D5DB]"></div>
                         <div className="absolute inset-x-0 top-0 h-[85%] rounded-[2rem] bg-[#F3F4F6] flex items-center justify-center shadow-sm">
                             <span className="text-4xl font-black text-[#1C1917] font-mono tracking-tighter">Do</span>
                         </div>
                     </div>
-
-                    {/* Key: A - Delays 0.2s */}
                     <div className="w-32 h-32 relative group animate-key-press" style={{ animationDelay: '0.2s' }}>
                         <div className="absolute inset-x-0 bottom-0 h-full rounded-[2rem] bg-[#D1D5DB]"></div>
                         <div className="absolute inset-x-0 top-0 h-[85%] rounded-[2rem] bg-[#F3F4F6] flex items-center justify-center shadow-sm">
@@ -250,10 +253,8 @@ const App: React.FC = () => {
                         </div>
                     </div>
                 </div>
-
-                {/* Key: Kickflip! - Delays 0.4s */}
                 <div className="w-[17rem] h-32 relative group animate-key-press" style={{ animationDelay: '0.4s' }}>
-                    <div className="absolute inset-x-0 bottom-0 h-full rounded-[2rem] bg-skate-deepOrange"></div> {/* Deep Orange Shadow */}
+                    <div className="absolute inset-x-0 bottom-0 h-full rounded-[2rem] bg-skate-deepOrange"></div>
                     <div className="absolute inset-x-0 top-0 h-[85%] rounded-[2rem] bg-skate-orange flex items-center justify-center shadow-sm flex-col gap-1">
                         <span className="text-4xl font-black text-white font-mono tracking-tight italic">Kickflip!</span>
                         <ArrowUpRight className="w-8 h-8 text-white/80" />
@@ -338,7 +339,6 @@ const App: React.FC = () => {
     <div className="h-screen w-full bg-skate-bg text-skate-black overflow-hidden font-sans relative">
       {renderView()}
 
-      {/* Floating Navigation - Black Pill Style */}
       {!isAuthChecking && !showSplash && (view === 'DASHBOARD' || view === 'ANALYTICS' || view === 'LEARNING' || view === 'SUMMARY' || view === 'AI_VISION') && (
          <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 w-auto z-50">
             <nav className="glass-nav rounded-full px-6 py-4 flex items-center gap-6 shadow-pop">

@@ -18,7 +18,8 @@ const STORAGE_KEYS = {
     USERS: "skate_db_users",
     SESSIONS: "skate_db_sessions",
     VISION: "skate_db_vision",
-    ANALYSIS: "skate_db_analysis"
+    ANALYSIS: "skate_db_analysis",
+    LEGACY_SESSIONS: "skate_session_history" // Old key for backward compatibility
 };
 
 // Helper to simulate DB delay
@@ -46,6 +47,7 @@ export const dbService = {
     // Check Date for Quests
     const today = new Date().toISOString().split('T')[0];
     if (updated.lastQuestDate !== today) {
+        // Keep existing quests if same day, otherwise reset
         updated.dailyQuests = generateDailyQuests();
         updated.lastQuestDate = today;
     }
@@ -66,15 +68,18 @@ export const dbService = {
     if (profile) {
         // Daily Quest Logic on Fetch
         const today = new Date().toISOString().split('T')[0];
-        if (profile.lastQuestDate !== today) {
+        
+        // Ensure quests exist and are up to date
+        if (profile.lastQuestDate !== today || !profile.dailyQuests) {
             profile.dailyQuests = generateDailyQuests();
             profile.lastQuestDate = today;
-            // Save back to DB immediately
+            
+            // Save back to DB immediately to persist the generated quests
             users[uid] = profile;
             localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
         }
         
-        // Init XP/Level if missing
+        // Init XP/Level if missing (Migration for existing users)
         if (profile.level === undefined) profile.level = 1;
         if (profile.xp === undefined) profile.xp = 0;
     }
@@ -89,9 +94,13 @@ export const dbService = {
     await delay(50);
     const allSessions = JSON.parse(localStorage.getItem(STORAGE_KEYS.SESSIONS) || "{}");
     const userSessions = allSessions[uid] || [];
-    userSessions.unshift(session); // Add to beginning
-    allSessions[uid] = userSessions;
-    localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(allSessions));
+    
+    // Prevent duplicates if ID exists
+    if (!userSessions.find((s: SessionResult) => s.id === session.id)) {
+        userSessions.unshift(session); // Add to beginning
+        allSessions[uid] = userSessions;
+        localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(allSessions));
+    }
   },
 
   /**
@@ -101,6 +110,41 @@ export const dbService = {
     await delay(50);
     const allSessions = JSON.parse(localStorage.getItem(STORAGE_KEYS.SESSIONS) || "{}");
     return allSessions[uid] || [];
+  },
+
+  /**
+   * MIGRATE LEGACY DATA
+   * Checks for old "skate_session_history" array in localStorage
+   * and moves it to the current user's DB entry if not already present.
+   */
+  async migrateLegacySessions(uid: string) {
+      try {
+          const legacyData = localStorage.getItem(STORAGE_KEYS.LEGACY_SESSIONS);
+          if (!legacyData) return; // No legacy data
+
+          const legacySessions: SessionResult[] = JSON.parse(legacyData);
+          if (!Array.isArray(legacySessions) || legacySessions.length === 0) return;
+
+          const allSessions = JSON.parse(localStorage.getItem(STORAGE_KEYS.SESSIONS) || "{}");
+          const currentSessions = allSessions[uid] || [];
+
+          // Filter out sessions that are already in the DB (avoid duplicates)
+          const newToImport = legacySessions.filter(ls => 
+              !currentSessions.some((cs: SessionResult) => cs.id === ls.id)
+          );
+
+          if (newToImport.length > 0) {
+              console.log(`[Migration] Importing ${newToImport.length} legacy sessions to user ${uid}`);
+              const merged = [...newToImport, ...currentSessions];
+              // Sort by date desc
+              merged.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+              
+              allSessions[uid] = merged;
+              localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(allSessions));
+          }
+      } catch (e) {
+          console.error("Migration failed", e);
+      }
   },
 
   async requestProVerification(uid: string) {
