@@ -122,6 +122,17 @@ export interface VisionAnalysis {
   landingAnalysis?: string; 
 }
 
+// Data structure for frame-by-frame tracking
+export interface TrackingDataPoint {
+  frame: number;
+  relX: number; // Relative center X (-0.5 to 0.5)
+  relY: number; // Relative center Y (-0.5 to 0.5)
+  width: number; // Relative width
+  height: number; // Relative height
+  aspectRatio: number; // w / h
+  confidence: number;
+}
+
 export type ViewState = 'DASHBOARD' | 'ANALYTICS' | 'SETUP' | 'ACTIVE_SESSION' | 'SUMMARY' | 'LEARNING' | 'AI_VISION';
 
 export type Language = 'EN' | 'KR';

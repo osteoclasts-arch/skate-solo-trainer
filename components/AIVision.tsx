@@ -1,333 +1,13 @@
-
-import React, { useState, useRef, useEffect } from 'react';
-import { Language, User, VisionAnalysis } from '../types';
+import React, { useState, useRef } from 'react';
+import { Language, User, VisionAnalysis, TrackingDataPoint } from '../types';
 import { TRANSLATIONS } from '../constants';
-import { Upload, Zap, Play, Pause, X, Eye, Video, FileVideo, Activity, Info, Camera, Box, AlertTriangle, Clock, FastForward, Rewind, Scissors, RotateCcw, Target } from 'lucide-react';
+import { Upload, Zap, X, Eye, Info, BrainCircuit, Activity } from 'lucide-react';
 import { analyzeMedia } from '../services/geminiService';
 import { dbService } from '../services/dbService';
-// @ts-ignore
-import mpPose from '@mediapipe/pose';
-
-const POSE_CONNECTIONS = [
-  [11, 12], [11, 13], [13, 15], [12, 14], [14, 16], [11, 23], [12, 24], 
-  [23, 24], [23, 25], [24, 26], [25, 27], [26, 28], [27, 29], [28, 30], 
-  [29, 31], [30, 32], [27, 31], [28, 32]
-];
 
 interface Props {
   language: Language;
   user: User | null;
-}
-
-// --- OBSTACLE TRACKER (Cones/Ledges) ---
-class ObstacleTracker {
-    detectedObstacles: { type: string, x: number, y: number, w: number, h: number }[] = [];
-    frameCount = 0;
-
-    scan(ctx: CanvasRenderingContext2D, width: number, height: number) {
-        if (this.frameCount % 15 !== 0) {
-            this.frameCount++;
-            return this.detectedObstacles;
-        }
-
-        const roiH = height * 0.4;
-        if (roiH <= 0 || width <= 0 || height <= 0) return this.detectedObstacles;
-
-        const startY = height - roiH;
-        
-        try {
-            const frame = ctx.getImageData(0, startY, width, roiH);
-            const data = frame.data;
-            const obstacles = [];
-
-            let orangeCount = 0;
-            let minX = width, maxX = 0, minY = height, maxY = 0;
-
-            for (let i = 0; i < data.length; i += 16) {
-                const r = data[i];
-                const g = data[i + 1];
-                const b = data[i + 2];
-
-                if (r > 150 && g > 50 && g < 180 && b < 100 && r > g + 40) {
-                    const idx = i / 4;
-                    const x = idx % width;
-                    const y = startY + Math.floor(idx / width);
-
-                    orangeCount++;
-                    if (x < minX) minX = x;
-                    if (x > maxX) maxX = x;
-                    if (y < minY) minY = y;
-                    if (y > maxY) maxY = y;
-                }
-            }
-
-            if (orangeCount > 100) {
-                obstacles.push({
-                    type: 'Cone',
-                    x: minX,
-                    y: minY,
-                    w: maxX - minX,
-                    h: maxY - minY
-                });
-            }
-            
-            this.detectedObstacles = obstacles;
-
-        } catch (e) {
-            console.error("Obstacle scan failed", e);
-        }
-        
-        this.frameCount++;
-        return this.detectedObstacles;
-    }
-}
-
-// --- ADVANCED BOARD TRACKER (OBB + PHYSICS + ANCHORING) ---
-class BoardTracker {
-    colorMean: [number, number, number] = [0, 0, 0];
-    isCalibrated = false;
-    
-    pos: { x: number, y: number } = { x: 0, y: 0 };
-    velocity: { x: number, y: number } = { x: 0, y: 0 };
-    angle: number = 0;
-    
-    dimensions = { length: 120, width: 35 }; // Standard skate pixels
-    history: { x: number, y: number }[] = [];
-
-    metrics = {
-        minWidth: Infinity, maxWidth: 0,
-        minLength: Infinity, maxLength: 0,
-        maxAngleChange: 0, airTimeFrames: 0
-    };
-
-    constructor() {
-        this.reset();
-    }
-
-    reset() {
-        this.colorMean = [0, 0, 0];
-        this.isCalibrated = false;
-        this.pos = { x: 0, y: 0 };
-        this.velocity = { x: 0, y: 0 };
-        this.angle = 0;
-        this.dimensions = { length: 120, width: 35 };
-        this.history = [];
-        this.metrics = {
-            minWidth: Infinity, maxWidth: 0,
-            minLength: Infinity, maxLength: 0,
-            maxAngleChange: 0, airTimeFrames: 0
-        };
-    }
-
-    calibrate(ctx: CanvasRenderingContext2D, width: number, height: number, leftFoot: any, rightFoot: any) {
-        if (!leftFoot || !rightFoot) return;
-        
-        const lx = leftFoot.x * width;
-        const ly = leftFoot.y * height;
-        const rx = rightFoot.x * width;
-        const ry = rightFoot.y * height;
-        
-        // Target: Center of feet, slightly down (Ground level)
-        const centerX = (lx + rx) / 2;
-        const centerY = Math.max(ly, ry) + (height * 0.05); 
-        
-        const sampleW = Math.abs(rx - lx) * 0.8; 
-        const sampleH = 40; 
-
-        try {
-            if (centerX < 0 || centerX > width || centerY < 0 || centerY > height) return;
-
-            const sx = Math.max(0, centerX - sampleW/2);
-            const sy = Math.max(0, centerY - sampleH/2);
-            const sw = Math.min(sampleW, width - sx);
-            const sh = Math.min(sampleH, height - sy);
-
-            if (sw <= 0 || sh <= 0) return;
-
-            const frame = ctx.getImageData(sx, sy, sw, sh);
-            const data = frame.data;
-            let r = 0, g = 0, b = 0, count = 0;
-
-            for (let i = 0; i < data.length; i += 4) {
-                // Ignore very bright pixels (concrete highlights)
-                if (data[i] < 200 && data[i+1] < 200 && data[i+2] < 200) {
-                    r += data[i];
-                    g += data[i + 1];
-                    b += data[i + 2];
-                    count++;
-                }
-            }
-            
-            if (count > 0) {
-                this.colorMean = [r / count, g / count, b / count];
-                this.isCalibrated = true;
-                this.pos = { x: centerX, y: centerY };
-                this.resetMetrics();
-            }
-        } catch (e) {
-            console.error("Calibration failed", e);
-        }
-    }
-    
-    resetMetrics() {
-        this.metrics = {
-            minWidth: Infinity, maxWidth: 0,
-            minLength: Infinity, maxLength: 0,
-            maxAngleChange: 0, airTimeFrames: 0
-        };
-    }
-
-    track(ctx: CanvasRenderingContext2D, width: number, height: number, leftAnkle: any, rightAnkle: any) {
-        if (!this.isCalibrated) return null;
-
-        // 1. ANCHOR POINT: Gravity Center between feet
-        let anchor = null;
-        if (leftAnkle && rightAnkle && leftAnkle.visibility > 0.5 && rightAnkle.visibility > 0.5) {
-             const fx = ((leftAnkle.x + rightAnkle.x) / 2) * width;
-             const fy = ((leftAnkle.y + rightAnkle.y) / 2) * height;
-             // Board is usually 5-10% screen height below ankles
-             anchor = { x: fx, y: fy + (height * 0.05) };
-        }
-
-        // 2. DEFINE SEARCH REGION (ROI)
-        // Look around current pos, but strongly biased towards Anchor
-        let roiX = this.pos.x + this.velocity.x;
-        let roiY = this.pos.y + this.velocity.y;
-        
-        if (anchor) {
-             // Pull ROI towards feet anchor to prevent drift
-             roiX = (roiX * 0.4) + (anchor.x * 0.6);
-             roiY = (roiY * 0.4) + (anchor.y * 0.6);
-        }
-
-        const roiSize = 250; 
-        const startX = Math.max(0, Math.min(width - roiSize, roiX - roiSize / 2));
-        const startY = Math.max(0, Math.min(height - roiSize, roiY - roiSize / 2));
-        
-        if (roiSize <= 0 || startX < 0 || startY < 0) return null;
-
-        // 3. PIXEL SCANNING (Color Matching)
-        let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0, sumY2 = 0;
-        let pixelCount = 0;
-        const [Tr, Tg, Tb] = this.colorMean;
-        const threshold = 60; // Slightly looser threshold for shadows
-
-        try {
-            const frame = ctx.getImageData(startX, startY, roiSize, roiSize);
-            const data = frame.data;
-            
-            for (let y = 0; y < roiSize; y += 4) { 
-                for (let x = 0; x < roiSize; x += 4) {
-                    const idx = (y * roiSize + x) * 4;
-                    const r = data[idx];
-                    const g = data[idx + 1];
-                    const b = data[idx + 2];
-                    
-                    // Color distance
-                    const dist = Math.abs(r - Tr) + Math.abs(g - Tg) + Math.abs(b - Tb);
-
-                    if (dist < threshold * 3) {
-                        const absX = startX + x;
-                        const absY = startY + y;
-                        
-                        // Distance weighting: Pixels closer to Anchor are more likely to be the board
-                        let weight = 1;
-                        if (anchor) {
-                            const dAnchor = Math.hypot(absX - anchor.x, absY - anchor.y);
-                            if (dAnchor > 150) weight = 0.1; // Ignore background noise
-                        }
-
-                        if (weight > 0.5) {
-                            sumX += absX; sumY += absY;
-                            sumX2 += absX * absX; sumY2 += absY * absY;
-                            sumXY += absX * absY;
-                            pixelCount++;
-                        }
-                    }
-                }
-            }
-        } catch (e) {
-            return null;
-        }
-
-        if (pixelCount > 30) {
-            const meanX = sumX / pixelCount;
-            const meanY = sumY / pixelCount;
-
-            // Apply Velocity
-            this.velocity = {
-                x: (meanX - this.pos.x) * 0.6 + this.velocity.x * 0.4,
-                y: (meanY - this.pos.y) * 0.6 + this.velocity.y * 0.4
-            };
-            this.pos = { x: meanX, y: meanY };
-
-            // PCA for Rotation
-            const varX = (sumX2 / pixelCount) - (meanX * meanX);
-            const varY = (sumY2 / pixelCount) - (meanY * meanY);
-            const covXY = (sumXY / pixelCount) - (meanX * meanY);
-            const rawAngle = 0.5 * Math.atan2(2 * covXY, varX - varY);
-            
-            // Smooth Angle
-            let deltaAngle = rawAngle - this.angle;
-            // Handle angle wrap-around
-            while (deltaAngle <= -Math.PI/2) deltaAngle += Math.PI;
-            while (deltaAngle > Math.PI/2) deltaAngle -= Math.PI;
-            
-            // Only update angle if sufficient pixels (structure exists)
-            if (pixelCount > 50) {
-                this.angle += deltaAngle * 0.6;
-            }
-
-            // OBB Dimensions
-            const cos = Math.cos(-this.angle);
-            const sin = Math.sin(-this.angle);
-            
-            // Heuristic dimensions based on pixel spread (Standard deviation)
-            const spreadLen = Math.sqrt(Math.abs(varX * cos*cos + varY * sin*sin));
-            const spreadWid = Math.sqrt(Math.abs(varX * sin*sin + varY * cos*cos));
-            
-            // Map spread to realistic pixels (approx 4 sigma)
-            const measuredLength = Math.max(80, spreadLen * 4);
-            const measuredWidth = Math.max(20, spreadWid * 4);
-            
-            this.dimensions.length = this.dimensions.length * 0.8 + measuredLength * 0.2;
-            this.dimensions.width = this.dimensions.width * 0.8 + measuredWidth * 0.2;
-
-            // Update Metrics for AI
-            if (anchor && this.pos.y < (height * 0.85)) { 
-                this.metrics.airTimeFrames++;
-                if (this.dimensions.width > this.metrics.maxWidth) this.metrics.maxWidth = this.dimensions.width;
-                if (this.dimensions.width < this.metrics.minWidth) this.metrics.minWidth = this.dimensions.width;
-                if (this.dimensions.length > this.metrics.maxLength) this.metrics.maxLength = this.dimensions.length;
-                if (this.dimensions.length < this.metrics.minLength) this.metrics.minLength = this.dimensions.length;
-            }
-
-        } else {
-            // LOST TRACKING FALLBACK
-            if (anchor) {
-                // Snap to feet if lost
-                this.pos.x = this.pos.x * 0.8 + anchor.x * 0.2;
-                this.pos.y = this.pos.y * 0.8 + anchor.y * 0.2;
-            }
-            this.velocity.x *= 0.9; 
-            this.velocity.y *= 0.9;
-        }
-
-        // Keep within screen
-        this.pos.x = Math.max(0, Math.min(width, this.pos.x));
-        this.pos.y = Math.max(0, Math.min(height, this.pos.y));
-
-        this.history.push({ ...this.pos });
-        if (this.history.length > 20) this.history.shift();
-
-        return { 
-            x: this.pos.x, 
-            y: this.pos.y, 
-            angle: this.angle,
-            length: this.dimensions.length,
-            width: this.dimensions.width
-        };
-    }
 }
 
 const AIVision: React.FC<Props> = ({ language, user }) => {
@@ -335,734 +15,307 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [result, setResult] = useState<VisionAnalysis | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [videoReady, setVideoReady] = useState(false);
-  
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [playbackSpeed, setPlaybackSpeed] = useState(0.5); 
-  
-  // Trimming State
-  const [trimStart, setTrimStart] = useState(0);
-  const [trimEnd, setTrimEnd] = useState(0);
-
-  const [userStance, setUserStance] = useState<'Regular' | 'Goofy'>('Regular');
-  const [userContext, setUserContext] = useState<string[]>([]);
-  const [trickNameInput, setTrickNameInput] = useState("");
-  const [manualCorrection, setManualCorrection] = useState("");
-  const [detectedObstacleName, setDetectedObstacleName] = useState<string | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<VisionAnalysis | null>(null);
+  const [status, setStatus] = useState<string>("");
+  const [trickNameHint, setTrickNameHint] = useState("");
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const poseRef = useRef<any>(null);
-  const boardTrackerRef = useRef<BoardTracker>(new BoardTracker());
-  const obstacleTrackerRef = useRef<ObstacleTracker>(new ObstacleTracker());
-  const requestRef = useRef<number | null>(null);
-  const statsRef = useRef({ maxHeight: 0, frameCount: 0 });
+  
+  // Placeholder for future tracking data from your LSTM model
+  const trackingHistory = useRef<TrackingDataPoint[]>([]);
 
-  useEffect(() => {
-      if (user) {
-          dbService.getUserFeedbacks(user.uid).then(ctx => {
-              setUserContext(ctx);
-          });
-      }
-  }, [user]);
-
-  useEffect(() => {
-    const initPose = async () => {
-        try {
-            const pose = new mpPose.Pose({
-                locateFile: (file: string) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`,
-            });
-            pose.setOptions({
-                modelComplexity: 1,
-                smoothLandmarks: true,
-                minDetectionConfidence: 0.5,
-                minTrackingConfidence: 0.5,
-            });
-            pose.onResults(onPoseResults);
-            poseRef.current = pose;
-        } catch (e) {
-            console.error("Failed to load Pose", e);
-            setError("AI 모델 로딩 실패. 새로고침 해주세요.");
-        }
-    };
-    initPose();
-    return () => {
-        if (poseRef.current) poseRef.current.close();
-        if (requestRef.current !== null) {
-            cancelAnimationFrame(requestRef.current);
-        }
-    };
-  }, []);
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (selectedFile) {
-        if (selectedFile.size > 50 * 1024 * 1024) {
-            setError(t.FILE_TOO_LARGE);
-            return;
-        }
-        setFile(selectedFile);
-        const url = URL.createObjectURL(selectedFile);
-        setPreviewUrl(url);
-        setResult(null);
-        setError(null);
-        setVideoReady(false); // Reset ready state
-        setDetectedObstacleName(null);
-        setTrickNameInput("");
-        setIsPlaying(false);
-        setProgress(0);
-        setTrimStart(0);
-        setTrimEnd(0);
-        
-        // Reset Logic
-        boardTrackerRef.current.reset();
-        statsRef.current = { maxHeight: 0, frameCount: 0 };
-        
-        // Don't auto play. Just load.
-        if (videoRef.current) {
-            videoRef.current.load();
-            videoRef.current.currentTime = 0;
-            videoRef.current.pause();
-        }
-    }
-  };
-
-  const startAnalysis = async () => {
-      if (!videoRef.current || !poseRef.current || !file) return;
-      setIsAnalyzing(true);
-      setError(null);
-      setResult(null);
-      boardTrackerRef.current.reset(); 
-      statsRef.current = { maxHeight: 0, frameCount: 0 };
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files[0]) {
+      const selectedFile = event.target.files[0];
       
-      const video = videoRef.current;
-      video.currentTime = trimStart > 0 ? trimStart : 0;
-      video.playbackRate = 1.5; // Fast forward for UX
-      
-      try {
-          // 1. Start Video Playback + CV Visualization
-          await video.play();
-          setIsPlaying(true);
-          processFrame(); 
-
-          // 2. Start Gemini API Call in PARALLEL (Do not wait for video end)
-          performGeminiAnalysis();
-
-      } catch (err) {
-          console.error("Play failed", err);
-          setError("동영상 재생 실패. 다시 시도해주세요.");
-          setIsAnalyzing(false);
-      }
-  };
-
-  const performGeminiAnalysis = async () => {
-      if (!file) return;
-      
-      // Since we call this immediately, we won't have full CV physics data yet.
-      // We rely on Gemini 3 Pro's vision capabilities.
-      // We pass userContext (history) but physicsContext will be empty/initial.
-      const initialContext = [`User Stance: ${userStance}`, ...userContext];
-      
-      // If trimEnd is 0, we consider it not trimmed or full duration
-      const effectiveEnd = trimEnd > 0 ? trimEnd : duration;
-      const effectiveStart = trimStart;
-
-      try {
-          const aiResult = await analyzeMedia(
-              file, 
-              language, 
-              initialContext, 
-              trickNameInput,
-              effectiveStart,
-              effectiveEnd
-            );
-          
-          let finalResult: VisionAnalysis;
-          
-          if (aiResult) {
-              finalResult = {
-                  ...aiResult,
-                  // If AI returned 0 height, use a default fallback, otherwise trust AI
-                  heightMeters: aiResult.heightMeters || 0.2, 
-                  score: aiResult.score || 50
-              };
-          } else {
-               finalResult = {
-                  id: Date.now().toString(),
-                  timestamp: new Date().toISOString(),
-                  trickName: "분석 실패 (UNKNOWN)",
-                  isLanded: false,
-                  confidence: 0,
-                  score: 50,
-                  heightMeters: 0,
-                  rotationDegrees: 0,
-                  feedbackText: "AI가 영상을 분석하지 못했습니다.",
-                  improvementTip: "다시 시도해주세요."
-              };
-          }
-          
-          setResult(finalResult);
-          setIsAnalyzing(false); // Stop loading spinner
-
-          // Reset playback speed to normal for viewing
-          if (videoRef.current) videoRef.current.playbackRate = 1.0; 
-
-          if (user) {
-              await dbService.saveAnalysisResult(user.uid, finalResult);
-          }
-      } catch (e) {
-          console.error("Analysis Error", e);
-          setIsAnalyzing(false);
-      }
-  };
-
-  const processFrame = async () => {
-      if (!videoRef.current || !canvasRef.current || !poseRef.current) return;
-      const video = videoRef.current;
-      
-      if (video.paused || video.ended) {
-          setIsPlaying(false);
-          // Note: We no longer trigger analysis on ended. It runs in parallel.
+      if (selectedFile.size > 50 * 1024 * 1024) {
+          alert(t.FILE_TOO_LARGE);
           return;
       }
 
-      await poseRef.current.send({ image: video });
-      requestRef.current = requestAnimationFrame(processFrame);
-  };
-
-  const processSingleFrame = async () => {
-    if (!videoRef.current || !poseRef.current) return;
-    try {
-        await poseRef.current.send({ image: videoRef.current });
-    } catch(e) {
-        console.log("Not ready to process frame");
+      setFile(selectedFile);
+      setPreviewUrl(URL.createObjectURL(selectedFile));
+      setAnalysisResult(null);
+      trackingHistory.current = [];
     }
-  }
-
-  const togglePlay = () => {
-      if (!videoRef.current) return;
-      if (isPlaying) {
-          videoRef.current.pause();
-          setIsPlaying(false);
-      } else {
-          videoRef.current.play().then(() => {
-              setIsPlaying(true);
-              processFrame();
-          }).catch(e => console.error(e));
-      }
   };
 
-  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
-      if (!videoRef.current) return;
-      const time = parseFloat(e.target.value);
-      videoRef.current.currentTime = time;
-      setProgress(time);
-      processSingleFrame(); 
-  };
-  
-  // Trimming Handlers
-  const handleSetStart = () => {
-      if(videoRef.current) {
-          const t = videoRef.current.currentTime;
-          setTrimStart(t);
-          if (trimEnd > 0 && t >= trimEnd) setTrimEnd(0); // Reset end if start passes it
-      }
-  };
-  
-  const handleSetEnd = () => {
-      if(videoRef.current) {
-          setTrimEnd(videoRef.current.currentTime);
-      }
-  };
+  const processVideo = async () => {
+    if (!file) return;
+    setIsAnalyzing(true);
+    setStatus(t.ANALYZING_WITH_GEMINI);
+            
+    try {
+        const userContext = user ? await dbService.getUserFeedbacks(user.uid) : [];
+        
+        // Passing empty tracking data since YOLO is removed. 
+        // Gemini will rely purely on visual analysis of the video frames.
+        const result = await analyzeMedia(
+            file, 
+            language, 
+            userContext,
+            trickNameHint || undefined,
+            undefined,
+            undefined,
+            [] 
+        );
 
-  const handleResetTrim = () => {
-      setTrimStart(0);
-      setTrimEnd(0);
-      if(videoRef.current) videoRef.current.currentTime = 0;
-  };
-
-  const handleSpeedChange = (speed: number) => {
-      setPlaybackSpeed(speed);
-      if (videoRef.current) {
-          videoRef.current.playbackRate = speed;
-      }
-  };
-
-  const onTimeUpdate = () => {
-      if (videoRef.current) {
-          const curr = videoRef.current.currentTime;
-          setProgress(curr);
-
-          // Trimming Loop Logic
-          if (trimEnd > 0 && curr >= trimEnd) {
-              videoRef.current.currentTime = trimStart;
-              if (!isPlaying) videoRef.current.pause();
-          }
-      }
+        if (result) {
+            setAnalysisResult(result);
+            if (user) {
+                await dbService.saveAnalysisResult(user.uid, result);
+            }
+        } else {
+            alert("Analysis failed. Please try a different video.");
+        }
+    } catch (error) {
+        console.error("Analysis Error:", error);
+        alert("An error occurred during analysis.");
+    } finally {
+        setIsAnalyzing(false);
+        setStatus("");
+    }
   };
 
-  const onLoadedMetadata = () => {
-      if (videoRef.current) {
-          setDuration(videoRef.current.duration);
-          if (canvasRef.current) {
-              canvasRef.current.width = videoRef.current.videoWidth;
-              canvasRef.current.height = videoRef.current.videoHeight;
-          }
-          setVideoReady(true);
-          // Process one frame to show preview
-          processSingleFrame();
-      }
-  };
-
-  const onPoseResults = (results: any) => {
-      if (!canvasRef.current || !videoRef.current) return;
-      const ctx = canvasRef.current.getContext('2d');
-      if (!ctx) return;
-      
-      const width = canvasRef.current.width;
-      const height = canvasRef.current.height;
-      if (width <= 0 || height <= 0) return;
-
-      ctx.save();
-      ctx.clearRect(0, 0, width, height);
-      ctx.drawImage(results.image, 0, 0, width, height);
-
-      let leftAnkle = null;
-      let rightAnkle = null;
-
-      if (results.poseLandmarks) {
-          drawSkeleton(ctx, results.poseLandmarks, width, height);
-          
-          leftAnkle = results.poseLandmarks[27];
-          rightAnkle = results.poseLandmarks[28];
-
-          // Calibrate on first few frames if feet detected
-          if (!boardTrackerRef.current.isCalibrated && statsRef.current.frameCount < 30) {
-             boardTrackerRef.current.calibrate(ctx, width, height, leftAnkle, rightAnkle);
-          }
-
-          const hipY = (results.poseLandmarks[23].y + results.poseLandmarks[24].y) / 2;
-          const currentHeight = (1 - hipY); 
-          if (currentHeight > statsRef.current.maxHeight) {
-              statsRef.current.maxHeight = currentHeight;
-          }
-      }
-
-      const obstacles = obstacleTrackerRef.current.scan(ctx, width, height);
-      if (obstacles.length > 0) {
-          drawObstacles(ctx, obstacles);
-          if (!detectedObstacleName) {
-              setDetectedObstacleName(obstacles[0].type);
-          }
-      }
-
-      const board = boardTrackerRef.current.track(ctx, width, height, leftAnkle, rightAnkle);
-      if (board) {
-          drawBoardVisuals(ctx, board);
-      }
-
-      ctx.restore();
-      if(isAnalyzing) statsRef.current.frameCount++;
-  };
-
-  const drawSkeleton = (ctx: CanvasRenderingContext2D, landmarks: any[], w: number, h: number) => {
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)'; 
-      ctx.fillStyle = '#E3FF37';
-
-      POSE_CONNECTIONS.forEach(([i, j]) => {
-          const p1 = landmarks[i];
-          const p2 = landmarks[j];
-          if (p1 && p2 && p1.visibility > 0.5 && p2.visibility > 0.5) {
-              ctx.beginPath();
-              ctx.moveTo(p1.x * w, p1.y * h);
-              ctx.lineTo(p2.x * w, p2.y * h);
-              ctx.stroke();
-          }
+  const handleFeedbackSubmit = async (feedbackData: any) => {
+      await dbService.saveVisionFeedback(user?.uid || null, {
+          ...feedbackData,
+          originalTrickName: analysisResult?.trickName
       });
-  };
-
-  const drawObstacles = (ctx: CanvasRenderingContext2D, obstacles: any[]) => {
-      obstacles.forEach(obs => {
-          ctx.strokeStyle = '#FF6B00';
-          ctx.lineWidth = 2;
-          ctx.setLineDash([5, 5]);
-          ctx.strokeRect(obs.x, obs.y, obs.w, obs.h);
-          ctx.setLineDash([]);
-          ctx.fillStyle = '#FF6B00';
-          ctx.font = 'bold 12px sans-serif';
-          ctx.fillText("OBSTACLE", obs.x, obs.y - 5);
-      });
-  };
-
-  const drawMarker = (ctx: CanvasRenderingContext2D, x: number, y: number, color: string) => {
-      ctx.beginPath();
-      ctx.arc(x, y, 4, 0, Math.PI * 2);
-      ctx.fillStyle = color;
-      ctx.fill();
-      
-      ctx.beginPath();
-      ctx.moveTo(x - 8, y);
-      ctx.lineTo(x + 8, y);
-      ctx.moveTo(x, y - 8);
-      ctx.lineTo(x, y + 8);
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 2;
-      ctx.stroke();
-  };
-
-  const drawBoardVisuals = (ctx: CanvasRenderingContext2D, board: {x: number, y: number, angle: number, length: number, width: number}) => {
-      ctx.save();
-      ctx.translate(board.x, board.y);
-      ctx.rotate(board.angle);
-
-      const deckLen = Math.max(80, board.length);
-      const truckOffset = deckLen * 0.35;
-
-      // Draw Center Marker
-      drawMarker(ctx, 0, 0, '#FF00FF'); // Magenta Center
-
-      // Draw Estimated Trucks (Axles) Markers
-      // We don't draw the board shape anymore, just the technical markers
-      ctx.translate(truckOffset, 0);
-      drawMarker(ctx, 0, 0, '#E3FF37'); // Front Truck (Neon)
-      ctx.translate(-2 * truckOffset, 0);
-      drawMarker(ctx, 0, 0, '#E3FF37'); // Back Truck (Neon)
-
-      ctx.restore();
-
-      // Trail
-      ctx.strokeStyle = 'rgba(227, 255, 55, 0.4)';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      boardTrackerRef.current.history.forEach((pt, i) => {
-          if (i === 0) ctx.moveTo(pt.x, pt.y);
-          else ctx.lineTo(pt.x, pt.y);
-      });
-      ctx.stroke();
-  };
-
-  const handleFeedbackSubmit = async (e: React.FormEvent) => {
-      e.preventDefault();
-      if (user && manualCorrection) {
-         await dbService.saveVisionFeedback(user.uid, {
-             analysisId: result?.id,
-             correction: "User reported inaccuracy",
-             actualTrickName: manualCorrection
-         });
-         setUserContext(prev => [...prev, manualCorrection]);
-      }
-      alert("피드백 감사합니다! 학습에 반영하겠습니다.");
-      setManualCorrection("");
+      setShowFeedbackModal(false);
+      alert(t.FEEDBACK_THANKS);
   };
 
   return (
-    <div className="flex flex-col h-full p-6 pb-32 overflow-y-auto animate-fade-in relative bg-black">
-        <div className="flex items-center space-x-3 mb-6">
-            <Eye className="text-skate-neon w-6 h-6" />
-            <div>
-                <h2 className="text-3xl font-display font-bold uppercase tracking-wide text-white leading-none">
-                    AI <span className="text-skate-neon text-glow">VISION</span>
-                </h2>
-                <p className="text-xs text-gray-500 font-bold uppercase tracking-widest mt-1">
-                    {t.AI_VISION_DESC}
-                </p>
-            </div>
+    <div className="flex flex-col h-full p-6 pb-32 overflow-y-auto animate-fade-in relative">
+      
+      {/* HEADER */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center space-x-3">
+            <Eye className="text-skate-neon w-8 h-8" />
+            <h2 className="text-4xl font-display font-bold uppercase tracking-wide text-white">{t.AI_VISION_TITLE}</h2>
         </div>
+        <div className="flex items-center space-x-2 bg-blue-500/10 px-3 py-1 rounded-full border border-blue-500/20">
+            <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+            <span className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">Gemini Vision Active</span>
+        </div>
+      </div>
 
-        {!previewUrl ? (
-            <div className="space-y-4">
-                <div className="glass-card p-5 rounded-2xl border border-white/5 bg-gradient-to-br from-white/5 to-transparent">
-                     <div className="flex items-center space-x-2 mb-3">
-                         <Info className="w-4 h-4 text-skate-neon" />
-                         <span className="text-[10px] font-bold uppercase tracking-widest text-gray-300">{t.UPLOAD_GUIDE}</span>
-                     </div>
-                     <div className="grid grid-cols-3 gap-2">
-                         <div className="bg-black/40 p-3 rounded-xl flex flex-col items-center text-center">
-                             <Camera className="w-5 h-5 text-gray-400 mb-2" />
-                             <span className="text-[10px] font-bold text-gray-300 leading-tight">{t.GUIDE_1}</span>
-                         </div>
-                         <div className="bg-black/40 p-3 rounded-xl flex flex-col items-center text-center">
-                             <Video className="w-5 h-5 text-gray-400 mb-2" />
-                             <span className="text-[10px] font-bold text-gray-300 leading-tight">{t.GUIDE_2}</span>
-                         </div>
-                         <div className="bg-black/40 p-3 rounded-xl flex flex-col items-center text-center">
-                             <Box className="w-5 h-5 text-gray-400 mb-2" />
-                             <span className="text-[10px] font-bold text-gray-300 leading-tight">{t.GUIDE_3}</span>
-                         </div>
-                     </div>
+      {/* MAIN CONTENT */}
+      <div className="space-y-6">
+        
+        {/* Upload Card */}
+        {!previewUrl && (
+            <div 
+                onClick={() => fileInputRef.current?.click()}
+                className="border-2 border-dashed border-white/20 rounded-3xl p-10 flex flex-col items-center justify-center text-center space-y-4 hover:bg-white/5 transition-colors cursor-pointer min-h-[300px] group"
+            >
+                <div className="w-20 h-20 bg-skate-neon/10 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Upload className="w-10 h-10 text-skate-neon" />
                 </div>
-
-                <div 
-                    onClick={() => fileInputRef.current?.click()}
-                    className="flex-1 min-h-[250px] border-2 border-dashed border-white/20 rounded-3xl flex flex-col items-center justify-center p-6 bg-white/5 hover:bg-white/10 transition-colors cursor-pointer group"
-                >
-                    <input 
-                        type="file" 
-                        ref={fileInputRef} 
-                        onChange={handleFileChange} 
-                        accept="video/*" 
-                        className="hidden" 
-                    />
-                    <div className="w-20 h-20 rounded-full bg-skate-neon/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                        <FileVideo className="w-8 h-8 text-skate-neon" />
-                    </div>
-                    <p className="text-white font-bold uppercase tracking-wider mb-2">{t.UPLOAD_MEDIA}</p>
-                    <p className="text-gray-500 text-xs text-center max-w-[200px]">
-                        Select a video clip (Max 50MB).
-                    </p>
+                <div>
+                    <h3 className="text-2xl font-display font-bold text-white mb-2">{t.UPLOAD_MEDIA}</h3>
+                    <p className="text-gray-400 text-sm max-w-xs mx-auto">{t.AI_VISION_DESC}</p>
                 </div>
+                <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    onChange={handleFileChange} 
+                    accept="video/*" 
+                    className="hidden" 
+                />
             </div>
-        ) : (
-            <div className="flex flex-col space-y-6">
-                <div className="relative rounded-3xl overflow-hidden border border-white/10 shadow-2xl bg-black aspect-video group">
-                    <button 
-                        onClick={() => { setPreviewUrl(null); setResult(null); }}
-                        className="absolute top-4 right-4 z-30 bg-black/50 p-2 rounded-full hover:bg-black/80 text-white"
-                    >
-                        <X className="w-5 h-5" />
-                    </button>
-                    
-                    <video 
-                        ref={videoRef}
-                        src={previewUrl} 
-                        className="absolute inset-0 w-full h-full object-contain opacity-0" 
-                        muted
-                        playsInline
-                        preload="metadata"
-                        onTimeUpdate={onTimeUpdate}
-                        onLoadedMetadata={onLoadedMetadata}
-                    />
-                    <canvas 
-                        ref={canvasRef}
-                        className="absolute inset-0 w-full h-full object-contain bg-black"
-                    />
-                    
-                    {detectedObstacleName && isAnalyzing && (
-                        <div className="absolute top-4 left-4 z-20 bg-skate-neon/90 text-black px-3 py-1 rounded-full flex items-center space-x-2 shadow-lg animate-pulse">
-                            <AlertTriangle className="w-3 h-3" />
-                            <span className="text-[10px] font-bold uppercase tracking-wide">{t.TRACKING_OBSTACLE} {detectedObstacleName}</span>
-                        </div>
-                    )}
-                    
-                    {!isAnalyzing && !result && !isPlaying && (
-                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-                            <Play className="w-16 h-16 text-white/80 fill-white/20" />
-                         </div>
-                    )}
+        )}
 
-                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-4 transition-opacity opacity-100 flex flex-col space-y-3 z-30">
-                        {/* Trim Controls Overlay */}
-                        {!isAnalyzing && !result && (
-                            <div className="flex items-center justify-between mb-1 px-1">
-                                <span className="text-[10px] font-bold text-skate-neon uppercase tracking-wide flex items-center">
-                                    <Scissors className="w-3 h-3 mr-1" />
-                                    {t.TRIM_RANGE}: 
-                                    <span className="text-white ml-1">
-                                        {trimStart.toFixed(1)}s - {trimEnd > 0 ? trimEnd.toFixed(1) : duration.toFixed(1)}s
-                                    </span>
-                                </span>
-                                <div className="flex gap-2">
-                                     <button 
-                                        onClick={handleSetStart}
-                                        className="bg-white/10 hover:bg-white/20 px-2 py-1 rounded text-[10px] font-bold text-white border border-white/10"
-                                     >
-                                         [ {t.SET_START}
-                                     </button>
-                                     <button 
-                                        onClick={handleSetEnd}
-                                        className="bg-white/10 hover:bg-white/20 px-2 py-1 rounded text-[10px] font-bold text-white border border-white/10"
-                                     >
-                                         {t.SET_END} ]
-                                     </button>
-                                     <button 
-                                        onClick={handleResetTrim}
-                                        className="bg-white/10 hover:bg-white/20 px-2 py-1 rounded text-[10px] font-bold text-gray-400 hover:text-white"
-                                     >
-                                         <RotateCcw className="w-3 h-3" />
-                                     </button>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Progress Bar (Visualizing Trim) */}
-                        <div className="relative w-full h-1 bg-white/20 rounded-full">
-                            {/* Trimmed Section Highlight */}
-                            {trimEnd > 0 && (
-                                <div 
-                                    className="absolute top-0 bottom-0 bg-skate-neon/30"
-                                    style={{
-                                        left: `${(trimStart / duration) * 100}%`,
-                                        width: `${((trimEnd - trimStart) / duration) * 100}%`
-                                    }}
-                                ></div>
-                            )}
-                            <input 
-                                type="range" 
-                                min="0" 
-                                max={duration} 
-                                step="0.01" 
-                                value={progress} 
-                                onChange={handleSeek}
-                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                            />
-                            {/* Playhead */}
-                            <div 
-                                className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-skate-neon rounded-full shadow pointer-events-none"
-                                style={{ left: `${(progress / duration) * 100}%` }}
-                            ></div>
-                        </div>
-                        
-                        <div className="flex justify-between items-center">
-                            <div className="flex items-center space-x-4">
-                                <button onClick={togglePlay} className="text-white hover:text-skate-neon">
-                                    {isPlaying ? <Pause className="w-6 h-6 fill-current" /> : <Play className="w-6 h-6 fill-current" />}
-                                </button>
-                                <span className="text-xs font-mono text-gray-300">
-                                    {progress.toFixed(1)}s / {duration.toFixed(1)}s
-                                </span>
-                            </div>
-
-                            <div className="flex items-center space-x-1 bg-black/40 rounded-full p-1 border border-white/10">
-                                <Clock className="w-3 h-3 text-gray-400 ml-1" />
-                                {[0.1, 0.5, 1.0].map(s => (
-                                    <button 
-                                        key={s}
-                                        onClick={() => handleSpeedChange(s)}
-                                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${playbackSpeed === s ? 'bg-skate-neon text-black' : 'text-gray-400 hover:text-white'}`}
-                                    >
-                                        {s}x
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {!result && !isAnalyzing && (
-                    <div className="glass-card p-5 rounded-2xl space-y-4">
-                        <div>
-                             <label className="text-gray-400 text-[10px] font-bold uppercase tracking-widest mb-2 block">{t.SELECT_YOUR_STANCE}</label>
-                             <div className="flex gap-2">
-                                 {['Regular', 'Goofy'].map(s => (
-                                     <button 
-                                        key={s}
-                                        onClick={() => setUserStance(s as 'Regular' | 'Goofy')}
-                                        className={`flex-1 py-3 rounded-xl font-bold uppercase text-xs transition-all ${userStance === s ? 'bg-skate-neon text-black' : 'bg-white/5 text-gray-400'}`}
-                                     >
-                                         {/* @ts-ignore */}
-                                         {t[s] || s}
-                                     </button>
-                                 ))}
-                             </div>
-                        </div>
-
-                        <div>
-                             <label className="text-gray-400 text-[10px] font-bold uppercase tracking-widest mb-2 block">{t.ENTER_TRICK_NAME}</label>
-                             <input 
-                                 type="text" 
-                                 value={trickNameInput}
-                                 onChange={(e) => setTrickNameInput(e.target.value)}
-                                 className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white focus:border-skate-neon outline-none mb-1"
-                                 placeholder="예: 킥플립"
-                             />
-                             <p className="text-[10px] text-gray-500">{t.TRICK_NAME_DESC}</p>
-                        </div>
-
-                        <button 
-                            onClick={startAnalysis}
-                            disabled={!videoReady}
-                            className={`w-full py-4 rounded-2xl font-display text-2xl font-bold uppercase tracking-wider transition-all flex items-center justify-center space-x-2 ${
-                                videoReady ? 'bg-white text-black hover:bg-gray-200' : 'bg-gray-800 text-gray-500 cursor-not-allowed'
-                            }`}
-                        >
-                            <Zap className="w-5 h-5 fill-black" />
-                            <span>{t.ANALYZE_TRICK}</span>
-                        </button>
-                    </div>
-                )}
+        {/* Video Preview & Analysis Overlay */}
+        {previewUrl && (
+            <div className="relative rounded-3xl overflow-hidden bg-black shadow-2xl border border-white/10 group">
+                <video 
+                    ref={videoRef}
+                    src={previewUrl} 
+                    className="w-full h-auto max-h-[60vh] object-contain"
+                    controls={!isAnalyzing}
+                    playsInline
+                    loop
+                    muted
+                    crossOrigin="anonymous"
+                />
                 
+                {/* Analysis Loading Overlay */}
                 {isAnalyzing && (
-                    <div className="text-center p-4">
-                        <Activity className="w-8 h-8 text-skate-neon mx-auto mb-2 animate-spin" />
-                        <p className="text-skate-neon font-bold uppercase animate-pulse">{t.ANALYZING_WITH_GEMINI}</p>
-                        <p className="text-xs text-gray-500 mt-1">{t.TRACKING_BOARD}</p>
-                    </div>
-                )}
-
-                {result && (
-                    <div className="space-y-4 animate-slide-up">
-                        <div className="glass-card p-6 rounded-3xl border border-skate-neon/30 relative overflow-hidden">
-                            <div className="relative z-10">
-                                <div className="flex justify-between items-start mb-2">
-                                    <span className="text-skate-neon text-[10px] font-bold uppercase tracking-[0.2em] block">AI ANALYSIS</span>
-                                    <span className="bg-green-500/20 text-green-400 text-xs font-bold px-2 py-1 rounded-lg border border-green-500/30">SUCCESS</span>
-                                </div>
-                                <h3 className="text-4xl font-display font-bold text-white mb-4">
-                                    {result.trickName === "UNKNOWN" ? <span className="text-gray-500">알 수 없음</span> : result.trickName}
-                                </h3>
-                                
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div className="bg-white/5 px-4 py-3 rounded-xl border border-white/5">
-                                        <span className="block text-[10px] text-gray-500 uppercase font-bold mb-1">{t.FORM_SCORE}</span>
-                                        <div className="flex items-baseline">
-                                            <span className="text-3xl font-display font-bold text-skate-neon">{result.score}</span>
-                                            <span className="text-gray-500 text-sm">/100</span>
-                                        </div>
-                                    </div>
-                                    <div className="bg-white/5 px-4 py-3 rounded-xl border border-white/5">
-                                        <span className="block text-[10px] text-gray-500 uppercase font-bold mb-1">{t.HEIGHT_EST}</span>
-                                        <div className="flex items-baseline">
-                                            <span className="text-3xl font-display font-bold text-white">{Math.round(result.heightMeters * 100)}</span>
-                                            <span className="text-gray-500 text-sm">cm</span>
-                                        </div>
+                    <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/90 backdrop-blur-md transition-all duration-500">
+                        <div className="flex items-center gap-6 mb-8 scale-110">
+                            {/* Gemini Engine */}
+                            <div className="flex flex-col items-center gap-2 group">
+                                <div className="relative">
+                                    <div className="absolute inset-0 bg-skate-neon/30 blur-xl rounded-full animate-pulse delay-75"></div>
+                                    <div className="w-16 h-16 bg-black border border-skate-neon/50 rounded-2xl flex items-center justify-center shadow-[0_0_15px_rgba(227,255,55,0.5)]">
+                                        <BrainCircuit className="w-8 h-8 text-skate-neon animate-pulse" />
                                     </div>
                                 </div>
+                                <span className="text-[10px] font-bold text-skate-neon font-mono tracking-widest uppercase">Gemini 3 Pro</span>
                             </div>
                         </div>
 
-                        <div className="bg-gradient-to-br from-skate-neon/10 to-transparent p-5 rounded-2xl border border-skate-neon/20">
-                            <h4 className="text-skate-neon text-[10px] font-bold uppercase tracking-widest mb-3 flex items-center">
-                                <Zap className="w-3 h-3 mr-1 fill-skate-neon" />
-                                {t.IMPROVEMENT_TIP}
-                            </h4>
-                            <p className="text-white text-sm font-medium leading-relaxed mb-4">
-                                {result.feedbackText}
+                        {/* Status Text */}
+                        <div className="text-center space-y-2">
+                            <h3 className="text-2xl font-display font-bold text-white tracking-widest animate-pulse">
+                                ANALYZING...
+                            </h3>
+                            <p className="text-gray-400 text-xs font-mono uppercase tracking-wider">
+                                {status}
                             </p>
-                            {result.improvementTip && (
-                                <div className="bg-black/40 p-3 rounded-xl border border-white/5">
-                                    <p className="text-xs text-gray-300">
-                                        <strong className="text-skate-neon block mb-1">TIP:</strong>
-                                        {result.improvementTip}
-                                    </p>
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="p-4 rounded-2xl bg-white/5">
-                            <h4 className="text-gray-400 text-[10px] font-bold uppercase tracking-widest mb-3">{t.WRONG_ANALYSIS}</h4>
-                            <form onSubmit={handleFeedbackSubmit} className="space-y-3">
-                                <input 
-                                    type="text" 
-                                    placeholder={t.ACTUAL_TRICK_NAME} 
-                                    value={manualCorrection}
-                                    onChange={(e) => setManualCorrection(e.target.value)}
-                                    className="w-full bg-black border border-white/10 rounded-lg p-2 text-xs text-white focus:border-skate-neon outline-none" 
-                                />
-                                <button type="submit" className="w-full py-2 bg-white/10 text-white rounded-lg text-xs font-bold hover:bg-white/20 transition-colors">
-                                    {t.SEND_FEEDBACK}
-                                </button>
-                            </form>
                         </div>
                     </div>
+                )}
+
+                {/* Reset Button */}
+                {!isAnalyzing && (
+                    <button 
+                        onClick={() => {
+                            setFile(null);
+                            setPreviewUrl(null);
+                            setAnalysisResult(null);
+                            setTrickNameHint("");
+                        }}
+                        className="absolute top-4 right-4 p-2 bg-black/50 backdrop-blur rounded-full text-white hover:bg-white/20 transition-colors z-40"
+                    >
+                        <X className="w-6 h-6" />
+                    </button>
                 )}
             </div>
         )}
+
+        {/* Trick Name Hint Input */}
+        {previewUrl && !analysisResult && !isAnalyzing && (
+            <div className="space-y-4 animate-fade-in">
+                <div className="glass-card p-4 rounded-2xl flex items-center space-x-3">
+                    <Info className="w-5 h-5 text-gray-400" />
+                    <input 
+                        type="text" 
+                        placeholder={t.ENTER_TRICK_NAME}
+                        value={trickNameHint}
+                        onChange={(e) => setTrickNameHint(e.target.value)}
+                        className="bg-transparent border-none outline-none text-white placeholder-gray-600 flex-1 text-sm font-medium"
+                    />
+                </div>
+                <button
+                    onClick={processVideo}
+                    className="w-full py-5 bg-skate-neon hover:bg-skate-neonHover text-black font-display text-3xl font-bold uppercase rounded-[2rem] shadow-[0_0_20px_rgba(204,255,0,0.3)] transform active:scale-95 transition-all flex items-center justify-center space-x-3"
+                >
+                    <Zap className="w-6 h-6 fill-black" />
+                    <span>{t.ANALYZE_TRICK}</span>
+                </button>
+            </div>
+        )}
+
+        {/* RESULTS SECTION */}
+        {analysisResult && (
+            <div className="space-y-6 animate-slide-up pb-10">
+                {/* Main Score Card */}
+                <div className="glass-card p-6 rounded-3xl border border-skate-neon/20 relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-skate-neon/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+                    
+                    <div className="flex justify-between items-start mb-4 relative z-10">
+                        <div>
+                            <span className="text-[10px] font-bold text-skate-neon uppercase tracking-widest mb-1 block">{t.TRICK_DETECTED}</span>
+                            <h2 className="text-4xl font-display font-bold text-white leading-none">{analysisResult.trickName}</h2>
+                        </div>
+                        <div className={`px-4 py-2 rounded-xl border ${analysisResult.isLanded ? 'bg-skate-neon/10 border-skate-neon text-skate-neon' : 'bg-red-500/10 border-red-500 text-red-500'}`}>
+                            <span className="font-bold uppercase tracking-wider text-sm">
+                                {analysisResult.isLanded ? 'LANDED' : 'MISSED'}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 mt-6 relative z-10">
+                        <div className="bg-black/40 rounded-2xl p-4">
+                            <span className="text-gray-500 text-[10px] font-bold uppercase tracking-widest">{t.FORM_SCORE}</span>
+                            <div className="flex items-baseline mt-1">
+                                <span className="text-3xl font-display font-bold text-white">{analysisResult.score}</span>
+                                <span className="text-sm text-gray-500 ml-1">/100</span>
+                            </div>
+                        </div>
+                        <div className="bg-black/40 rounded-2xl p-4">
+                            <span className="text-gray-500 text-[10px] font-bold uppercase tracking-widest">{t.HEIGHT_EST}</span>
+                            <div className="flex items-baseline mt-1">
+                                <span className="text-3xl font-display font-bold text-white">{analysisResult.heightMeters}</span>
+                                <span className="text-sm text-gray-500 ml-1">m</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* AI Analysis Text */}
+                <div className="space-y-4">
+                    <div className="glass-card p-6 rounded-3xl border border-white/5">
+                        <div className="flex items-center space-x-2 mb-3">
+                            <Activity className="w-5 h-5 text-blue-400" />
+                            <h3 className="text-sm font-bold text-gray-300 uppercase tracking-widest">{t.POSTURE_ANALYSIS}</h3>
+                        </div>
+                        <p className="text-gray-300 text-sm leading-relaxed whitespace-pre-wrap">
+                            {analysisResult.feedbackText}
+                        </p>
+                    </div>
+
+                    <div className="glass-card p-6 rounded-3xl border border-skate-neon/20 bg-skate-neon/5">
+                        <div className="flex items-center space-x-2 mb-3">
+                            <Zap className="w-5 h-5 text-skate-neon" />
+                            <h3 className="text-sm font-bold text-skate-neon uppercase tracking-widest">{t.IMPROVEMENT_TIP}</h3>
+                        </div>
+                        <p className="text-white text-lg font-display font-bold leading-tight">
+                            "{analysisResult.improvementTip}"
+                        </p>
+                    </div>
+                </div>
+
+                {/* Feedback Loop */}
+                <button 
+                    onClick={() => setShowFeedbackModal(true)}
+                    className="w-full py-4 text-gray-500 text-xs font-bold uppercase tracking-widest hover:text-white transition-colors"
+                >
+                    {t.WRONG_ANALYSIS}
+                </button>
+            </div>
+        )}
+      </div>
+
+      {/* Feedback Modal */}
+      {showFeedbackModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-6 animate-fade-in">
+              <div className="glass-card p-6 rounded-3xl w-full max-w-sm">
+                  <h3 className="text-xl font-display font-bold text-white mb-2">{t.WRONG_ANALYSIS}</h3>
+                  <p className="text-gray-400 text-xs mb-4">{t.PROVIDE_FEEDBACK}</p>
+                  
+                  <input 
+                    type="text" 
+                    placeholder={t.ACTUAL_TRICK_NAME}
+                    id="actualTrick"
+                    className="w-full bg-black/50 border border-white/10 rounded-xl p-4 text-white text-sm mb-4"
+                  />
+                  
+                  <div className="flex gap-3">
+                      <button 
+                        onClick={() => setShowFeedbackModal(false)}
+                        className="flex-1 py-3 bg-gray-800 rounded-xl font-bold text-gray-400"
+                      >
+                          {t.CANCEL}
+                      </button>
+                      <button 
+                        onClick={() => {
+                            const input = document.getElementById('actualTrick') as HTMLInputElement;
+                            handleFeedbackSubmit({ actualTrickName: input.value });
+                        }}
+                        className="flex-1 py-3 bg-skate-neon text-black rounded-xl font-bold"
+                      >
+                          {t.SEND_FEEDBACK}
+                      </button>
+                  </div>
+              </div>
+          </div>
+      )}
     </div>
   );
 };

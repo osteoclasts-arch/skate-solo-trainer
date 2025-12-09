@@ -6,13 +6,70 @@ declare var process: {
 };
 
 import { GoogleGenAI, Type, Schema } from "@google/genai";
-import { Trick, SessionSettings, Difficulty, TrickCategory, SessionResult, TrickTip, Language, AnalyticsInsight, VisionAnalysis } from "../types";
+import { Trick, SessionSettings, Difficulty, TrickCategory, SessionResult, TrickTip, Language, AnalyticsInsight, VisionAnalysis, TrackingDataPoint } from "../types";
 import { TRICK_TIPS_DB, BASE_TRICKS } from "../constants";
 
 const apiKey = process.env.API_KEY || '';
 
 // Safely initialize GenAI only if key exists (handled in calls)
 const getAI = () => new GoogleGenAI({ apiKey });
+
+/**
+ * Helper to clean JSON string from AI response.
+ * Robustly extracts the JSON object or array from the text.
+ * Throws error if no valid JSON structure is found to prevent SyntaxError in JSON.parse
+ */
+const cleanJson = (text: string): string => {
+  if (!text) throw new Error("Empty response from AI");
+
+  // 1. Remove generic markdown code block indicators
+  let clean = text.replace(/```json/g, '').replace(/```/g, '');
+
+  // 2. Locate the first '{' or '['
+  const firstCurly = clean.indexOf('{');
+  const firstSquare = clean.indexOf('[');
+  
+  let startIndex = -1;
+  let isObject = false;
+
+  if (firstCurly !== -1 && firstSquare !== -1) {
+    if (firstCurly < firstSquare) {
+      startIndex = firstCurly;
+      isObject = true;
+    } else {
+      startIndex = firstSquare;
+    }
+  } else if (firstCurly !== -1) {
+    startIndex = firstCurly;
+    isObject = true;
+  } else if (firstSquare !== -1) {
+    startIndex = firstSquare;
+  }
+
+  // CRITICAL FIX: If no JSON start found, throw error instead of returning garbage
+  if (startIndex === -1) {
+      throw new Error("No JSON object or array found in response");
+  }
+
+  // 3. Locate the last '}' or ']' based on type
+  const lastCurly = clean.lastIndexOf('}');
+  const lastSquare = clean.lastIndexOf(']');
+  
+  let endIndex = -1;
+
+  if (isObject) {
+      endIndex = lastCurly;
+  } else {
+      endIndex = lastSquare;
+  }
+
+  if (endIndex !== -1 && endIndex >= startIndex) {
+      return clean.substring(startIndex, endIndex + 1);
+  }
+
+  // Fallback: return from start index to end
+  return clean.substring(startIndex).trim();
+};
 
 export const generateAISession = async (settings: SessionSettings): Promise<Trick[]> => {
   if (!apiKey) {
@@ -66,14 +123,21 @@ export const generateAISession = async (settings: SessionSettings): Promise<Tric
     const text = response.text;
     if (!text) return [];
     
-    const rawTricks = JSON.parse(text);
-    return rawTricks.map((t: any, idx: number) => ({
-      id: `ai-trick-${idx}-${Date.now()}`,
-      name: t.name,
-      category: t.category,
-      difficulty: t.difficulty,
-      stance: t.stance
-    }));
+    // Clean and parse with safety
+    try {
+        const cleaned = cleanJson(text);
+        const rawTricks = JSON.parse(cleaned);
+        return rawTricks.map((t: any, idx: number) => ({
+          id: `ai-trick-${idx}-${Date.now()}`,
+          name: t.name,
+          category: t.category,
+          difficulty: t.difficulty,
+          stance: t.stance
+        }));
+    } catch (parseError) {
+        console.error("Failed to parse AI Session JSON:", parseError);
+        return [];
+    }
   } catch (error) {
     console.error("Error generating AI session:", error);
     return [];
@@ -225,7 +289,13 @@ export const getAnalyticsInsight = async (
         });
 
         if (response.text) {
-            return JSON.parse(response.text) as AnalyticsInsight;
+            try {
+                const cleaned = cleanJson(response.text);
+                return JSON.parse(cleaned) as AnalyticsInsight;
+            } catch (parseError) {
+                console.error("Failed to parse Analytics Insight:", parseError);
+                return null;
+            }
         }
         return null;
     } catch (error) {
@@ -269,7 +339,8 @@ export const analyzeMedia = async (
     userContext: string[] = [],
     trickHint?: string,
     startTime?: number,
-    endTime?: number
+    endTime?: number,
+    trackingData?: TrackingDataPoint[] // NEW: Receive YOLO tracking data
 ): Promise<VisionAnalysis | null> => {
     if (!apiKey) return null;
 
@@ -292,6 +363,24 @@ export const analyzeMedia = async (
     const langName = language === 'KR' ? 'KOREAN (Hangul)' : 'ENGLISH';
     const langCode = language === 'KR' ? 'KOREAN' : 'ENGLISH';
 
+    // Format Tracking Data for Prompt (CSV-like)
+    let trackingStr = "No YOLO tracking data available. Rely solely on visual analysis.";
+    if (trackingData && trackingData.length > 0) {
+        // Limit data to prevent token overflow, take every 2nd point if needed
+        const points = trackingData.map(p => 
+            `Fr:${p.frame}|RelX:${p.relX.toFixed(3)}|RelY:${p.relY.toFixed(3)}|Asp:${p.aspectRatio.toFixed(2)}`
+        ).join("\n");
+        trackingStr = `
+*** PRECISE YOLO TRACKING DATA (Frame-by-Frame) ***
+This is the machine-verified movement of the skateboard. 
+Use this as GROUND TRUTH over visual estimation.
+Format: Frame | Relative X (-0.5=Left, 0=Center, 0.5=Right) | Relative Y (-0.5=Top, 0.5=Bottom) | AspectRatio (W/H)
+
+${points}
+***************************************************
+        `;
+    }
+
     // USER PROVIDED PROMPT FOR 2-STAGE ANALYSIS
     const prompt = `
 # SYSTEM INSTRUCTION: 2-STAGE ANALYSIS
@@ -299,10 +388,13 @@ You must analyze the provided video in two strict stages.
 
 --- STAGE 1: BOARD TRACKING & STATE EXTRACTION (INTERNAL) ---
 # Role
-You are a Computer Vision Object Tracking Engine optimized for extreme sports. Your SOLE purpose is to track the "Skateboard Deck" and "Wheels" frame-by-frame. You do NOT identify trick names in this stage.
+You are a Computer Vision Object Tracking Engine optimized for extreme sports. 
+${trackingData && trackingData.length > 0 ? "I have provided you with PRECISE YOLO TRACKING DATA below. You MUST combine your visual analysis with this data." : "Analyze the video frames visually to determine board state."}
+
+${trackingStr}
 
 # Objective
-Analyze the provided video frames and extract the precise location and visual state of the skateboard.
+Analyze the provided video frames ${trackingData && trackingData.length > 0 ? "and tracking data" : ""} to extract the precise location and visual state of the skateboard.
 
 # Visual Definitions (Visual Anchors)
 To distinguish the board from the background and the rider's shoes, look for these specific features:
@@ -327,8 +419,22 @@ For each sampled frame, determine the following:
 --- STAGE 2: TRICK IDENTIFICATION ---
 Using the visual observations and physics data extracted in Stage 1, identify the skateboard trick. 
 
-1. **Board Physics:** Determine if the board flips (Kickflip/Heelflip), rotates (Shove-it), or does both (Tre Flip).
-2. **Body Physics:** Determine if the rider rotates with the board.
+# Rotation Axis Logic Matrix (Use this to classify):
+1.  **ROLL Axis (Flip):**
+    - Board spins like a rolling log. 
+    - You see: Grip Tape -> Edge -> Graphic -> Edge -> Grip Tape.
+    - Examples: Kickflip, Heelflip.
+2.  **YAW Axis (Shuvit/Spin):**
+    - Board spins flat like a helicopter blade (or near flat).
+    - You generally see ONLY Grip Tape (or ONLY Graphic if upside down), but the nose/tail switch positions.
+    - Examples: Pop Shuvit, 360 Shuvit, Bigspin.
+3.  **MIXED Axis (Tre/Varial):**
+    - Board does BOTH. It flips (Roll) and rotates (Yaw).
+    - Examples: Tre Flip (360 Flip), Varial Kickflip, Hardflip.
+
+# Task:
+1. **Analyze Board Physics:** Determine if the board flips (Roll), rotates (Yaw), or does both. Use the matrix above.
+2. **Analyze Body Physics:** Determine if the rider rotates their body with the board (e.g., 180, Bigspin) or stays facing the same direction (e.g., Kickflip, Shuvit).
 3. **Stance:** Determine stance based on pop foot.
 4. **Identification:** Combine these factors to name the trick.
 
@@ -345,7 +451,7 @@ IMPORTANT: 'feedbackText' and 'improvementTip' MUST be in ${langName}.
 {
   "trickName": "String (The Final Trick Name from Stage 2)",
   "confidence": 0.0 to 1.0,
-  "board_physics": "String (Summary of Stage 1 observations, e.g., 'Board flipped once on axis, grip tape visible at landing')",
+  "board_physics": "String (Summary of Stage 1 observations, e.g., 'Board flipped once on roll axis, maintained yaw stability')",
   "score": 0-100 (Integer, based on cleanliness and height),
   "heightMeters": 0.0-2.0 (Float, approximate jump height),
   "feedbackText": "String (${langCode}: Detailed coaching feedback based on the analysis)",
@@ -370,19 +476,28 @@ IMPORTANT: 'feedbackText' and 'improvementTip' MUST be in ${langName}.
         });
 
         if (response.text) {
-             const data = JSON.parse(response.text);
-             return {
-                 id: Date.now().toString(),
-                 timestamp: new Date().toISOString(),
-                 trickName: data.trickName || data.trick_name || "UNKNOWN",
-                 isLanded: data.score > 40,
-                 confidence: data.confidence || 0.8,
-                 score: data.score,
-                 heightMeters: data.heightMeters,
-                 rotationDegrees: 0, 
-                 feedbackText: data.feedbackText,
-                 improvementTip: data.improvementTip
-             };
+             // Clean JSON before parsing
+             try {
+                const cleanedText = cleanJson(response.text);
+                const data = JSON.parse(cleanedText);
+                
+                return {
+                    id: Date.now().toString(),
+                    timestamp: new Date().toISOString(),
+                    trickName: data.trickName || data.trick_name || "UNKNOWN",
+                    isLanded: data.score > 40,
+                    confidence: data.confidence || 0.8,
+                    score: data.score,
+                    heightMeters: data.heightMeters,
+                    rotationDegrees: 0, 
+                    feedbackText: data.feedbackText,
+                    improvementTip: data.improvementTip
+                };
+             } catch (parseError) {
+                 console.error("Failed to parse Vision Analysis JSON:", parseError);
+                 console.log("Raw AI Response:", response.text);
+                 return null;
+             }
         }
         return null;
     } catch (error) {
