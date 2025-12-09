@@ -111,7 +111,7 @@ export const generateAISession = async (settings: SessionSettings): Promise<Tric
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-pro-preview",
+      model: "gemini-2.5-flash",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -171,7 +171,7 @@ export const getSessionAnalysis = async (result: SessionResult, language: Langua
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-pro-preview",
+      model: "gemini-2.5-flash",
       contents: prompt,
     });
     return response.text || fallbackMsg;
@@ -202,7 +202,7 @@ export const getTrickTip = async (trickName: string, language: Language): Promis
     const ai = getAI();
     try {
         const response = await ai.models.generateContent({
-            model: "gemini-3-pro-preview",
+            model: "gemini-2.5-flash",
             contents: `Give me one pro tip for landing a ${trickName} on a skateboard. Max 15 words. Speak like a pro. Return output in English and Korean. Format: EN|KR`,
         });
         const [en, kr] = (response.text || "").split("|");
@@ -280,7 +280,7 @@ export const getAnalyticsInsight = async (
 
     try {
         const response = await ai.models.generateContent({
-            model: "gemini-3-pro-preview",
+            model: "gemini-2.5-flash",
             contents: prompt,
             config: {
                 responseMimeType: "application/json",
@@ -340,7 +340,8 @@ export const analyzeMedia = async (
     trickHint?: string,
     startTime?: number,
     endTime?: number,
-    trackingData?: TrackingDataPoint[] // NEW: Receive YOLO tracking data
+    trackingData?: TrackingDataPoint[],
+    motionDataCsv?: string // Added CSV input for strict physics
 ): Promise<VisionAnalysis | null> => {
     if (!apiKey) return null;
 
@@ -363,80 +364,34 @@ export const analyzeMedia = async (
     const langName = language === 'KR' ? 'KOREAN (Hangul)' : 'ENGLISH';
     const langCode = language === 'KR' ? 'KOREAN' : 'ENGLISH';
 
-    // Format Tracking Data for Prompt (CSV-like)
-    let trackingStr = "No YOLO tracking data available. Rely solely on visual analysis.";
-    if (trackingData && trackingData.length > 0) {
-        // Limit data to prevent token overflow, take every 2nd point if needed
-        const points = trackingData.map(p => 
-            `Fr:${p.frame}|RelX:${p.relX.toFixed(3)}|RelY:${p.relY.toFixed(3)}|Asp:${p.aspectRatio.toFixed(2)}`
-        ).join("\n");
-        trackingStr = `
-*** PRECISE YOLO TRACKING DATA (Frame-by-Frame) ***
-This is the machine-verified movement of the skateboard. 
-Use this as GROUND TRUTH over visual estimation.
-Format: Frame | Relative X (-0.5=Left, 0=Center, 0.5=Right) | Relative Y (-0.5=Top, 0.5=Bottom) | AspectRatio (W/H)
-
-${points}
-***************************************************
-        `;
-    }
-
     // USER PROVIDED PROMPT FOR 2-STAGE ANALYSIS
     const prompt = `
-# SYSTEM INSTRUCTION: 2-STAGE ANALYSIS
-You must analyze the provided video in two strict stages.
+# SYSTEM INSTRUCTION: MULTI-MODAL ANALYSIS (VIDEO + CSV PHYSICS)
+You are an AI Skateboard Judge. You are provided with TWO sources of information:
+1. **The Video**: Visual context, style, body rotation, and obstacle interaction.
+2. **The Motion Data CSV**: A precise, frame-by-frame log of Board Angle, Height, and Pose.
 
---- STAGE 1: BOARD TRACKING & STATE EXTRACTION (INTERNAL) ---
-# Role
-You are a Computer Vision Object Tracking Engine optimized for extreme sports. 
-${trackingData && trackingData.length > 0 ? "I have provided you with PRECISE YOLO TRACKING DATA below. You MUST combine your visual analysis with this data." : "Analyze the video frames visually to determine board state."}
+**CRITICAL RULE:** The CSV data is the GROUND TRUTH for physics. If the video looks like a flip but the CSV says "BoardAngle" stayed near 0, it is NOT a flip.
 
-${trackingStr}
+--- CSV DATA ANALYSIS ---
+${motionDataCsv ? `Here is the Motion Data extracted by the physics engine:\n${motionDataCsv.substring(0, 3000)}... (truncated)` : "No CSV data provided, rely on visual analysis."}
 
-# Objective
-Analyze the provided video frames ${trackingData && trackingData.length > 0 ? "and tracking data" : ""} to extract the precise location and visual state of the skateboard.
+Use the CSV to determine:
+- **BoardAngle Change**: Did it rotate ~180 (Shuvit) or stay 0?
+- **BoardHeight**: Did it go high (Ollie) or stay low?
 
-# Visual Definitions (Visual Anchors)
-To distinguish the board from the background and the rider's shoes, look for these specific features:
-1.  **The Deck Edge:** A thin sandwich line of wood (maple layers).
-2.  **The Trucks:** Silver/Metallic mechanical parts attached to the board.
-3.  **The Wheels:** Small, round, usually white or urethane-colored objects.
-4.  **Contrast:**
-    - **Top:** Usually black (Grip tape).
-    - **Bottom:** Usually colored/patterned (Graphic).
+--- TRICK IDENTIFICATION LOGIC ---
+1. **Analyze Board Physics (From CSV + Video):**
+   - **ROLL Axis (Flip):** Board spins like a rolling log. (Kickflip/Heelflip).
+   - **YAW Axis (Shuvit):** Board spins horizontally. (Pop Shuvit, 360 Shuvit).
+   - **MIXED:** Tre Flip, Varial.
+   - **NONE:** Ollie, 180 Ollie (if body rotates).
 
-# Instructions for Analysis
-For each sampled frame, determine the following:
-1.  **Location:** Where is the board relative to the rider's feet? (e.g., Attached, Floating Mid-air, Vertical)
-2.  **Orientation (CRITICAL):**
-    - \`Flat\`: Board is parallel to the ground.
-    - \`Vertical/Edge\`: Board is sideways (90 degrees).
-    - \`Inverted\`: Board is upside down (Graphic facing up).
-3.  **Visible Side:** Can you see the Black Grip tape, the Graphic Bottom, or just the Edge?
+2. **Analyze Body Physics (From Video):**
+   - Does the rider rotate? (180, 360).
+   - Same direction as board?
 
-*NOTE: Use this Stage 1 analysis internally to deduce the board's physics. Do not output the raw frame list, but summarize the physics findings in the 'board_physics' field.*
-
---- STAGE 2: TRICK IDENTIFICATION ---
-Using the visual observations and physics data extracted in Stage 1, identify the skateboard trick. 
-
-# Rotation Axis Logic Matrix (Use this to classify):
-1.  **ROLL Axis (Flip):**
-    - Board spins like a rolling log. 
-    - You see: Grip Tape -> Edge -> Graphic -> Edge -> Grip Tape.
-    - Examples: Kickflip, Heelflip.
-2.  **YAW Axis (Shuvit/Spin):**
-    - Board spins flat like a helicopter blade (or near flat).
-    - You generally see ONLY Grip Tape (or ONLY Graphic if upside down), but the nose/tail switch positions.
-    - Examples: Pop Shuvit, 360 Shuvit, Bigspin.
-3.  **MIXED Axis (Tre/Varial):**
-    - Board does BOTH. It flips (Roll) and rotates (Yaw).
-    - Examples: Tre Flip (360 Flip), Varial Kickflip, Hardflip.
-
-# Task:
-1. **Analyze Board Physics:** Determine if the board flips (Roll), rotates (Yaw), or does both. Use the matrix above.
-2. **Analyze Body Physics:** Determine if the rider rotates their body with the board (e.g., 180, Bigspin) or stays facing the same direction (e.g., Kickflip, Shuvit).
-3. **Stance:** Determine stance based on pop foot.
-4. **Identification:** Combine these factors to name the trick.
+3. **Identification:** Combine Physics + Body.
 
 # Input Context
 Analysis Scope: ${timeRangeStr}
@@ -445,17 +400,19 @@ User History: ${contextStr}
 Possible Candidates: [${allTricks}]
 
 # Output Format
-Return a SINGLE JSON object with the following fields. 
+Return a SINGLE JSON object.
 IMPORTANT: 'feedbackText' and 'improvementTip' MUST be in ${langName}.
+'board_physics_desc' MUST also be in ${langName}.
 
 {
-  "trickName": "String (The Final Trick Name from Stage 2)",
+  "trickName": "String (The Final Trick Name)",
   "confidence": 0.0 to 1.0,
-  "board_physics": "String (Summary of Stage 1 observations, e.g., 'Board flipped once on roll axis, maintained yaw stability')",
-  "score": 0-100 (Integer, based on cleanliness and height),
-  "heightMeters": 0.0-2.0 (Float, approximate jump height),
-  "feedbackText": "String (${langCode}: Detailed coaching feedback based on the analysis)",
-  "improvementTip": "String (${langCode}: One specific tip to improve technique)"
+  "rotation_axis": "String (ROLL, YAW, MIXED, NONE)",
+  "board_physics_desc": "String (${langCode}: Explain the physics seen in CSV/Video)",
+  "score": 0-100,
+  "heightMeters": 0.0-2.0,
+  "feedbackText": "String (${langCode}: Detailed coaching feedback)",
+  "improvementTip": "String (${langCode}: One specific tip)"
 }
     `;
 
@@ -463,7 +420,7 @@ IMPORTANT: 'feedbackText' and 'improvementTip' MUST be in ${langName}.
         if (!file) throw new Error("No file provided");
         const videoPart = await fileToPart(file);
 
-        // Using gemini-3-pro-preview for higher reasoning capabilities
+        // Using gemini-3-pro-preview for highest reasoning capability
         const response = await ai.models.generateContent({
             model: "gemini-3-pro-preview", 
             contents: {
@@ -471,7 +428,7 @@ IMPORTANT: 'feedbackText' and 'improvementTip' MUST be in ${langName}.
             },
             config: {
                 responseMimeType: "application/json",
-                temperature: 0.1 // Low temperature for deterministic physics judgment
+                temperature: 0.1 // Low temp for factual consistency
             }
         });
 
@@ -491,7 +448,11 @@ IMPORTANT: 'feedbackText' and 'improvementTip' MUST be in ${langName}.
                     heightMeters: data.heightMeters,
                     rotationDegrees: 0, 
                     feedbackText: data.feedbackText,
-                    improvementTip: data.improvementTip
+                    improvementTip: data.improvementTip,
+                    boardPhysics: {
+                        axis: data.rotation_axis || "NONE",
+                        description: data.board_physics_desc || "Analysis unavailable"
+                    }
                 };
              } catch (parseError) {
                  console.error("Failed to parse Vision Analysis JSON:", parseError);

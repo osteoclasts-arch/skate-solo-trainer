@@ -142,7 +142,16 @@ export const TRANSLATIONS = {
     SET_START: "Set Start",
     SET_END: "Set End",
     RESET_TRIM: "Reset",
-    CLIP_DURATION: "Clip Duration"
+    CLIP_DURATION: "Clip Duration",
+    PHYSICS_ANALYSIS: "Physics Analysis",
+    AXIS_ROLL: "Roll (Flip)",
+    AXIS_YAW: "Yaw (Spin)",
+    AXIS_MIXED: "Mixed Axis",
+    AXIS_NONE: "No Rotation",
+    FRAMING_GUIDE_TITLE: "How to Film for Best Results",
+    FRAMING_TIP_1: "Use a tripod or static camera angle.",
+    FRAMING_TIP_2: "Keep skater's whole body and board in frame.",
+    FRAMING_TIP_3: "Side view is best for trick recognition."
   },
   KR: {
     NEW_SESSION: "새로운 세션",
@@ -282,7 +291,16 @@ export const TRANSLATIONS = {
     SET_START: "시작점",
     SET_END: "종료점",
     RESET_TRIM: "초기화",
-    CLIP_DURATION: "선택된 길이"
+    CLIP_DURATION: "선택된 길이",
+    PHYSICS_ANALYSIS: "물리 엔진 분석",
+    AXIS_ROLL: "플립 축 (Roll)",
+    AXIS_YAW: "회전 축 (Yaw)",
+    AXIS_MIXED: "복합 축 (Mixed)",
+    AXIS_NONE: "축 없음",
+    FRAMING_GUIDE_TITLE: "정확한 분석을 위한 촬영 가이드",
+    FRAMING_TIP_1: "카메라는 삼각대로 고정해주세요.",
+    FRAMING_TIP_2: "스케이터의 전신과 보드가 모두 나와야 합니다.",
+    FRAMING_TIP_3: "측면(Side view)에서 촬영하면 가장 정확합니다."
   }
 };
 

@@ -115,6 +115,12 @@ export interface VisionAnalysis {
   feedbackText?: string; 
   improvementTip?: string; 
 
+  // Physics Analysis
+  boardPhysics?: {
+    axis: 'ROLL' | 'YAW' | 'MIXED' | 'NONE';
+    description: string;
+  };
+
   // Legacy fields for backward compatibility if needed
   formScore?: number; 
   heightEstimate?: string; 
