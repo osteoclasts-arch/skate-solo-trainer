@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { TRANSLATIONS } from '../constants';
-import { Play, BookOpen, Eye, Edit2, LogOut, CheckCircle, Zap, UserPlus, Calendar, ArrowUpRight, TrendingUp, Target, Shield, Check, Star, X } from 'lucide-react';
+import { Play, BookOpen, Eye, Edit2, LogOut, CheckCircle, Zap, UserPlus, Calendar, ArrowUpRight, TrendingUp, Target, Shield, Check, Star, X, MapPin } from 'lucide-react';
 import { SessionResult, Language, User as UserType, Quest } from '../types';
 import { dbService } from '../services/dbService';
 
@@ -49,6 +49,16 @@ const Dashboard: React.FC<Props> = ({
   const [dailyQuests, setDailyQuests] = useState<Quest[]>([]);
   const [xp, setXp] = useState(0);
   const [showLevelModal, setShowLevelModal] = useState(false);
+
+  // Location Suggestion State
+  const [suggestedSpot, setSuggestedSpot] = useState("");
+
+  useEffect(() => {
+    const spotsKR = ["뚝섬(파크)", "컬트(훈련소)", "보라매(성지)", "반포(한강)", "노들섬(크루징)", "여의도(광장)", "난지(파크)"];
+    const spotsEN = ["the local park", "downtown plaza", "a street spot", "the skatepark", "a quiet flatground"];
+    const targetSpots = language === 'KR' ? spotsKR : spotsEN;
+    setSuggestedSpot(targetSpots[Math.floor(Math.random() * targetSpots.length)]);
+  }, [language]);
 
   // Load quests and stats from User prop on mount/update
   useEffect(() => {
@@ -275,6 +285,10 @@ const Dashboard: React.FC<Props> = ({
                 <span className="text-gray-400">Daily Skating</span>
                 <span className="text-skate-yellow ml-1 animate-pulse">✨</span>
             </h1>
+            <p className="text-xs font-medium text-gray-500 mt-2 flex items-center gap-1.5 animate-fade-in">
+                <MapPin className="w-3.5 h-3.5 text-skate-deep" />
+                {language === 'KR' ? `오늘은 ${suggestedSpot} 어때요?` : `How about ${suggestedSpot} today?`}
+            </p>
         </div>
         
         <button 
