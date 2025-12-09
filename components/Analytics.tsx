@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { SessionResult, Language, AnalyticsInsight, User } from '../types';
 import { TRANSLATIONS } from '../constants';
@@ -83,7 +84,7 @@ const Analytics: React.FC<Props> = ({ history, language, daysSkating = 1, user, 
         )}
 
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between shrink-0">
             <h2 className="text-3xl font-black text-skate-black">{t.ANALYTICS}</h2>
             <button className="p-3 bg-white rounded-full hover:bg-gray-100 transition-colors shadow-sm border border-gray-100">
                 <Instagram className="w-5 h-5 text-skate-black" />
@@ -91,7 +92,7 @@ const Analytics: React.FC<Props> = ({ history, language, daysSkating = 1, user, 
         </div>
 
         {/* AI Insight Card (Moved to Top) */}
-        <div className="pop-card p-6 bg-white relative overflow-hidden border-2 border-skate-black">
+        <div className="pop-card p-6 bg-white border-2 border-skate-black flex-shrink-0 relative">
             <div className="flex items-center gap-3 mb-4">
                 <BrainCircuit className="w-6 h-6 text-skate-black" />
                 <h3 className="text-lg font-bold text-skate-black">AI Diagnosis</h3>
@@ -110,8 +111,8 @@ const Analytics: React.FC<Props> = ({ history, language, daysSkating = 1, user, 
                 </div>
             ) : (
                 <div className="space-y-4">
-                    <h4 className="text-2xl font-black text-skate-black leading-tight">"{insight.diagnosis}"</h4>
-                    <p className="text-gray-600 text-sm leading-relaxed font-medium">{insight.summary}</p>
+                    <h4 className="text-2xl font-black text-skate-black leading-tight break-keep whitespace-pre-wrap">"{insight.diagnosis}"</h4>
+                    <p className="text-gray-600 text-sm leading-relaxed font-medium whitespace-pre-wrap break-words">{insight.summary}</p>
                     <div className="bg-gray-50 rounded-xl p-4">
                         <p className="text-skate-deep text-xs font-black uppercase mb-2">Focus on</p>
                         <ul className="space-y-2">
@@ -128,7 +129,7 @@ const Analytics: React.FC<Props> = ({ history, language, daysSkating = 1, user, 
         </div>
 
         {/* Chart Card */}
-        <div className="w-full bg-white rounded-[2.5rem] p-6 shadow-pop relative overflow-hidden">
+        <div className="w-full bg-white rounded-[2.5rem] p-6 shadow-pop relative overflow-hidden flex-shrink-0">
              <div className="flex justify-between items-center mb-8 relative z-10">
                  <div>
                     <p className="text-gray-400 text-sm font-bold uppercase tracking-widest mb-1">{t.AVG_SUCCESS}</p>
@@ -174,7 +175,7 @@ const Analytics: React.FC<Props> = ({ history, language, daysSkating = 1, user, 
         </div>
 
         {/* Metric Cards Grid */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-4 flex-shrink-0">
              {/* Total Sessions */}
              <div className="pop-card bg-white p-6 flex flex-col justify-between h-40">
                  <div className="w-10 h-10 rounded-full bg-skate-deep text-white flex items-center justify-center mb-2">
