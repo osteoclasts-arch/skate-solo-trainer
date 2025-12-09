@@ -440,7 +440,9 @@ const Dashboard: React.FC<Props> = ({
                           </div>
                           <div className="flex-1">
                               <p className="text-sm font-bold text-white">{new Date(session.date).toLocaleDateString()}</p>
-                              <p className="text-[10px] text-white/60 font-medium uppercase">{session.totalTricks} Tricks • {session.difficulty}</p>
+                              <p className="text-[10px] text-white/60 font-medium uppercase">
+                                {session.totalTricks} Tricks • {session.difficulty || 'Custom'}
+                              </p>
                           </div>
                       </div>
                   )) : (

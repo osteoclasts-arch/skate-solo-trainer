@@ -1,17 +1,20 @@
+
+
 import React, { useState, useEffect } from 'react';
-import { Trick, SessionResult, TrickAttempt, Language, TrickTip } from '../types';
+import { Trick, SessionResult, TrickAttempt, Language, TrickTip, Difficulty } from '../types';
 import { Check, X, Lightbulb, Video, AlertTriangle } from 'lucide-react';
 import { SKATE_LETTERS, TRANSLATIONS } from '../constants';
 import { getTrickTip } from '../services/geminiService';
 
 interface Props {
   tricks: Trick[];
+  difficulty: Difficulty;
   onComplete: (result: SessionResult) => void;
   onAbort: () => void;
   language: Language;
 }
 
-const ActiveSession: React.FC<Props> = ({ tricks, onComplete, onAbort, language }) => {
+const ActiveSession: React.FC<Props> = ({ tricks, difficulty, onComplete, onAbort, language }) => {
   const t = TRANSLATIONS[language];
   const [currentIndex, setCurrentIndex] = useState(0);
   const [history, setHistory] = useState<TrickAttempt[]>([]);
@@ -44,7 +47,8 @@ const ActiveSession: React.FC<Props> = ({ tricks, onComplete, onAbort, language 
       landedCount,
       failedCount,
       letters,
-      trickHistory: history
+      trickHistory: history,
+      difficulty: difficulty
     };
     onComplete(result);
   };

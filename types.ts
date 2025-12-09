@@ -1,4 +1,5 @@
 
+
 export enum Stance {
   REGULAR = 'Regular',
   FAKIE = 'Fakie',
@@ -85,6 +86,7 @@ export interface SessionResult {
   letters: string; // "S", "SK", etc.
   trickHistory: TrickAttempt[];
   aiAnalysis?: string;
+  difficulty?: Difficulty;
 }
 
 export interface TrickAttempt {

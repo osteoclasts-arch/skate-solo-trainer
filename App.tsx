@@ -18,6 +18,7 @@ import { Home, BarChart2, BookOpen, Eye, Instagram, ArrowUpRight } from 'lucide-
 const App: React.FC = () => {
   const [view, setView] = useState<ViewState>('DASHBOARD');
   const [activeTricks, setActiveTricks] = useState<Trick[]>([]);
+  const [activeDifficulty, setActiveDifficulty] = useState<Difficulty>(Difficulty.MEDIUM);
   
   // User Authentication State
   const [user, setUser] = useState<User | null>(null);
@@ -161,6 +162,8 @@ const App: React.FC = () => {
     setIsGenerating(true);
     let tricks: Trick[] = [];
 
+    setActiveDifficulty(settings.difficulty);
+
     if (settings.useAI) {
        tricks = await generateAISession(settings);
     } else {
@@ -295,6 +298,7 @@ const App: React.FC = () => {
         return (
           <ActiveSession 
             tricks={activeTricks} 
+            difficulty={activeDifficulty}
             onComplete={handleSessionComplete} 
             onAbort={() => setView('DASHBOARD')} 
             language={language}
