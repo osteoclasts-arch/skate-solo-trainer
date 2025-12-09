@@ -1,119 +1,19 @@
-
 import React, { useState, useRef, useEffect } from 'react';
-import { Language, User, VisionAnalysis, TrackingDataPoint } from '../types';
+import { Language, User, VisionAnalysis } from '../types';
 import { TRANSLATIONS } from '../constants';
-import { Upload, Zap, X, Eye, Info, BrainCircuit, Activity, Rotate3d, Compass, Scan, CheckCircle2 } from 'lucide-react';
+import { Upload, Zap, X, Eye, Info, BrainCircuit, Activity, Rotate3d, Compass, Scan, CheckCircle2, Scissors, Play, Pause, FastForward, Rewind } from 'lucide-react';
 import { analyzeMedia } from '../services/geminiService';
 import { dbService } from '../services/dbService';
 // @ts-ignore
 import * as mpPose from '@mediapipe/pose';
+// @ts-ignore
+import * as mpDrawing from '@mediapipe/drawing_utils';
 
-// --- BOARD TRACKER CLASS (Client-Side Physics Engine) ---
-class BoardTracker {
-    private history: { x: number, y: number, angle: number, width: number, height: number }[] = [];
-    private baseColor: { r: number, g: number, b: number } | null = null;
-    
-    constructor() {
-        this.reset();
-    }
-
-    reset() {
-        this.history = [];
-        this.baseColor = null;
-    }
-
-    // Capture the board color from between the feet in the first few frames
-    calibrate(ctx: CanvasRenderingContext2D, feet: { x: number, y: number }[]) {
-        if (feet.length < 2 || this.baseColor) return;
-        
-        const midX = (feet[0].x + feet[1].x) / 2;
-        const midY = (feet[0].y + feet[1].y) / 2;
-        
-        // Sample a small area between feet
-        const p = ctx.getImageData(midX - 5, midY, 10, 10).data;
-        this.baseColor = { r: p[0], g: p[1], b: p[2] };
-    }
-
-    track(ctx: CanvasRenderingContext2D, width: number, height: number, feet: {x:number, y:number}[]): { angle: number, height: number } {
-        if (!this.baseColor) return { angle: 0, height: 0 };
-
-        // Define Search Area (ROI): Focus under the feet/ankles
-        // If feet are detected, look around them. If not, look at last known position.
-        let minX = 0, maxX = width, minY = 0, maxY = height;
-        
-        if (feet.length === 2) {
-             const ankleY = Math.max(feet[0].y, feet[1].y);
-             minX = Math.min(feet[0].x, feet[1].x) - 100;
-             maxX = Math.max(feet[0].x, feet[1].x) + 100;
-             minY = ankleY - 50; // Slightly above ankles
-             maxY = ankleY + 150; // Mostly below ankles
-        } else if (this.history.length > 0) {
-             // Fallback to last known pos
-             const last = this.history[this.history.length - 1];
-             minX = last.x - 150; maxX = last.x + 150;
-             minY = last.y - 150; maxY = last.y + 150;
-        }
-
-        // Clamping
-        minX = Math.max(0, minX); maxX = Math.min(width, maxX);
-        minY = Math.max(0, minY); maxY = Math.min(height, maxY);
-
-        // --- COMPUTER VISION: COLOR SEGMENTATION + PCA ---
-        const imgData = ctx.getImageData(minX, minY, maxX - minX, maxY - minY);
-        const data = imgData.data;
-        
-        let sumX = 0, sumY = 0, count = 0;
-        let points: {x:number, y:number}[] = [];
-
-        for (let i = 0; i < data.length; i += 4) {
-            const r = data[i], g = data[i+1], b = data[i+2];
-            // Simple color distance check
-            const dist = Math.sqrt(
-                Math.pow(r - this.baseColor.r, 2) + 
-                Math.pow(g - this.baseColor.g, 2) + 
-                Math.pow(b - this.baseColor.b, 2)
-            );
-
-            if (dist < 60) { // Threshold
-                const pixelIndex = i / 4;
-                const localX = pixelIndex % (maxX - minX);
-                const localY = Math.floor(pixelIndex / (maxX - minX));
-                const globalX = minX + localX;
-                const globalY = minY + localY;
-
-                sumX += globalX;
-                sumY += globalY;
-                points.push({x: globalX, y: globalY});
-                count++;
-            }
-        }
-
-        if (count < 50) return { angle: 0, height: 0 }; // Lost tracking
-
-        const avgX = sumX / count;
-        const avgY = sumY / count;
-
-        // PCA Calculation for Angle
-        let u20 = 0, u02 = 0, u11 = 0;
-        for (const p of points) {
-            u20 += Math.pow(p.x - avgX, 2);
-            u02 += Math.pow(p.y - avgY, 2);
-            u11 += (p.x - avgX) * (p.y - avgY);
-        }
-        
-        // Orientation angle theta = 0.5 * atan2(2*u11, u20 - u02)
-        const angleRad = 0.5 * Math.atan2(2 * u11, u20 - u02);
-        const angleDeg = angleRad * (180 / Math.PI);
-
-        // Store history
-        this.history.push({ x: avgX, y: avgY, angle: angleDeg, width: 0, height: 0 });
-
-        // Calculate Height (Inverted Y: 0 is top)
-        // Normalize: 0.0 is ground, 1.0 is top of screen (approx)
-        const normalizedHeight = 1 - (avgY / height);
-
-        return { angle: angleDeg, height: normalizedHeight };
-    }
+// Types for Visualization
+interface PoseFrame {
+    time: number;
+    landmarks: any[]; // MediaPipe landmarks
+    boardCenter: { x: number, y: number } | null;
 }
 
 interface Props {
@@ -123,32 +23,44 @@ interface Props {
 
 const AIVision: React.FC<Props> = ({ language, user }) => {
   const t = TRANSLATIONS[language];
+  
+  // State
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [videoDuration, setVideoDuration] = useState(0);
+  
+  // Trimming State
+  const [trimStart, setTrimStart] = useState(0);
+  const [trimEnd, setTrimEnd] = useState(0);
+  
+  // Analysis State
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<VisionAnalysis | null>(null);
   const [status, setStatus] = useState<string>("");
   const [trickNameHint, setTrickNameHint] = useState("");
-  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [extractionProgress, setExtractionProgress] = useState(0);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
 
+  // Result Playback State
+  const [trackingData, setTrackingData] = useState<PoseFrame[]>([]);
+  const [playbackSpeed, setPlaybackSpeed] = useState(1.0);
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  // Refs
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null); // Hidden canvas for processing
-  
-  // Logic Refs
-  const boardTracker = useRef(new BoardTracker());
-  const poseEstimator = useRef<any>(null); // Weakly typed to handle dynamic import
-  const extractionData = useRef<string[]>([]); // CSV Lines
+  const resultVideoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null); 
+  const poseEstimator = useRef<any>(null);
+  const requestRef = useRef<number>(0);
 
   // Initialize MediaPipe Pose
   useEffect(() => {
-      // Robustly resolve Pose class from namespace (handles CDN variations)
       // @ts-ignore
       const Pose = mpPose.Pose || (mpPose.default?.Pose) || (window as any).Pose;
 
       if (!Pose) {
-        console.error("MediaPipe Pose class could not be found. Check import.", mpPose);
+        console.error("MediaPipe Pose class could not be found.");
         return;
       }
 
@@ -163,40 +75,53 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
           minDetectionConfidence: 0.5,
           minTrackingConfidence: 0.5
       });
-      pose.onResults(onPoseResults);
+      
       poseEstimator.current = pose;
       
       return () => {
           pose.close();
+          if (requestRef.current) {
+            cancelAnimationFrame(requestRef.current);
+          }
       };
   }, []);
-
-  const onPoseResults = (results: any) => {
-      // This callback is used during the extraction loop
-      // We process the results immediately in the loop context usually, 
-      // but here we store them to be picked up by the processing step
-  };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
       const selectedFile = event.target.files[0];
       
-      if (selectedFile.size > 50 * 1024 * 1024) {
+      if (selectedFile.size > 100 * 1024 * 1024) { // Increased limit slightly
           alert(t.FILE_TOO_LARGE);
           return;
       }
 
       setFile(selectedFile);
-      setPreviewUrl(URL.createObjectURL(selectedFile));
+      const url = URL.createObjectURL(selectedFile);
+      setPreviewUrl(url);
       setAnalysisResult(null);
-      setExtractionProgress(0);
-      extractionData.current = [];
-      boardTracker.current.reset();
+      setTrackingData([]);
+      setPlaybackSpeed(1.0);
+      
+      // Reset trim when new file loads
+      const vid = document.createElement('video');
+      vid.preload = 'metadata';
+      vid.onloadedmetadata = () => {
+          setVideoDuration(vid.duration);
+          setTrimStart(0);
+          setTrimEnd(vid.duration);
+      };
+      vid.src = url;
     }
   };
 
-  // --- EXTRACTION LOGIC ---
-  const extractMotionData = async () => {
+  const handleMetadataLoaded = (e: React.SyntheticEvent<HTMLVideoElement>) => {
+      const duration = e.currentTarget.duration;
+      setVideoDuration(duration);
+      if (trimEnd === 0) setTrimEnd(duration);
+  };
+
+  // --- EXTRACTION & TRACKING LOGIC ---
+  const extractMotionData = async (): Promise<string> => {
       if (!videoRef.current || !poseEstimator.current) return "";
       
       const video = videoRef.current;
@@ -204,121 +129,235 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
       const ctx = canvas.getContext('2d');
       if (!ctx) return "";
 
-      setStatus("물리 데이터 추출 중 (Pose & Board)...");
+      setStatus("Tracking Skater & Board...");
       
-      // Setup Video for extraction
-      video.currentTime = 0;
-      const duration = video.duration;
-      if (isNaN(duration) || duration === 0) return ""; // Wait for metadata
-
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
 
-      const fps = 30; // Sample rate
+      const fps = 30; 
       const interval = 1 / fps;
-      let currentTime = 0;
-      
-      // CSV Header
+      let currentTime = trimStart;
+      const recordedFrames: PoseFrame[] = [];
       const csvLines = ["Timestamp,LeftAnkleY,RightAnkleY,BoardAngle,BoardHeight,ShoulderRotation"];
-      
+
+      // Setup Pose Callback for this extraction session
+      let frameResolver: ((value: any) => void) | null = null;
+      poseEstimator.current.onResults((results: any) => {
+          if (frameResolver) frameResolver(results);
+      });
+
       // Processing Loop
-      while (currentTime < duration) {
+      while (currentTime <= trimEnd) {
           video.currentTime = currentTime;
-          // Wait for seek
+          
+          // Wait for seek to complete
           await new Promise<void>(r => {
               const onSeek = () => { video.removeEventListener('seeked', onSeek); r(); };
               video.addEventListener('seeked', onSeek);
           });
 
-          // Draw frame
+          // Draw video frame to canvas for MediaPipe
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
           
-          // 1. Pose Extraction
-          let feet: { x: number; y: number }[] = [];
-          let shoulderRot = 0;
-          let leftAnkleY = 0;
-          let rightAnkleY = 0;
-
-          await poseEstimator.current.send({image: canvas}).then(async () => {
-              // Wait for results - but MediaPipe is weird with sync.
-              // For simplicity in this env, we assume send() awaits internal processing.
-              // *Note: In a strict implementation, we'd hook into onResults.
-              // *Here, we will simulate the data extraction if we can't get result object back directly easily.
-              // *Actually, the standard way is to use the `onResults` callback.
+          // Wait for Pose Estimation
+          const results: any = await new Promise(resolve => {
+              frameResolver = resolve;
+              poseEstimator.current.send({image: canvas});
           });
-          
-          // *Hack for this architecture:*
-          // Since we can't easily await the callback data inside this loop without complex promises,
-          // We will proceed with Board Tracking which is synchronous, and Mock the pose data 
-          // OR rely on the board tracker primarily if Pose is too slow.
-          
-          // Let's implement Board Tracking accurately here
-          // For feet position, we'll try to find "shoes" (bottom of person) using color blob if pose fails,
-          // OR we just scan the bottom half.
-          
-          // 2. Board Tracking
-          const boardData = boardTracker.current.track(ctx, canvas.width, canvas.height, feet); // Feet might be empty
 
-          // Add to CSV
-          csvLines.push(`${currentTime.toFixed(2)},${leftAnkleY.toFixed(3)},${rightAnkleY.toFixed(3)},${boardData.angle.toFixed(1)},${boardData.height.toFixed(3)},${shoulderRot.toFixed(1)}`);
+          // Process Results
+          let landmarks = null;
+          let boardCenter = null;
+          let leftAnkleY = 0, rightAnkleY = 0, boardHeight = 0, boardAngle = 0, shoulderRot = 0;
+
+          if (results.poseLandmarks) {
+              landmarks = results.poseLandmarks;
+              
+              // 28: Left Ankle, 27: Right Ankle (MediaPipe Pose)
+              const la = landmarks[28];
+              const ra = landmarks[27];
+              
+              if (la && ra) {
+                  leftAnkleY = la.y;
+                  rightAnkleY = ra.y;
+                  
+                  // Calculate Board Center (Midpoint of ankles, shifted slightly down)
+                  boardCenter = {
+                      x: (la.x + ra.x) / 2,
+                      y: (la.y + ra.y) / 2 + 0.02 // Offset slightly down to deck level
+                  };
+
+                  // Simple Physics Data for CSV
+                  boardHeight = 1 - boardCenter.y; // Inverted Y
+                  const dx = ra.x - la.x;
+                  const dy = ra.y - la.y;
+                  boardAngle = Math.atan2(dy, dx) * (180 / Math.PI);
+                  
+                  // Shoulders: 11 (Left), 12 (Right)
+                  const ls = landmarks[11];
+                  const rs = landmarks[12];
+                  if (ls && rs) {
+                      const sdx = rs.x - ls.x;
+                      const sdy = rs.y - ls.y;
+                      shoulderRot = Math.atan2(sdy, sdx) * (180 / Math.PI);
+                  }
+              }
+          }
+
+          recordedFrames.push({
+              time: currentTime,
+              landmarks: landmarks,
+              boardCenter: boardCenter
+          });
+
+          csvLines.push(`${currentTime.toFixed(2)},${leftAnkleY.toFixed(3)},${rightAnkleY.toFixed(3)},${boardAngle.toFixed(1)},${boardHeight.toFixed(3)},${shoulderRot.toFixed(1)}`);
           
-          currentTime += 0.1; // Skip 0.1s
-          setExtractionProgress(Math.min(100, Math.round((currentTime / duration) * 100)));
+          currentTime += interval;
+          const progress = Math.min(100, Math.round(((currentTime - trimStart) / (trimEnd - trimStart)) * 100));
+          setExtractionProgress(progress);
       }
 
-      // Reset video for playback
-      video.currentTime = 0;
+      setTrackingData(recordedFrames);
       return csvLines.join("\n");
   };
 
   const processVideo = async () => {
     if (!file) return;
     setIsAnalyzing(true);
-    setStatus("데이터 전처리 중...");
+    setStatus("Analyzing...");
     setExtractionProgress(0);
             
     try {
-        // 1. Extract Motion Data (Client Side)
-        // Wait for video to be ready
-        if (videoRef.current && videoRef.current.readyState >= 2) {
+        if (videoRef.current && videoRef.current.readyState >= 1) {
              const csvData = await extractMotionData();
-             console.log("Extracted CSV Preview:", csvData.substring(0, 200));
-
              setStatus(t.ANALYZING_WITH_GEMINI);
              
              const userContext = user ? await dbService.getUserFeedbacks(user.uid) : [];
              
-             // 2. Send to Gemini (Video + CSV)
              const result = await analyzeMedia(
                 file, 
                 language, 
                 userContext,
                 trickNameHint || undefined,
+                trimStart,
+                trimEnd,
                 undefined,
-                undefined,
-                undefined,
-                csvData // Pass the CSV data!
+                csvData 
             );
     
             if (result) {
                 setAnalysisResult(result);
-                if (user) {
-                    await dbService.saveAnalysisResult(user.uid, result);
-                }
+                if (user) await dbService.saveAnalysisResult(user.uid, result);
             } else {
-                alert("분석에 실패했습니다.");
+                alert("Analysis failed. Please try again.");
             }
         } else {
-            alert("비디오가 아직 로드되지 않았습니다. 잠시 후 다시 시도해주세요.");
+            alert("Video not ready. Please wait a moment.");
         }
     } catch (error) {
         console.error("Analysis Error:", error);
-        alert("분석 중 오류가 발생했습니다.");
+        alert("An error occurred during analysis.");
     } finally {
         setIsAnalyzing(false);
         setStatus("");
         setExtractionProgress(0);
     }
+  };
+
+  // --- RESULT PLAYBACK & VISUALIZATION ---
+  
+  const drawResultFrame = () => {
+      const video = resultVideoRef.current;
+      const canvas = canvasRef.current;
+      if (!video || !canvas || trackingData.length === 0) return;
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      // Handle looping within trim range manually for precision
+      if (video.currentTime >= trimEnd) {
+          video.currentTime = trimStart;
+      }
+      if (video.currentTime < trimStart) {
+          video.currentTime = trimStart;
+      }
+
+      // Find closest frame data
+      const currentFrameData = trackingData.reduce((prev, curr) => 
+        Math.abs(curr.time - video.currentTime) < Math.abs(prev.time - video.currentTime) ? curr : prev
+      );
+
+      // Clear & Draw
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      // Draw Skeleton
+      if (currentFrameData.landmarks) {
+           // @ts-ignore
+           if (mpDrawing && mpDrawing.drawConnectors && mpDrawing.drawLandmarks) {
+               // @ts-ignore
+               mpDrawing.drawConnectors(ctx, currentFrameData.landmarks, mpPose.POSE_CONNECTIONS, {color: 'rgba(255, 255, 255, 0.6)', lineWidth: 2});
+               // @ts-ignore
+               mpDrawing.drawLandmarks(ctx, currentFrameData.landmarks, {color: '#E3FF37', lineWidth: 1, radius: 2});
+           }
+      }
+
+      // Draw Board Center Tracking
+      if (currentFrameData.boardCenter) {
+          const x = currentFrameData.boardCenter.x * canvas.width;
+          const y = currentFrameData.boardCenter.y * canvas.height;
+          
+          // Draw Target
+          ctx.beginPath();
+          ctx.arc(x, y, 8, 0, 2 * Math.PI);
+          ctx.strokeStyle = '#E3FF37'; // Neon
+          ctx.lineWidth = 3;
+          ctx.stroke();
+          
+          ctx.beginPath();
+          ctx.arc(x, y, 3, 0, 2 * Math.PI);
+          ctx.fillStyle = '#E3FF37';
+          ctx.fill();
+
+          // Label
+          ctx.fillStyle = '#E3FF37';
+          ctx.font = 'bold 12px sans-serif';
+          ctx.fillText("BOARD", x + 12, y + 4);
+      }
+
+      requestRef.current = requestAnimationFrame(drawResultFrame);
+  };
+
+  useEffect(() => {
+      if (analysisResult && isPlaying) {
+          requestRef.current = requestAnimationFrame(drawResultFrame);
+      } else {
+          if (requestRef.current) {
+              cancelAnimationFrame(requestRef.current);
+          }
+      }
+      return () => {
+          if (requestRef.current) {
+              cancelAnimationFrame(requestRef.current);
+          }
+      };
+  }, [analysisResult, isPlaying, trackingData]);
+
+  const togglePlay = () => {
+      if (resultVideoRef.current) {
+          if (isPlaying) {
+              resultVideoRef.current.pause();
+          } else {
+              resultVideoRef.current.play();
+          }
+          setIsPlaying(!isPlaying);
+      }
+  };
+
+  const changeSpeed = (speed: number) => {
+      setPlaybackSpeed(speed);
+      if (resultVideoRef.current) {
+          resultVideoRef.current.playbackRate = speed;
+      }
   };
 
   const handleFeedbackSubmit = async (feedbackData: any) => {
@@ -340,7 +379,7 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
   };
 
   return (
-    <div className="flex flex-col h-full p-6 pb-32 overflow-y-auto animate-fade-in relative">
+    <div className="flex flex-col h-full p-6 pb-32 overflow-y-auto animate-fade-in relative bg-black">
       
       {/* HEADER */}
       <div className="flex items-center justify-between mb-6">
@@ -348,11 +387,19 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
             <Eye className="text-skate-neon w-8 h-8" />
             <h2 className="text-4xl font-display font-bold uppercase tracking-wide text-white">{t.AI_VISION_TITLE}</h2>
         </div>
-        <div className="flex items-center space-x-2 bg-blue-500/10 px-3 py-1 rounded-full border border-blue-500/20">
-            <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-            <span className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">Gemini Vision Active</span>
-        </div>
       </div>
+
+      {/* TIP BANNER */}
+      {!analysisResult && (
+          <div className="bg-blue-900/20 border border-blue-500/30 rounded-xl p-4 mb-6 flex items-start space-x-3">
+              <Info className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
+              <p className="text-sm text-blue-200">
+                  {language === 'KR' 
+                    ? "슬로우 모션(고프레임) 영상일수록 AI 분석과 트래킹 정확도가 훨씬 높아집니다." 
+                    : "Using Slow Motion (High FPS) video significantly improves AI analysis and tracking accuracy."}
+              </p>
+          </div>
+      )}
 
       {/* MAIN CONTENT */}
       <div className="space-y-6">
@@ -379,116 +426,175 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
                         className="hidden" 
                     />
                 </div>
-
-                {/* Framing Guide */}
-                <div className="glass-card p-6 rounded-3xl border border-white/10 bg-white/5">
-                    <h3 className="text-white font-bold mb-4 flex items-center text-sm uppercase tracking-wider">
-                        <Scan className="w-4 h-4 mr-2 text-skate-neon"/>
-                        {t.FRAMING_GUIDE_TITLE}
-                    </h3>
-                    <ul className="space-y-3">
-                        <li className="flex items-start text-sm text-gray-300">
-                            <CheckCircle2 className="w-5 h-5 mr-3 text-skate-neon shrink-0"/> 
-                            {t.FRAMING_TIP_1}
-                        </li>
-                        <li className="flex items-start text-sm text-gray-300">
-                            <CheckCircle2 className="w-5 h-5 mr-3 text-skate-neon shrink-0"/> 
-                            {t.FRAMING_TIP_2}
-                        </li>
-                        <li className="flex items-start text-sm text-gray-300">
-                            <CheckCircle2 className="w-5 h-5 mr-3 text-skate-neon shrink-0"/> 
-                            {t.FRAMING_TIP_3}
-                        </li>
-                    </ul>
-                </div>
             </div>
         )}
 
-        {/* Video Preview & Analysis Overlay */}
-        {previewUrl && (
-            <div className="relative rounded-3xl overflow-hidden bg-black shadow-2xl border border-white/10 group">
-                <video 
-                    ref={videoRef}
-                    src={previewUrl} 
-                    className="w-full h-auto max-h-[60vh] object-contain"
-                    controls={!isAnalyzing}
-                    playsInline
-                    muted
-                    crossOrigin="anonymous"
-                />
-                
-                {/* Analysis Loading Overlay */}
-                {isAnalyzing && (
-                    <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/90 backdrop-blur-md transition-all duration-500">
-                        <div className="flex items-center gap-6 mb-8 scale-110">
-                            {/* Gemini Engine */}
-                            <div className="flex flex-col items-center gap-2 group">
-                                <div className="relative">
-                                    <div className="absolute inset-0 bg-skate-neon/30 blur-xl rounded-full animate-pulse delay-75"></div>
-                                    <div className="w-16 h-16 bg-black border border-skate-neon/50 rounded-2xl flex items-center justify-center shadow-[0_0_15px_rgba(227,255,55,0.5)]">
-                                        <BrainCircuit className="w-8 h-8 text-skate-neon animate-pulse" />
-                                    </div>
-                                </div>
-                                <span className="text-[10px] font-bold text-skate-neon font-mono tracking-widest uppercase">Gemini 3 Pro</span>
-                            </div>
-                        </div>
-
-                        {/* Status Text */}
-                        <div className="text-center space-y-2">
-                            <h3 className="text-2xl font-display font-bold text-white tracking-widest animate-pulse">
-                                ANALYZING... {extractionProgress > 0 && extractionProgress < 100 ? `${extractionProgress}%` : ''}
-                            </h3>
-                            <p className="text-gray-400 text-xs font-mono uppercase tracking-wider">
-                                {status}
-                            </p>
-                        </div>
-                    </div>
-                )}
-
-                {/* Reset Button */}
-                {!isAnalyzing && (
-                    <button 
+        {/* Video Preview & Trim Controls */}
+        {previewUrl && !analysisResult && (
+            <div className="space-y-6 animate-fade-in">
+                <div className="relative rounded-3xl overflow-hidden bg-black shadow-2xl border border-white/10 group">
+                    <video 
+                        ref={videoRef}
+                        src={previewUrl} 
+                        className="w-full h-auto max-h-[50vh] object-contain"
+                        controls={false}
+                        playsInline
+                        muted
+                        onLoadedMetadata={handleMetadataLoaded}
+                    />
+                     <button 
                         onClick={() => {
                             setFile(null);
                             setPreviewUrl(null);
-                            setAnalysisResult(null);
-                            setTrickNameHint("");
                         }}
                         className="absolute top-4 right-4 p-2 bg-black/50 backdrop-blur rounded-full text-white hover:bg-white/20 transition-colors z-40"
                     >
-                        <X className="w-6 h-6" />
+                        <X className="w-5 h-5" />
                     </button>
-                )}
-            </div>
-        )}
-
-        {/* Trick Name Hint Input */}
-        {previewUrl && !analysisResult && !isAnalyzing && (
-            <div className="space-y-4 animate-fade-in">
-                <div className="glass-card p-4 rounded-2xl flex items-center space-x-3">
-                    <Info className="w-5 h-5 text-gray-400" />
-                    <input 
-                        type="text" 
-                        placeholder={t.ENTER_TRICK_NAME}
-                        value={trickNameHint}
-                        onChange={(e) => setTrickNameHint(e.target.value)}
-                        className="bg-transparent border-none outline-none text-white placeholder-gray-600 flex-1 text-sm font-medium"
-                    />
                 </div>
-                <button
-                    onClick={processVideo}
-                    className="w-full py-5 bg-skate-neon hover:bg-skate-neonHover text-black font-display text-3xl font-bold uppercase rounded-[2rem] shadow-[0_0_20px_rgba(204,255,0,0.3)] transform active:scale-95 transition-all flex items-center justify-center space-x-3"
-                >
-                    <Zap className="w-6 h-6 fill-black" />
-                    <span>{t.ANALYZE_TRICK}</span>
-                </button>
+
+                {/* Trim Controls */}
+                <div className="glass-card p-5 rounded-2xl border border-white/10 space-y-4">
+                    <div className="flex items-center space-x-2 text-gray-400 mb-2">
+                        <Scissors className="w-4 h-4" />
+                        <span className="text-xs font-bold uppercase tracking-widest">{t.TRIM_RANGE || "Trim Video"}</span>
+                    </div>
+                    
+                    <div className="flex items-center space-x-4">
+                         <div className="flex-1 space-y-1">
+                             <label className="text-[10px] uppercase font-bold text-gray-500">{t.SET_START}</label>
+                             <div className="flex items-center space-x-2">
+                                <input 
+                                    type="number" 
+                                    step="0.1" 
+                                    min="0" 
+                                    max={trimEnd}
+                                    value={trimStart}
+                                    onChange={(e) => setTrimStart(Number(e.target.value))}
+                                    className="bg-black/50 border border-white/10 rounded-lg p-2 text-white w-full text-sm"
+                                />
+                                <span className="text-xs text-gray-500">s</span>
+                             </div>
+                         </div>
+                         <div className="flex-1 space-y-1">
+                             <label className="text-[10px] uppercase font-bold text-gray-500">{t.SET_END}</label>
+                             <div className="flex items-center space-x-2">
+                                <input 
+                                    type="number" 
+                                    step="0.1" 
+                                    min={trimStart}
+                                    max={videoDuration}
+                                    value={trimEnd}
+                                    onChange={(e) => setTrimEnd(Number(e.target.value))}
+                                    className="bg-black/50 border border-white/10 rounded-lg p-2 text-white w-full text-sm"
+                                />
+                                <span className="text-xs text-gray-500">s</span>
+                             </div>
+                         </div>
+                         <button 
+                            onClick={() => { setTrimStart(0); setTrimEnd(videoDuration); }}
+                            className="bg-white/5 p-3 rounded-xl hover:bg-white/10 mt-5"
+                         >
+                             <span className="text-xs font-bold text-gray-400">{t.RESET_TRIM}</span>
+                         </button>
+                    </div>
+                    <div className="w-full bg-gray-800 h-1.5 rounded-full relative mt-2">
+                        <div 
+                            className="absolute h-full bg-skate-neon opacity-50" 
+                            style={{ 
+                                left: `${(trimStart / videoDuration) * 100}%`, 
+                                width: `${((trimEnd - trimStart) / videoDuration) * 100}%` 
+                            }}
+                        />
+                    </div>
+                    <div className="text-center text-xs text-skate-neon font-bold uppercase tracking-widest">
+                        {t.CLIP_DURATION}: {(trimEnd - trimStart).toFixed(1)}s
+                    </div>
+                </div>
+
+                {/* Loading Overlay */}
+                {isAnalyzing && (
+                    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/90 backdrop-blur-md transition-all">
+                        <div className="w-20 h-20 border-4 border-skate-neon/30 border-t-skate-neon rounded-full animate-spin mb-6"></div>
+                        <h3 className="text-2xl font-display font-bold text-white tracking-widest animate-pulse">
+                            ANALYZING {extractionProgress > 0 && `${extractionProgress}%`}
+                        </h3>
+                        <p className="text-gray-400 text-xs font-mono uppercase tracking-wider mt-2">
+                            {status}
+                        </p>
+                    </div>
+                )}
+
+                {/* Action Buttons */}
+                {!isAnalyzing && (
+                    <div className="space-y-4">
+                        <div className="glass-card p-4 rounded-2xl flex items-center space-x-3">
+                            <Info className="w-5 h-5 text-gray-400" />
+                            <input 
+                                type="text" 
+                                placeholder={t.ENTER_TRICK_NAME}
+                                value={trickNameHint}
+                                onChange={(e) => setTrickNameHint(e.target.value)}
+                                className="bg-transparent border-none outline-none text-white placeholder-gray-600 flex-1 text-sm font-medium"
+                            />
+                        </div>
+                        <button
+                            onClick={processVideo}
+                            className="w-full py-5 bg-skate-neon hover:bg-skate-neonHover text-black font-display text-3xl font-bold uppercase rounded-[2rem] shadow-[0_0_20px_rgba(204,255,0,0.3)] transform active:scale-95 transition-all flex items-center justify-center space-x-3"
+                        >
+                            <Zap className="w-6 h-6 fill-black" />
+                            <span>{t.ANALYZE_TRICK}</span>
+                        </button>
+                    </div>
+                )}
             </div>
         )}
 
         {/* RESULTS SECTION */}
         {analysisResult && (
             <div className="space-y-6 animate-slide-up pb-10">
-                {/* Main Score Card */}
+                
+                {/* Result Video Player with Overlay */}
+                <div className="relative rounded-3xl overflow-hidden bg-black border border-white/10 shadow-2xl">
+                    <video 
+                        ref={resultVideoRef}
+                        src={previewUrl!} 
+                        className="w-full h-auto max-h-[60vh] object-contain opacity-80"
+                        playsInline
+                        muted
+                        loop
+                        onPlay={() => setIsPlaying(true)}
+                        onPause={() => setIsPlaying(false)}
+                    />
+                    <canvas 
+                        ref={canvasRef}
+                        className="absolute inset-0 w-full h-full pointer-events-none"
+                        width={resultVideoRef.current?.videoWidth}
+                        height={resultVideoRef.current?.videoHeight}
+                    />
+                    
+                    {/* Player Controls */}
+                    <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between bg-black/60 backdrop-blur rounded-2xl p-3">
+                        <button onClick={togglePlay} className="p-2 bg-white text-black rounded-full hover:bg-gray-200">
+                            {isPlaying ? <Pause className="w-4 h-4 fill-black" /> : <Play className="w-4 h-4 fill-black ml-0.5" />}
+                        </button>
+                        
+                        <div className="flex items-center space-x-2">
+                             <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mr-1">SPEED</span>
+                             {[0.25, 0.5, 1.0].map(speed => (
+                                 <button
+                                    key={speed}
+                                    onClick={() => changeSpeed(speed)}
+                                    className={`px-2 py-1 rounded-lg text-xs font-bold ${playbackSpeed === speed ? 'bg-skate-neon text-black' : 'bg-white/10 text-white hover:bg-white/20'}`}
+                                 >
+                                     {speed}x
+                                 </button>
+                             ))}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Score Card */}
                 <div className="glass-card p-6 rounded-3xl border border-skate-neon/20 relative overflow-hidden group">
                     <div className="absolute top-0 right-0 w-32 h-32 bg-skate-neon/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
                     
@@ -522,7 +628,7 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
                     </div>
                 </div>
 
-                {/* Physics Analysis Card */}
+                {/* Physics & AI Feedback */}
                 {analysisResult.boardPhysics && (
                      <div className="glass-card p-6 rounded-3xl border border-purple-500/20 bg-purple-900/10">
                         <div className="flex items-center justify-between mb-3">
@@ -541,7 +647,6 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
                     </div>
                 )}
 
-                {/* AI Feedback & Tips */}
                 <div className="space-y-4">
                     <div className="glass-card p-6 rounded-3xl border border-white/5">
                         <div className="flex items-center space-x-2 mb-3">
@@ -570,6 +675,16 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
                     className="w-full py-4 text-gray-500 text-xs font-bold uppercase tracking-widest hover:text-white transition-colors"
                 >
                     {t.WRONG_ANALYSIS}
+                </button>
+                
+                <button 
+                    onClick={() => {
+                        setAnalysisResult(null);
+                        setTrackingData([]);
+                    }}
+                    className="w-full py-4 bg-white/5 rounded-2xl text-white font-bold uppercase tracking-widest hover:bg-white/10"
+                >
+                    ANALYZE NEW VIDEO
                 </button>
             </div>
         )}
