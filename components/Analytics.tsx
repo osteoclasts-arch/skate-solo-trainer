@@ -90,6 +90,43 @@ const Analytics: React.FC<Props> = ({ history, language, daysSkating = 1, user, 
             </button>
         </div>
 
+        {/* AI Insight Card (Moved to Top) */}
+        <div className="pop-card p-6 bg-white relative overflow-hidden border-2 border-skate-black">
+            <div className="flex items-center gap-3 mb-4">
+                <BrainCircuit className="w-6 h-6 text-skate-black" />
+                <h3 className="text-lg font-bold text-skate-black">AI Diagnosis</h3>
+            </div>
+
+            {!insight ? (
+                <div className="text-center py-6">
+                    {history.length > 0 ? (
+                         <button onClick={handleGenerateInsight} className="w-full py-3 bg-gray-50 text-skate-black shadow-sm rounded-xl font-bold hover:bg-gray-100 transition-colors flex items-center justify-center gap-2 border border-gray-100">
+                             <Sparkles className="w-4 h-4 text-skate-yellow fill-skate-yellow" />
+                             {isGenerating ? "Analyzing..." : "Generate Report"}
+                         </button>
+                    ) : (
+                        <p className="text-gray-400 text-sm font-medium">Complete a session to get insights.</p>
+                    )}
+                </div>
+            ) : (
+                <div className="space-y-4">
+                    <h4 className="text-2xl font-black text-skate-black leading-tight">"{insight.diagnosis}"</h4>
+                    <p className="text-gray-600 text-sm leading-relaxed font-medium">{insight.summary}</p>
+                    <div className="bg-gray-50 rounded-xl p-4">
+                        <p className="text-skate-deep text-xs font-black uppercase mb-2">Focus on</p>
+                        <ul className="space-y-2">
+                            {insight.improvementSuggestions.slice(0, 2).map((s, i) => (
+                                <li key={i} className="flex gap-2 text-sm text-gray-600 font-medium">
+                                    <span className="text-skate-yellow font-black">•</span>
+                                    {s}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                </div>
+            )}
+        </div>
+
         {/* Chart Card */}
         <div className="w-full bg-white rounded-[2.5rem] p-6 shadow-pop relative overflow-hidden">
              <div className="flex justify-between items-center mb-8 relative z-10">
@@ -159,43 +196,6 @@ const Analytics: React.FC<Props> = ({ history, language, daysSkating = 1, user, 
                      <p className="text-2xl font-black text-skate-black mt-1">{totalLanded}</p>
                  </div>
              </div>
-        </div>
-
-        {/* AI Insight Card */}
-        <div className="pop-card p-6 bg-white relative overflow-hidden border-2 border-skate-black">
-            <div className="flex items-center gap-3 mb-4">
-                <BrainCircuit className="w-6 h-6 text-skate-black" />
-                <h3 className="text-lg font-bold text-skate-black">AI Diagnosis</h3>
-            </div>
-
-            {!insight ? (
-                <div className="text-center py-6">
-                    {history.length > 0 ? (
-                         <button onClick={handleGenerateInsight} className="w-full py-3 bg-gray-50 text-skate-black shadow-sm rounded-xl font-bold hover:bg-gray-100 transition-colors flex items-center justify-center gap-2 border border-gray-100">
-                             <Sparkles className="w-4 h-4 text-skate-yellow fill-skate-yellow" />
-                             {isGenerating ? "Analyzing..." : "Generate Report"}
-                         </button>
-                    ) : (
-                        <p className="text-gray-400 text-sm font-medium">Complete a session to get insights.</p>
-                    )}
-                </div>
-            ) : (
-                <div className="space-y-4">
-                    <h4 className="text-2xl font-black text-skate-black leading-tight">"{insight.diagnosis}"</h4>
-                    <p className="text-gray-600 text-sm leading-relaxed font-medium">{insight.summary}</p>
-                    <div className="bg-gray-50 rounded-xl p-4">
-                        <p className="text-skate-deep text-xs font-black uppercase mb-2">Focus on</p>
-                        <ul className="space-y-2">
-                            {insight.improvementSuggestions.slice(0, 2).map((s, i) => (
-                                <li key={i} className="flex gap-2 text-sm text-gray-600 font-medium">
-                                    <span className="text-skate-yellow font-black">•</span>
-                                    {s}
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
-                </div>
-            )}
         </div>
     </div>
   );

@@ -11,7 +11,7 @@ import { BASE_TRICKS, TRANSLATIONS } from './constants';
 import { generateAISession } from './services/geminiService';
 import { loginAsGuest, logout, checkLocalSession } from './services/authService';
 import { dbService } from './services/dbService';
-import { Home, BarChart2, BookOpen, Eye, Instagram } from 'lucide-react';
+import { Home, BarChart2, BookOpen, Eye, Instagram, ArrowUpRight } from 'lucide-react';
 
 const App: React.FC = () => {
   const [view, setView] = useState<ViewState>('DASHBOARD');
@@ -49,7 +49,7 @@ const App: React.FC = () => {
   useEffect(() => {
     const timer = setTimeout(() => {
         setShowSplash(false);
-    }, 2500);
+    }, 2800); // Slightly longer for the animation to play out
     return () => clearTimeout(timer);
   }, []);
 
@@ -226,16 +226,32 @@ const App: React.FC = () => {
   const renderView = () => {
     if (isAuthChecking || showSplash) {
         return (
-            <div className="flex h-screen flex-col items-center justify-center bg-skate-yellow space-y-8 animate-fade-in relative overflow-hidden">
-                <div className="text-center relative z-10 scale-110">
-                    <h1 className="text-[4rem] font-display font-black text-skate-black tracking-tight leading-[0.9] mb-4">
-                        SKATE<br/>
-                        <span className="text-white">TRAINER</span>
-                    </h1>
-                    <div className="flex items-center justify-center space-x-3">
-                        <div className="h-3 w-3 bg-skate-black rounded-full animate-bounce"></div>
-                        <div className="h-3 w-3 bg-white rounded-full animate-bounce delay-75"></div>
-                        <div className="h-3 w-3 bg-skate-black rounded-full animate-bounce delay-150"></div>
+            <div className="flex h-screen w-full flex-col items-center justify-center bg-[#E5E5E5] space-y-4 font-sans select-none overflow-hidden">
+                {/* 3D Keyboard Keys Aesthetic */}
+                <div className="grid grid-cols-2 gap-4">
+                    {/* Key: Do - Delays 0s */}
+                    <div className="w-32 h-32 relative group animate-key-press" style={{ animationDelay: '0s' }}>
+                        <div className="absolute inset-x-0 bottom-0 h-full rounded-[2rem] bg-[#D1D5DB]"></div> {/* Shadow */}
+                        <div className="absolute inset-x-0 top-0 h-[85%] rounded-[2rem] bg-[#F3F4F6] flex items-center justify-center shadow-sm">
+                            <span className="text-4xl font-black text-[#1C1917] font-mono tracking-tighter">Do</span>
+                        </div>
+                    </div>
+
+                    {/* Key: A - Delays 0.2s */}
+                    <div className="w-32 h-32 relative group animate-key-press" style={{ animationDelay: '0.2s' }}>
+                        <div className="absolute inset-x-0 bottom-0 h-full rounded-[2rem] bg-[#D1D5DB]"></div>
+                        <div className="absolute inset-x-0 top-0 h-[85%] rounded-[2rem] bg-[#F3F4F6] flex items-center justify-center shadow-sm">
+                            <span className="text-4xl font-black text-[#1C1917] font-mono tracking-tighter">A</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Key: Kickflip! - Delays 0.4s */}
+                <div className="w-[17rem] h-32 relative group animate-key-press" style={{ animationDelay: '0.4s' }}>
+                    <div className="absolute inset-x-0 bottom-0 h-full rounded-[2rem] bg-skate-deepOrange"></div> {/* Deep Orange Shadow */}
+                    <div className="absolute inset-x-0 top-0 h-[85%] rounded-[2rem] bg-skate-orange flex items-center justify-center shadow-sm flex-col gap-1">
+                        <span className="text-4xl font-black text-white font-mono tracking-tight italic">Kickflip!</span>
+                        <ArrowUpRight className="w-8 h-8 text-white/80" />
                     </div>
                 </div>
             </div>

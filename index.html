@@ -14,6 +14,7 @@
             fontFamily: {
               sans: ['Pretendard', 'Inter', '-apple-system', 'system-ui', 'sans-serif'],
               display: ['Pretendard', 'sans-serif'],
+              mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', "Liberation Mono", "Courier New", 'monospace'],
             },
             colors: {
               skate: {
@@ -22,6 +23,8 @@
                 black: '#1C1917', // Warm Black
                 deep: '#4A3B32', // Coffee Brown (Secondary)
                 yellow: '#FFE500', // Gen Z Yellow (Primary)
+                orange: '#FF6B00', // Vibrant Orange
+                deepOrange: '#C2410C', // Dark Orange (Shadow)
                 gray: '#A8A29E', // Warm Gray
                 lightGray: '#F5F5F4',
                 matcha: '#B6E388', 
@@ -39,6 +42,7 @@
               'fade-in': 'fadeIn 0.5s ease-out forwards',
               'slide-up': 'slideUp 0.4s ease-out forwards',
               'pulse-soft': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+              'key-press': 'keyPress 2s infinite',
             },
             keyframes: {
               fadeIn: {
@@ -48,6 +52,10 @@
               slideUp: {
                 '0%': { transform: 'translateY(20px)', opacity: '0' },
                 '100%': { transform: 'translateY(0)', opacity: '1' },
+              },
+              keyPress: {
+                '0%, 100%': { transform: 'translateY(0)' },
+                '50%': { transform: 'translateY(12px)' }, 
               }
             }
           }
