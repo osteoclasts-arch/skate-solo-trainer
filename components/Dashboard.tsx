@@ -1,7 +1,8 @@
+
 import React, { useState } from 'react';
 import { TRANSLATIONS } from '../constants';
 import { ResponsiveContainer, AreaChart, Area, Tooltip } from 'recharts';
-import { PlayCircle, Trophy, Activity, Globe, BookOpen, Calendar, Edit2, LogOut, Instagram, ArrowUpRight } from 'lucide-react';
+import { PlayCircle, Trophy, Activity, Globe, BookOpen, Calendar, Edit2, LogOut, Instagram, ArrowUpRight, CheckCircle, Target, Award } from 'lucide-react';
 import { SessionResult, Language, User } from '../types';
 
 interface Props {
@@ -34,6 +35,18 @@ const Dashboard: React.FC<Props> = ({
   const t = TRANSLATIONS[language];
   const [isEditingDate, setIsEditingDate] = useState(false);
   const [tempDate, setTempDate] = useState(startDate);
+
+  // --- DAILY QUESTS LOGIC ---
+  const today = new Date().toISOString().split('T')[0];
+  const todaysSessions = history.filter(h => new Date(h.date).toISOString().split('T')[0] === today);
+  const todayLanded = todaysSessions.reduce((acc, s) => acc + s.landedCount, 0);
+
+  const quests = [
+      { id: 1, title: language === 'KR' ? "출석 체크" : "Daily Check-in", current: 1, target: 1, completed: true },
+      { id: 2, title: language === 'KR' ? "세션 1회 완료" : "Complete 1 Session", current: todaysSessions.length, target: 1, completed: todaysSessions.length >= 1 },
+      { id: 3, title: language === 'KR' ? "트릭 10회 성공" : "Land 10 Tricks", current: todayLanded, target: 10, completed: todayLanded >= 10 }
+  ];
+  const allClear = quests.every(q => q.completed);
 
   // Generate chart data or use flat line for empty state
   const chartData = history.length > 0 
@@ -98,7 +111,7 @@ const Dashboard: React.FC<Props> = ({
       )}
 
       {/* Header */}
-      <header className="flex justify-between items-start pt-2">
+      <header className="flex justify-between items-start pt-2 shrink-0">
         <div className="flex flex-col">
             <h1 className="text-[3.5rem] font-display font-bold text-white leading-[0.85] tracking-tight">
                 SKATE<br/>
@@ -157,8 +170,54 @@ const Dashboard: React.FC<Props> = ({
         </div>
       </header>
 
+      {/* --- DAILY QUESTS CARD --- */}
+      <div className={`glass-card p-5 rounded-3xl border border-white/5 relative overflow-hidden transition-all duration-500 shrink-0 ${allClear ? 'shadow-[0_0_30px_rgba(204,255,0,0.15)] border-skate-neon/30' : ''}`}>
+          {allClear && (
+               <div className="absolute top-0 right-0 p-4 animate-fade-in z-10">
+                   <div className="bg-skate-neon text-black px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest flex items-center shadow-lg transform rotate-2">
+                       <Award className="w-3 h-3 mr-1" /> ALL CLEAR
+                   </div>
+               </div>
+          )}
+          
+          <div className="flex items-center space-x-2 mb-4">
+              <Target className={`w-5 h-5 ${allClear ? 'text-skate-neon' : 'text-gray-400'}`} />
+              <h3 className="text-sm font-bold uppercase tracking-widest text-white">
+                  {language === 'KR' ? "일일 퀘스트" : "Daily Missions"}
+              </h3>
+          </div>
+
+          <div className="space-y-3">
+              {quests.map(quest => (
+                  <div key={quest.id} className="group">
+                      <div className="flex justify-between items-center mb-1.5">
+                          <span className={`text-xs font-bold ${quest.completed ? 'text-white' : 'text-gray-400'}`}>
+                              {quest.title}
+                          </span>
+                          <div className="flex items-center space-x-2">
+                              <span className="text-[10px] font-mono text-gray-500">
+                                  {Math.min(quest.current, quest.target)} / {quest.target}
+                              </span>
+                              {quest.completed ? (
+                                  <CheckCircle className="w-4 h-4 text-skate-neon fill-skate-neon/20" />
+                              ) : (
+                                  <div className="w-4 h-4 rounded-full border border-gray-600" />
+                              )}
+                          </div>
+                      </div>
+                      <div className="h-1.5 w-full bg-gray-800 rounded-full overflow-hidden">
+                          <div 
+                              className={`h-full rounded-full transition-all duration-500 ${quest.completed ? 'bg-skate-neon shadow-[0_0_10px_rgba(204,255,0,0.5)]' : 'bg-gray-600'}`}
+                              style={{ width: `${Math.min((quest.current / quest.target) * 100, 100)}%` }}
+                          />
+                      </div>
+                  </div>
+              ))}
+          </div>
+      </div>
+
       {/* Main Stats (Bento Grid) */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3 shrink-0">
         {/* Total Landed */}
         <div className="glass-card p-5 rounded-3xl flex flex-col justify-between h-32 relative overflow-hidden group">
              <div className="absolute right-[-20px] top-[-20px] w-24 h-24 bg-skate-neon/5 rounded-full blur-2xl group-hover:bg-skate-neon/10 transition-all"></div>
@@ -220,7 +279,7 @@ const Dashboard: React.FC<Props> = ({
       </div>
 
       {/* Main Actions */}
-      <div className="space-y-4">
+      <div className="space-y-4 shrink-0">
           {/* New Session Action - Hero Button */}
           <button 
             onClick={onStart}
@@ -252,7 +311,7 @@ const Dashboard: React.FC<Props> = ({
       </div>
 
       {/* Footer / Credits */}
-      <div className="flex flex-col items-center justify-center mt-4 pb-4 space-y-2">
+      <div className="flex flex-col items-center justify-center mt-4 pb-4 space-y-2 shrink-0">
         <a 
           href="https://instagram.com/osteoclasts_" 
           target="_blank" 

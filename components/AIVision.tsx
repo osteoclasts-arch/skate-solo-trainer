@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Language, User, VisionAnalysis } from '../types';
 import { TRANSLATIONS } from '../constants';
-import { Upload, Zap, X, Eye, Info, Activity, Rotate3d, Compass, Scissors, Play, Pause, HelpCircle, BrainCircuit, ChevronLeft, ChevronRight, RotateCcw, AlertCircle, Footprints } from 'lucide-react';
+import { Upload, Zap, X, Eye, Info, Activity, Rotate3d, Compass, Scissors, Play, Pause, HelpCircle, BrainCircuit, ChevronLeft, ChevronRight, RotateCcw, AlertCircle, Footprints, Sparkles } from 'lucide-react';
 import { analyzeMedia } from '../services/geminiService';
 import { dbService } from '../services/dbService';
 // @ts-ignore
@@ -20,6 +20,14 @@ interface Props {
   language: Language;
   user: User | null;
 }
+
+const THINKING_STEPS = [
+    { text: { EN: "Tracking joints...", KR: "관절 위치 찾는 중..." } },
+    { text: { EN: "Calculating board physics...", KR: "보드 회전각 계산 중..." } },
+    { text: { EN: "Identifying trick...", KR: "트릭 기술 식별 중..." } },
+    { text: { EN: "Analyzing landing...", KR: "착지 안정성 평가 중..." } },
+    { text: { EN: "Generating feedback...", KR: "코칭 피드백 작성 중..." } }
+];
 
 const AIVision: React.FC<Props> = ({ language, user }) => {
   const t = TRANSLATIONS[language];
@@ -41,9 +49,9 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
   // Analysis State
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<VisionAnalysis | null>(null);
-  const [status, setStatus] = useState<string>("");
   const [extractionProgress, setExtractionProgress] = useState(0);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [thinkingStep, setThinkingStep] = useState(0);
 
   // Timer & Info State
   const [elapsedTime, setElapsedTime] = useState(0);
@@ -95,6 +103,18 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
           }
       };
   }, []);
+
+  // Cycle thinking steps
+  useEffect(() => {
+      if (isAnalyzing) {
+          const interval = setInterval(() => {
+              setThinkingStep(prev => (prev + 1) % THINKING_STEPS.length);
+          }, 2000);
+          return () => clearInterval(interval);
+      } else {
+          setThinkingStep(0);
+      }
+  }, [isAnalyzing]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
@@ -226,8 +246,6 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
       if (!ctx) return "";
-
-      setStatus("Tracking Skater & Board...");
       
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
@@ -322,7 +340,6 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
   const processVideo = async () => {
     if (!file) return;
     setIsAnalyzing(true);
-    setStatus("Analyzing...");
     setExtractionProgress(0);
     setElapsedTime(0);
 
@@ -336,7 +353,6 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
     try {
         if (videoRef.current && videoRef.current.readyState >= 1) {
              const csvData = await extractMotionData();
-             setStatus(t.ANALYZING_WITH_GEMINI);
              
              const userContext = user ? await dbService.getUserFeedbacks(user.uid) : [];
              
@@ -367,7 +383,6 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
     } finally {
         if (analysisTimerRef.current) clearInterval(analysisTimerRef.current);
         setIsAnalyzing(false);
-        setStatus("");
         setExtractionProgress(0);
     }
   };
@@ -482,7 +497,10 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
       {/* HEADER */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center space-x-3">
-            <Eye className="text-skate-neon w-8 h-8" />
+            <div className="relative">
+                <div className="absolute inset-0 bg-skate-neon blur-lg opacity-40 rounded-full"></div>
+                <Eye className="text-skate-neon w-8 h-8 relative z-10" />
+            </div>
             <h2 className="text-4xl font-display font-bold uppercase tracking-wide text-white">{t.AI_VISION_TITLE}</h2>
         </div>
         <button 
@@ -542,13 +560,13 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
       )}
 
       {/* TIP BANNER */}
-      {!analysisResult && (
-          <div className="bg-blue-900/20 border border-blue-500/30 rounded-xl p-4 mb-6 flex items-start space-x-3">
+      {!analysisResult && !isAnalyzing && (
+          <div className="bg-blue-900/10 border border-blue-500/20 rounded-2xl p-4 mb-6 flex items-start space-x-3">
               <Info className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
-              <p className="text-sm text-blue-200">
+              <p className="text-xs text-blue-200 leading-relaxed font-medium">
                   {language === 'KR' 
-                    ? "슬로우 모션(고프레임) 영상일수록, 그리고 정측면보다 정면과 측면 사이 보드가 잘 보이는 각도일 때 가장 정확합니다." 
-                    : "Best accuracy with Slow Motion (High FPS) and filming from a 45° angle (between front/side) where the board is clearly visible."}
+                    ? "팁: 슬로우 모션(고프레임) 영상일수록 분석이 정확합니다. 보드가 잘 보이도록 45도 각도나 측면에서 촬영해주세요." 
+                    : "Tip: Best accuracy with Slow Motion (High FPS). Film from a 45° angle or side view where the board is clearly visible."}
               </p>
           </div>
       )}
@@ -561,14 +579,14 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
             <div className="space-y-6">
                 <div 
                     onClick={() => fileInputRef.current?.click()}
-                    className="border-2 border-dashed border-white/20 rounded-3xl p-10 flex flex-col items-center justify-center text-center space-y-4 hover:bg-white/5 transition-colors cursor-pointer min-h-[250px] group"
+                    className="border-2 border-dashed border-white/10 rounded-[2rem] p-10 flex flex-col items-center justify-center text-center space-y-4 hover:bg-white/5 transition-all cursor-pointer min-h-[300px] group bg-white/[0.02]"
                 >
-                    <div className="w-20 h-20 bg-skate-neon/10 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
-                        <Upload className="w-10 h-10 text-skate-neon" />
+                    <div className="w-24 h-24 bg-skate-neon/5 rounded-full flex items-center justify-center group-hover:scale-110 group-hover:bg-skate-neon/10 transition-all duration-500">
+                        <Upload className="w-10 h-10 text-skate-neon opacity-80 group-hover:opacity-100" />
                     </div>
                     <div>
-                        <h3 className="text-2xl font-display font-bold text-white mb-2">{t.UPLOAD_MEDIA}</h3>
-                        <p className="text-gray-400 text-sm max-w-xs mx-auto">{t.AI_VISION_DESC}</p>
+                        <h3 className="text-2xl font-display font-bold text-white mb-2 tracking-wide">{t.UPLOAD_MEDIA}</h3>
+                        <p className="text-gray-500 text-sm max-w-xs mx-auto leading-relaxed">{t.AI_VISION_DESC}</p>
                     </div>
                     <input 
                         type="file" 
@@ -597,11 +615,11 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
                      </div>
                 )}
 
-                <div className="relative rounded-3xl overflow-hidden bg-black shadow-2xl border border-white/10 group">
+                <div className="relative rounded-[2rem] overflow-hidden bg-black shadow-2xl border border-white/10 group aspect-[9/16] md:aspect-video max-h-[60vh] mx-auto">
                     <video 
                         ref={videoRef}
                         src={previewUrl} 
-                        className="w-full h-auto max-h-[50vh] object-contain"
+                        className="w-full h-full object-contain"
                         playsInline
                         muted={false}
                         onLoadedMetadata={handleMetadataLoaded}
@@ -619,7 +637,7 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
                     </button>
                     {/* Centered Play Button for Preview */}
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                         <div className="bg-black/40 rounded-full p-4 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity">
+                         <div className="bg-black/40 rounded-full p-6 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity">
                             {videoRef.current?.paused ? <Play className="fill-white text-white w-8 h-8" /> : <Pause className="fill-white text-white w-8 h-8" />}
                          </div>
                     </div>
@@ -630,8 +648,8 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
                 </div>
 
                 {/* iPhone Style Trim Controls */}
-                <div className="glass-card p-4 rounded-2xl border border-white/10 space-y-3">
-                    <div className="flex items-center justify-between text-gray-400 mb-1">
+                <div className="glass-card p-4 rounded-3xl border border-white/10 space-y-3">
+                    <div className="flex items-center justify-between text-gray-400 mb-1 px-1">
                         <div className="flex items-center space-x-2">
                             <Scissors className="w-4 h-4" />
                             <span className="text-xs font-bold uppercase tracking-widest">{t.TRIM_RANGE || "Trim Video"}</span>
@@ -644,7 +662,7 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
                     {/* Timeline Container */}
                     <div 
                         ref={timelineRef}
-                        className="relative h-14 bg-gray-900 rounded-lg w-full select-none touch-none overflow-hidden cursor-pointer group"
+                        className="relative h-14 bg-gray-900 rounded-xl w-full select-none touch-none overflow-hidden cursor-pointer group border border-white/5"
                         onMouseDown={(e) => {
                              // If clicking on track (not handle), move playhead
                              const rect = e.currentTarget.getBoundingClientRect();
@@ -690,20 +708,20 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
                         >
                             {/* Left Handle (Ear) */}
                             <div 
-                                className="absolute left-0 top-0 bottom-0 w-5 bg-skate-neon flex items-center justify-center cursor-ew-resize pointer-events-auto shadow-lg -translate-x-1/2 rounded-l-md"
+                                className="absolute left-0 top-0 bottom-0 w-6 bg-skate-neon flex items-center justify-center cursor-ew-resize pointer-events-auto shadow-lg -translate-x-1/2 rounded-l-md active:scale-110 transition-transform"
                                 onMouseDown={(e) => { e.stopPropagation(); setIsDragging('start'); }}
                                 onTouchStart={(e) => { e.stopPropagation(); setIsDragging('start'); }}
                             >
-                                <ChevronLeft className="w-3 h-3 text-black" />
+                                <ChevronLeft className="w-4 h-4 text-black" />
                             </div>
 
                             {/* Right Handle (Ear) */}
                             <div 
-                                className="absolute right-0 top-0 bottom-0 w-5 bg-skate-neon flex items-center justify-center cursor-ew-resize pointer-events-auto shadow-lg translate-x-1/2 rounded-r-md"
+                                className="absolute right-0 top-0 bottom-0 w-6 bg-skate-neon flex items-center justify-center cursor-ew-resize pointer-events-auto shadow-lg translate-x-1/2 rounded-r-md active:scale-110 transition-transform"
                                 onMouseDown={(e) => { e.stopPropagation(); setIsDragging('end'); }}
                                 onTouchStart={(e) => { e.stopPropagation(); setIsDragging('end'); }}
                             >
-                                <ChevronRight className="w-3 h-3 text-black" />
+                                <ChevronRight className="w-4 h-4 text-black" />
                             </div>
                         </div>
 
@@ -712,16 +730,16 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
                             className="absolute top-0 bottom-0 w-0.5 bg-white z-30 pointer-events-none shadow-[0_0_5px_rgba(0,0,0,0.5)]"
                             style={{ left: `${(currentTime / videoDuration) * 100}%` }}
                         >
-                            <div className="absolute -top-1 -translate-x-1/2 w-2 h-2 bg-white rounded-full"></div>
+                            <div className="absolute -top-1 -translate-x-1/2 w-3 h-3 bg-white rounded-full shadow-md"></div>
                         </div>
                     </div>
 
-                    <div className="flex justify-between items-center mt-2">
+                    <div className="flex justify-between items-center mt-2 px-1">
                         <span className="text-[10px] font-mono text-gray-500">{trimStart.toFixed(1)}s</span>
                         <div className="flex space-x-3">
                              <button 
                                 onClick={() => { setTrimStart(0); setTrimEnd(videoDuration); }}
-                                className="text-[10px] font-bold text-gray-500 hover:text-white flex items-center bg-white/5 px-2 py-1 rounded"
+                                className="text-[10px] font-bold text-gray-500 hover:text-white flex items-center bg-white/5 px-3 py-1.5 rounded-full transition-colors"
                              >
                                  <RotateCcw className="w-3 h-3 mr-1" />
                                  RESET
@@ -731,19 +749,42 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
                     </div>
                 </div>
 
-                {/* Loading Overlay */}
+                {/* --- NEW LOADING UI --- */}
                 {isAnalyzing && (
-                    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/90 backdrop-blur-md transition-all">
-                        <div className="w-20 h-20 border-4 border-skate-neon/30 border-t-skate-neon rounded-full animate-spin mb-6"></div>
-                        <h3 className="text-2xl font-display font-bold text-white tracking-widest animate-pulse">
-                            ANALYZING {extractionProgress > 0 && extractionProgress < 100 && `${extractionProgress}%`}
-                        </h3>
-                        <p className="text-skate-neon font-mono text-xl font-bold mt-2">
-                             {elapsedTime.toFixed(1)}s
-                        </p>
-                        <p className="text-gray-400 text-xs font-mono uppercase tracking-wider mt-2">
-                            {status}
-                        </p>
+                    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/80 backdrop-blur-xl transition-all animate-fade-in">
+                        
+                        {/* Gemini Orb Animation */}
+                        <div className="relative mb-12">
+                            {/* Outer Glow */}
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-blue-500/20 rounded-full blur-3xl animate-pulse-slow"></div>
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-purple-500/30 rounded-full blur-2xl animate-pulse"></div>
+                            
+                            {/* Core Orb */}
+                            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-400 via-purple-400 to-skate-neon animate-blob shadow-[0_0_50px_rgba(255,255,255,0.2)] flex items-center justify-center relative overflow-hidden">
+                                <div className="absolute inset-0 bg-white/30 blur-sm animate-pulse-slow"></div>
+                                <Sparkles className="w-8 h-8 text-white animate-spin duration-[3000ms]" />
+                            </div>
+                        </div>
+
+                        {/* Thinking Text */}
+                        <div className="text-center space-y-4">
+                            <h3 className="text-3xl font-display font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-200 via-white to-purple-200 tracking-widest animate-pulse">
+                                GEMINI AI
+                            </h3>
+                            
+                            <div className="h-8 overflow-hidden">
+                                <p key={thinkingStep} className="text-skate-neon font-mono text-sm font-bold uppercase tracking-widest animate-slide-up">
+                                    {/* @ts-ignore */}
+                                    {THINKING_STEPS[thinkingStep].text[language]}
+                                </p>
+                            </div>
+
+                            <div className="bg-white/5 px-4 py-1 rounded-full border border-white/10 inline-block">
+                                <p className="text-gray-400 font-mono text-xs">
+                                     {elapsedTime.toFixed(1)}s elapsed
+                                </p>
+                            </div>
+                        </div>
                     </div>
                 )}
 
@@ -751,21 +792,21 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
                 {!isAnalyzing && (
                     <div className="space-y-4">
                         {/* Stance Selector */}
-                        <div className="glass-card p-4 rounded-2xl flex items-center justify-between">
+                        <div className="glass-card p-4 rounded-2xl flex items-center justify-between border border-white/5">
                              <div className="flex items-center space-x-2 text-gray-400">
                                 <Footprints className="w-5 h-5" />
                                 <span className="text-xs font-bold uppercase tracking-widest">{t.SELECT_YOUR_STANCE || "STANCE"}</span>
                              </div>
-                             <div className="flex space-x-2 bg-black/40 rounded-lg p-1">
+                             <div className="flex space-x-2 bg-black/40 rounded-xl p-1">
                                 <button 
                                     onClick={() => setStance('Regular')}
-                                    className={`px-4 py-2 rounded-md text-xs font-bold transition-all ${stance === 'Regular' ? 'bg-skate-neon text-black' : 'text-gray-500 hover:text-white'}`}
+                                    className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${stance === 'Regular' ? 'bg-skate-neon text-black shadow-lg' : 'text-gray-500 hover:text-white'}`}
                                 >
                                     REGULAR
                                 </button>
                                 <button 
                                     onClick={() => setStance('Goofy')}
-                                    className={`px-4 py-2 rounded-md text-xs font-bold transition-all ${stance === 'Goofy' ? 'bg-skate-neon text-black' : 'text-gray-500 hover:text-white'}`}
+                                    className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${stance === 'Goofy' ? 'bg-skate-neon text-black shadow-lg' : 'text-gray-500 hover:text-white'}`}
                                 >
                                     GOOFY
                                 </button>
@@ -773,7 +814,7 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
                         </div>
 
                         {/* Trick Name Input */}
-                        <div className="glass-card p-4 rounded-2xl flex items-center space-x-3">
+                        <div className="glass-card p-4 rounded-2xl flex items-center space-x-3 border border-white/5">
                             <Info className="w-5 h-5 text-gray-400" />
                             <input 
                                 type="text" 
@@ -787,7 +828,7 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
                         <button
                             onClick={processVideo}
                             disabled={isVideoError}
-                            className={`w-full py-5 bg-skate-neon hover:bg-skate-neonHover text-black font-display text-3xl font-bold uppercase rounded-[2rem] shadow-[0_0_20px_rgba(204,255,0,0.3)] transform active:scale-95 transition-all flex items-center justify-center space-x-3 ${isVideoError ? 'opacity-50 cursor-not-allowed grayscale' : ''}`}
+                            className={`w-full py-5 bg-skate-neon hover:bg-skate-neonHover text-black font-display text-3xl font-bold uppercase rounded-[2rem] shadow-[0_0_20px_rgba(204,255,0,0.3)] transform active:scale-[0.98] transition-all flex items-center justify-center space-x-3 ${isVideoError ? 'opacity-50 cursor-not-allowed grayscale' : ''}`}
                         >
                             <Zap className="w-6 h-6 fill-black" />
                             <span>{t.ANALYZE_TRICK}</span>
@@ -802,7 +843,7 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
             <div className="space-y-6 animate-slide-up pb-10">
                 
                 {/* Result Video Player with Overlay */}
-                <div className="relative rounded-3xl overflow-hidden bg-black border border-white/10 shadow-2xl">
+                <div className="relative rounded-[2rem] overflow-hidden bg-black border border-white/10 shadow-2xl mx-auto">
                     <video 
                         ref={resultVideoRef}
                         src={previewUrl!} 
@@ -821,18 +862,18 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
                     />
                     
                     {/* Player Controls */}
-                    <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between bg-black/60 backdrop-blur rounded-2xl p-3">
-                        <button onClick={togglePlay} className="p-2 bg-white text-black rounded-full hover:bg-gray-200">
+                    <div className="absolute bottom-6 left-6 right-6 flex items-center justify-between bg-black/60 backdrop-blur-md rounded-2xl p-3 border border-white/5">
+                        <button onClick={togglePlay} className="p-3 bg-white text-black rounded-full hover:bg-gray-200 transition-colors">
                             {isPlaying ? <Pause className="w-4 h-4 fill-black" /> : <Play className="w-4 h-4 fill-black ml-0.5" />}
                         </button>
                         
                         <div className="flex items-center space-x-2">
-                             <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mr-1">SPEED</span>
+                             <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mr-2">SPEED</span>
                              {[0.25, 0.5, 1.0].map(speed => (
                                  <button
                                     key={speed}
                                     onClick={() => changeSpeed(speed)}
-                                    className={`px-2 py-1 rounded-lg text-xs font-bold ${playbackSpeed === speed ? 'bg-skate-neon text-black' : 'bg-white/10 text-white hover:bg-white/20'}`}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${playbackSpeed === speed ? 'bg-skate-neon text-black' : 'bg-white/10 text-white hover:bg-white/20'}`}
                                  >
                                      {speed}x
                                  </button>
@@ -858,14 +899,14 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
                     </div>
 
                     <div className="grid grid-cols-2 gap-4 mt-6 relative z-10">
-                        <div className="bg-black/40 rounded-2xl p-4">
+                        <div className="bg-black/40 rounded-2xl p-4 border border-white/5">
                             <span className="text-gray-500 text-[10px] font-bold uppercase tracking-widest">{t.FORM_SCORE}</span>
                             <div className="flex items-baseline mt-1">
                                 <span className="text-3xl font-display font-bold text-white">{analysisResult.score}</span>
                                 <span className="text-sm text-gray-500 ml-1">/100</span>
                             </div>
                         </div>
-                        <div className="bg-black/40 rounded-2xl p-4">
+                        <div className="bg-black/40 rounded-2xl p-4 border border-white/5">
                             <span className="text-gray-500 text-[10px] font-bold uppercase tracking-widest">{t.HEIGHT_EST}</span>
                             <div className="flex items-baseline mt-1">
                                 <span className="text-3xl font-display font-bold text-white">{analysisResult.heightMeters}</span>
@@ -888,7 +929,7 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
                                 <span className="text-[10px] font-bold text-purple-300 uppercase">{getAxisLabel(analysisResult.boardPhysics.axis)}</span>
                             </div>
                         </div>
-                        <p className="text-gray-300 text-sm leading-relaxed whitespace-pre-wrap italic">
+                        <p className="text-gray-300 text-sm leading-relaxed whitespace-pre-wrap italic pl-2 border-l-2 border-purple-500/30">
                             "{analysisResult.boardPhysics.description}"
                         </p>
                     </div>
@@ -929,7 +970,7 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
                         setAnalysisResult(null);
                         setTrackingData([]);
                     }}
-                    className="w-full py-4 bg-white/5 rounded-2xl text-white font-bold uppercase tracking-widest hover:bg-white/10"
+                    className="w-full py-5 bg-white text-black rounded-[2rem] font-bold text-lg uppercase tracking-wide hover:bg-gray-200 transition-colors shadow-xl"
                 >
                     ANALYZE NEW VIDEO
                 </button>
@@ -939,8 +980,8 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
 
       {/* Feedback Modal */}
       {showFeedbackModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-6 animate-fade-in">
-              <div className="glass-card p-6 rounded-3xl w-full max-w-sm">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-6 animate-fade-in">
+              <div className="glass-card p-6 rounded-3xl w-full max-w-sm border border-white/10">
                   <h3 className="text-xl font-display font-bold text-white mb-2">{t.WRONG_ANALYSIS}</h3>
                   <p className="text-gray-400 text-xs mb-4">{t.PROVIDE_FEEDBACK}</p>
                   
@@ -954,7 +995,7 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
                   <div className="flex gap-3">
                       <button 
                         onClick={() => setShowFeedbackModal(false)}
-                        className="flex-1 py-3 bg-gray-800 rounded-xl font-bold text-gray-400"
+                        className="flex-1 py-3 bg-gray-800 rounded-xl font-bold text-gray-400 hover:bg-gray-700 transition-colors"
                       >
                           {t.CANCEL}
                       </button>
@@ -963,7 +1004,7 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
                             const input = document.getElementById('actualTrick') as HTMLInputElement;
                             handleFeedbackSubmit({ actualTrickName: input.value });
                         }}
-                        className="flex-1 py-3 bg-skate-neon text-black rounded-xl font-bold"
+                        className="flex-1 py-3 bg-skate-neon text-black rounded-xl font-bold hover:bg-skate-neonHover transition-colors"
                       >
                           {t.SEND_FEEDBACK}
                       </button>
