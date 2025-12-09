@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Language, User, VisionAnalysis } from '../types';
 import { TRANSLATIONS } from '../constants';
-import { Upload, Zap, X, Eye, Info, Activity, Rotate3d, Compass, Scissors, Play, Pause, HelpCircle, BrainCircuit } from 'lucide-react';
+import { Upload, Zap, X, Eye, Info, Activity, Rotate3d, Compass, Scissors, Play, Pause, HelpCircle, BrainCircuit, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react';
 import { analyzeMedia } from '../services/geminiService';
 import { dbService } from '../services/dbService';
 // @ts-ignore
@@ -32,6 +32,8 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
   // Trimming State
   const [trimStart, setTrimStart] = useState(0);
   const [trimEnd, setTrimEnd] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0); // Track playback for UI
+  const [isDragging, setIsDragging] = useState<'start' | 'end' | 'playhead' | null>(null);
   
   // Analysis State
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -54,6 +56,7 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
   // Refs
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const timelineRef = useRef<HTMLDivElement>(null);
   const resultVideoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null); 
   const poseEstimator = useRef<any>(null);
@@ -124,6 +127,74 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
       setVideoDuration(duration);
       if (trimEnd === 0) setTrimEnd(duration);
   };
+
+  const handleTimeUpdate = (e: React.SyntheticEvent<HTMLVideoElement>) => {
+      const vid = e.currentTarget;
+      setCurrentTime(vid.currentTime);
+
+      // Loop Logic during Preview
+      if (!analysisResult && !isDragging) {
+          if (vid.currentTime >= trimEnd) {
+              vid.currentTime = trimStart;
+              vid.play();
+          }
+      }
+  };
+
+  // --- TIMELINE DRAG LOGIC ---
+  const handleTimelineInteraction = (clientX: number) => {
+      if (!timelineRef.current || videoDuration === 0) return;
+      const rect = timelineRef.current.getBoundingClientRect();
+      const x = Math.max(0, Math.min(clientX - rect.left, rect.width));
+      const percentage = x / rect.width;
+      const newTime = percentage * videoDuration;
+
+      if (isDragging === 'start') {
+          // Constrain: Can't go past End - 0.5s
+          const maxStart = Math.max(0, trimEnd - 0.5);
+          const val = Math.min(newTime, maxStart);
+          setTrimStart(val);
+          if (videoRef.current) videoRef.current.currentTime = val;
+      } else if (isDragging === 'end') {
+          // Constrain: Can't go before Start + 0.5s
+          const minEnd = Math.min(videoDuration, trimStart + 0.5);
+          const val = Math.max(newTime, minEnd);
+          setTrimEnd(val);
+          if (videoRef.current) videoRef.current.currentTime = val;
+      } else if (isDragging === 'playhead') {
+          // Playhead logic (scrubbing)
+          if (videoRef.current) {
+              videoRef.current.currentTime = newTime;
+              setCurrentTime(newTime);
+          }
+      }
+  };
+
+  useEffect(() => {
+      const handleMove = (e: MouseEvent | TouchEvent) => {
+          if (isDragging) {
+              const clientX = 'touches' in e ? e.touches[0].clientX : (e as MouseEvent).clientX;
+              handleTimelineInteraction(clientX);
+          }
+      };
+      const handleUp = () => {
+          setIsDragging(null);
+      };
+
+      if (isDragging) {
+          window.addEventListener('mousemove', handleMove);
+          window.addEventListener('mouseup', handleUp);
+          window.addEventListener('touchmove', handleMove);
+          window.addEventListener('touchend', handleUp);
+      }
+      return () => {
+          window.removeEventListener('mousemove', handleMove);
+          window.removeEventListener('mouseup', handleUp);
+          window.removeEventListener('touchmove', handleMove);
+          window.removeEventListener('touchend', handleUp);
+      };
+  }, [isDragging, videoDuration, trimStart, trimEnd]);
+
 
   // --- EXTRACTION & TRACKING LOGIC ---
   const extractMotionData = async (): Promise<string> => {
@@ -314,29 +385,7 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
                mpDrawing.drawLandmarks(ctx, currentFrameData.landmarks, {color: '#E3FF37', lineWidth: 1, radius: 2});
            }
       }
-
-      // Draw Board Center Tracking
-      if (currentFrameData.boardCenter) {
-          const x = currentFrameData.boardCenter.x * canvas.width;
-          const y = currentFrameData.boardCenter.y * canvas.height;
-          
-          // Draw Target
-          ctx.beginPath();
-          ctx.arc(x, y, 8, 0, 2 * Math.PI);
-          ctx.strokeStyle = '#E3FF37'; // Neon
-          ctx.lineWidth = 3;
-          ctx.stroke();
-          
-          ctx.beginPath();
-          ctx.arc(x, y, 3, 0, 2 * Math.PI);
-          ctx.fillStyle = '#E3FF37';
-          ctx.fill();
-
-          // Label
-          ctx.fillStyle = '#E3FF37';
-          ctx.font = 'bold 12px sans-serif';
-          ctx.fillText("BOARD", x + 12, y + 4);
-      }
+      // Removed Board Marker drawing as requested
 
       requestRef.current = requestAnimationFrame(drawResultFrame);
   };
@@ -389,6 +438,19 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
           case 'YAW': return t.AXIS_YAW;
           case 'MIXED': return t.AXIS_MIXED;
           default: return t.AXIS_NONE;
+      }
+  };
+
+  const togglePreviewPlay = () => {
+      if (!videoRef.current) return;
+      if (videoRef.current.paused) {
+          // If we are at the end of clip, restart from trimStart
+          if (videoRef.current.currentTime >= trimEnd) {
+              videoRef.current.currentTime = trimStart;
+          }
+          videoRef.current.play();
+      } else {
+          videoRef.current.pause();
       }
   };
 
@@ -463,8 +525,8 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
               <Info className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
               <p className="text-sm text-blue-200">
                   {language === 'KR' 
-                    ? "슬로우 모션(고프레임) 영상일수록 AI 분석과 트래킹 정확도가 훨씬 높아집니다." 
-                    : "Using Slow Motion (High FPS) video significantly improves AI analysis and tracking accuracy."}
+                    ? "슬로우 모션(고프레임) 영상일수록, 그리고 정측면보다 정면과 측면 사이 보드가 잘 보이는 각도일 때 가장 정확합니다." 
+                    : "Best accuracy with Slow Motion (High FPS) and filming from a 45° angle (between front/side) where the board is clearly visible."}
               </p>
           </div>
       )}
@@ -505,10 +567,10 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
                         ref={videoRef}
                         src={previewUrl} 
                         className="w-full h-auto max-h-[50vh] object-contain"
-                        controls={false}
                         playsInline
-                        muted
+                        muted={false}
                         onLoadedMetadata={handleMetadataLoaded}
+                        onTimeUpdate={handleTimeUpdate}
                     />
                      <button 
                         onClick={() => {
@@ -519,64 +581,117 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
                     >
                         <X className="w-5 h-5" />
                     </button>
+                    {/* Centered Play Button for Preview */}
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                         <div className="bg-black/40 rounded-full p-4 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity">
+                            {videoRef.current?.paused ? <Play className="fill-white text-white w-8 h-8" /> : <Pause className="fill-white text-white w-8 h-8" />}
+                         </div>
+                    </div>
+                    <button 
+                        onClick={togglePreviewPlay}
+                        className="absolute inset-0 w-full h-full cursor-pointer z-10 opacity-0"
+                    ></button>
                 </div>
 
-                {/* Trim Controls */}
-                <div className="glass-card p-5 rounded-2xl border border-white/10 space-y-4">
-                    <div className="flex items-center space-x-2 text-gray-400 mb-2">
-                        <Scissors className="w-4 h-4" />
-                        <span className="text-xs font-bold uppercase tracking-widest">{t.TRIM_RANGE || "Trim Video"}</span>
+                {/* iPhone Style Trim Controls */}
+                <div className="glass-card p-4 rounded-2xl border border-white/10 space-y-3">
+                    <div className="flex items-center justify-between text-gray-400 mb-1">
+                        <div className="flex items-center space-x-2">
+                            <Scissors className="w-4 h-4" />
+                            <span className="text-xs font-bold uppercase tracking-widest">{t.TRIM_RANGE || "Trim Video"}</span>
+                        </div>
+                        <span className="text-xs font-mono font-bold text-skate-neon">
+                            {(trimEnd - trimStart).toFixed(1)}s Selected
+                        </span>
                     </div>
-                    
-                    <div className="flex items-center space-x-4">
-                         <div className="flex-1 space-y-1">
-                             <label className="text-[10px] uppercase font-bold text-gray-500">{t.SET_START}</label>
-                             <div className="flex items-center space-x-2">
-                                <input 
-                                    type="number" 
-                                    step="0.1" 
-                                    min="0" 
-                                    max={trimEnd}
-                                    value={trimStart}
-                                    onChange={(e) => setTrimStart(Number(e.target.value))}
-                                    className="bg-black/50 border border-white/10 rounded-lg p-2 text-white w-full text-sm"
-                                />
-                                <span className="text-xs text-gray-500">s</span>
-                             </div>
-                         </div>
-                         <div className="flex-1 space-y-1">
-                             <label className="text-[10px] uppercase font-bold text-gray-500">{t.SET_END}</label>
-                             <div className="flex items-center space-x-2">
-                                <input 
-                                    type="number" 
-                                    step="0.1" 
-                                    min={trimStart}
-                                    max={videoDuration}
-                                    value={trimEnd}
-                                    onChange={(e) => setTrimEnd(Number(e.target.value))}
-                                    className="bg-black/50 border border-white/10 rounded-lg p-2 text-white w-full text-sm"
-                                />
-                                <span className="text-xs text-gray-500">s</span>
-                             </div>
-                         </div>
-                         <button 
-                            onClick={() => { setTrimStart(0); setTrimEnd(videoDuration); }}
-                            className="bg-white/5 p-3 rounded-xl hover:bg-white/10 mt-5"
-                         >
-                             <span className="text-xs font-bold text-gray-400">{t.RESET_TRIM}</span>
-                         </button>
-                    </div>
-                    <div className="w-full bg-gray-800 h-1.5 rounded-full relative mt-2">
+
+                    {/* Timeline Container */}
+                    <div 
+                        ref={timelineRef}
+                        className="relative h-14 bg-gray-900 rounded-lg w-full select-none touch-none overflow-hidden cursor-pointer group"
+                        onMouseDown={(e) => {
+                             // If clicking on track (not handle), move playhead
+                             const rect = e.currentTarget.getBoundingClientRect();
+                             const x = e.clientX - rect.left;
+                             const pct = x / rect.width;
+                             const time = pct * videoDuration;
+                             if (videoRef.current) {
+                                 videoRef.current.currentTime = time;
+                                 setCurrentTime(time);
+                             }
+                             setIsDragging('playhead');
+                        }}
+                        onTouchStart={(e) => {
+                             const rect = e.currentTarget.getBoundingClientRect();
+                             const x = e.touches[0].clientX - rect.left;
+                             const pct = x / rect.width;
+                             const time = pct * videoDuration;
+                             setIsDragging('playhead');
+                             if(time < trimStart || time > trimEnd) {
+                                  if(videoRef.current) videoRef.current.currentTime = time;
+                             }
+                        }}
+                    >
+                        {/* Dimmed Overlay Left */}
                         <div 
-                            className="absolute h-full bg-skate-neon opacity-50" 
-                            style={{ 
-                                left: `${(trimStart / videoDuration) * 100}%`, 
-                                width: `${((trimEnd - trimStart) / videoDuration) * 100}%` 
-                            }}
+                            className="absolute left-0 top-0 bottom-0 bg-black/70 pointer-events-none z-10 transition-all duration-75"
+                            style={{ width: `${(trimStart / videoDuration) * 100}%` }}
                         />
+                        
+                        {/* Dimmed Overlay Right */}
+                        <div 
+                            className="absolute right-0 top-0 bottom-0 bg-black/70 pointer-events-none z-10 transition-all duration-75"
+                            style={{ width: `${100 - (trimEnd / videoDuration) * 100}%` }}
+                        />
+
+                        {/* Active Selection Frame (Yellow Box) */}
+                        <div 
+                            className="absolute top-0 bottom-0 border-y-2 border-skate-neon z-20 pointer-events-none"
+                            style={{ 
+                                left: `${(trimStart / videoDuration) * 100}%`,
+                                right: `${100 - (trimEnd / videoDuration) * 100}%`
+                            }}
+                        >
+                            {/* Left Handle (Ear) */}
+                            <div 
+                                className="absolute left-0 top-0 bottom-0 w-5 bg-skate-neon flex items-center justify-center cursor-ew-resize pointer-events-auto shadow-lg -translate-x-1/2 rounded-l-md"
+                                onMouseDown={(e) => { e.stopPropagation(); setIsDragging('start'); }}
+                                onTouchStart={(e) => { e.stopPropagation(); setIsDragging('start'); }}
+                            >
+                                <ChevronLeft className="w-3 h-3 text-black" />
+                            </div>
+
+                            {/* Right Handle (Ear) */}
+                            <div 
+                                className="absolute right-0 top-0 bottom-0 w-5 bg-skate-neon flex items-center justify-center cursor-ew-resize pointer-events-auto shadow-lg translate-x-1/2 rounded-r-md"
+                                onMouseDown={(e) => { e.stopPropagation(); setIsDragging('end'); }}
+                                onTouchStart={(e) => { e.stopPropagation(); setIsDragging('end'); }}
+                            >
+                                <ChevronRight className="w-3 h-3 text-black" />
+                            </div>
+                        </div>
+
+                        {/* Playhead */}
+                        <div 
+                            className="absolute top-0 bottom-0 w-0.5 bg-white z-30 pointer-events-none shadow-[0_0_5px_rgba(0,0,0,0.5)]"
+                            style={{ left: `${(currentTime / videoDuration) * 100}%` }}
+                        >
+                            <div className="absolute -top-1 -translate-x-1/2 w-2 h-2 bg-white rounded-full"></div>
+                        </div>
                     </div>
-                    <div className="text-center text-xs text-skate-neon font-bold uppercase tracking-widest">
-                        {t.CLIP_DURATION}: {(trimEnd - trimStart).toFixed(1)}s
+
+                    <div className="flex justify-between items-center mt-2">
+                        <span className="text-[10px] font-mono text-gray-500">{trimStart.toFixed(1)}s</span>
+                        <div className="flex space-x-3">
+                             <button 
+                                onClick={() => { setTrimStart(0); setTrimEnd(videoDuration); }}
+                                className="text-[10px] font-bold text-gray-500 hover:text-white flex items-center bg-white/5 px-2 py-1 rounded"
+                             >
+                                 <RotateCcw className="w-3 h-3 mr-1" />
+                                 RESET
+                             </button>
+                        </div>
+                        <span className="text-[10px] font-mono text-gray-500">{trimEnd.toFixed(1)}s</span>
                     </div>
                 </div>
 
