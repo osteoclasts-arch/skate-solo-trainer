@@ -54,10 +54,38 @@ const Dashboard: React.FC<Props> = ({
   const [suggestedSpot, setSuggestedSpot] = useState("");
 
   useEffect(() => {
-    const spotsKR = ["뚝섬(파크)", "컬트(훈련소)", "보라매(성지)", "반포(한강)", "노들섬(크루징)", "여의도(광장)", "난지(파크)"];
-    const spotsEN = ["the local park", "downtown plaza", "a street spot", "the skatepark", "a quiet flatground"];
-    const targetSpots = language === 'KR' ? spotsKR : spotsEN;
-    setSuggestedSpot(targetSpots[Math.floor(Math.random() * targetSpots.length)]);
+    if (language === 'KR') {
+        // 15% chance to suggest rainy day spots for variety
+        const isRainyMood = Math.random() < 0.15; 
+
+        const sunnySpots = [
+            "뚝섬 한강공원", 
+            "보라매 (성지)", 
+            "서울숲 스케이트파크", 
+            "집 앞 스트릿 스팟", 
+            "컬트 (훈련소)", 
+            "난지 파크",
+            "동대문 (훈련소)",
+            "이촌 한강공원"
+        ];
+        const rainySpots = [
+            "신대방 (다리 밑)", 
+            "디디미 (실내 파크)", 
+            "집 거실 (카페트 보딩)"
+        ];
+
+        if (isRainyMood) {
+            const spot = rainySpots[Math.floor(Math.random() * rainySpots.length)];
+            setSuggestedSpot(`혹시 비가 오나요? ${spot} 추천!`);
+        } else {
+            const spot = sunnySpots[Math.floor(Math.random() * sunnySpots.length)];
+            setSuggestedSpot(`오늘은 ${spot} 어때요?`);
+        }
+    } else {
+        const spots = ["the local park", "a covered spot", "the skatepark", "a street spot", "your garage"];
+        const spot = spots[Math.floor(Math.random() * spots.length)];
+        setSuggestedSpot(`How about ${spot} today?`);
+    }
   }, [language]);
 
   // Load quests and stats from User prop on mount/update
@@ -287,7 +315,7 @@ const Dashboard: React.FC<Props> = ({
             </h1>
             <p className="text-xs font-medium text-gray-500 mt-2 flex items-center gap-1.5 animate-fade-in">
                 <MapPin className="w-3.5 h-3.5 text-skate-deep" />
-                {language === 'KR' ? `오늘은 ${suggestedSpot} 어때요?` : `How about ${suggestedSpot} today?`}
+                {suggestedSpot}
             </p>
         </div>
         
