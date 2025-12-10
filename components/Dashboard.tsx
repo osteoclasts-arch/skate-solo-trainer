@@ -22,12 +22,11 @@ interface Props {
 }
 
 const STREET_SPOTS = [
+  "세운상가",
   "용두공원", 
   "코엑스 앞", 
   "서울대 정문", 
   "낙성대 공원", 
-  "신대방 (다리 밑)", 
-  "디디미 (다리 밑)", 
   "이촌 한강공원"
 ];
 
@@ -37,9 +36,15 @@ const PARK_SPOTS = [
   "서울숲 스케이트파크", 
   "컬트 (훈련원 공원)", 
   "난지 파크", 
-  "K88 (실내 파크)", 
-  "트랜지션 정글 (실내 파크)", 
-  "크래프터 평택 (실내 파크)"
+  "신대방 (다리 밑)", 
+  "디디미 (다리 밑)"
+];
+
+const INDOOR_SPOTS = [
+  "로프라운지",
+  "K88", 
+  "트랜지션 정글", 
+  "크래프터 평택"
 ];
 
 const Dashboard: React.FC<Props> = ({ 
@@ -84,15 +89,23 @@ const Dashboard: React.FC<Props> = ({
   useEffect(() => {
     if (language === 'KR') {
         const isRainyMood = Math.random() < 0.15; 
-        const sunnySpots = ["뚝섬 한강공원", "보라매 x게임장 (헬멧 필수)", "서울숲 스케이트파크", "컬트 (훈련원 공원)", "난지 파크", "이촌 한강공원", "용두공원", "코엑스 앞", "서울대 정문", "낙성대 공원"];
-        const rainySpots = ["신대방 (다리 밑)", "디디미 (다리 밑)", "K88 (실내 파크)", "트랜지션 정글 (실내 파크)", "크래프터 평택 (실내 파크)", "집 거실 (카페트 보딩)"];
-
+        
         if (isRainyMood) {
+            // Suggest Indoor or Covered spots
+            const rainySpots = [...INDOOR_SPOTS, "신대방 (다리 밑)", "디디미 (다리 밑)"];
             const spot = rainySpots[Math.floor(Math.random() * rainySpots.length)];
             setSuggestedSpot(`혹시 비가 오나요? ${spot} 추천!`);
         } else {
-            const spot = sunnySpots[Math.floor(Math.random() * sunnySpots.length)];
-            setSuggestedSpot(`오늘은 ${spot} 어때요?`);
+            // 50% chance for Street vs Park
+            const isStreet = Math.random() > 0.5;
+            
+            if (isStreet) {
+                const spot = STREET_SPOTS[Math.floor(Math.random() * STREET_SPOTS.length)];
+                setSuggestedSpot(`오늘 ${spot}에서 스트릿 어때요?`);
+            } else {
+                const spot = PARK_SPOTS[Math.floor(Math.random() * PARK_SPOTS.length)];
+                setSuggestedSpot(`오늘은 ${spot} 어때요?`);
+            }
         }
     } else {
         const spots = ["the local park", "a covered spot", "the skatepark", "a street spot", "your garage"];
@@ -317,6 +330,9 @@ const Dashboard: React.FC<Props> = ({
           </button>
           <button onClick={() => setSpotListModal({ title: language === 'KR' ? '스케이트 파크' : 'Skate Parks', spots: PARK_SPOTS })} className="px-5 py-2 rounded-full bg-white dark:bg-zinc-900 text-gray-400 dark:text-gray-300 text-sm font-bold border border-gray-100 dark:border-zinc-800 whitespace-nowrap active:scale-95 transition-transform hover:bg-gray-50 dark:hover:bg-zinc-800 hover:text-skate-black dark:hover:text-white">
             Park
+          </button>
+          <button onClick={() => setSpotListModal({ title: language === 'KR' ? '실내 파크' : 'Indoor Parks', spots: INDOOR_SPOTS })} className="px-5 py-2 rounded-full bg-white dark:bg-zinc-900 text-gray-400 dark:text-gray-300 text-sm font-bold border border-gray-100 dark:border-zinc-800 whitespace-nowrap active:scale-95 transition-transform hover:bg-gray-50 dark:hover:bg-zinc-800 hover:text-skate-black dark:hover:text-white">
+            Indoor
           </button>
       </div>
 
