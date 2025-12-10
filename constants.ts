@@ -493,5 +493,35 @@ export const TRICK_TIPS_DB: Record<string, TrickTip[]> = {
         },
         source: "Pro Coach"
       }
+  ],
+  "Backside 180": [
+      {
+        text: {
+            EN: "Wind up your shoulders before you pop. Release the turn AS you pop, not after.",
+            KR: "점프 전에 어깨를 먼저 감았다가(Wind up), 팝과 동시에 몸을 던져야 합니다. 팝하고 돌면 늦습니다."
+        },
+        source: "Pro Coach"
+      },
+      {
+        text: {
+            EN: "Your body follows your head. Turn your head aggressively to look behind you.",
+            KR: "머리와 시선이 가는 곳으로 몸이 따라갑니다. 등이 보이는 쪽으로 시선을 과감하게 보내세요."
+        },
+        source: "Pro Coach"
+      },
+      {
+        text: {
+            EN: "Pop like an Ollie but add a slight scoop to help the board stick to your feet.",
+            KR: "알리 팝과 동시에 뒷발에 약간의 스쿱을 섞어주면 보드가 발에 잘 붙어옵니다."
+        },
+        source: "Community"
+      },
+      {
+        text: {
+            EN: "If you under-rotate, land heavy on the nose wheels and pivot the rest.",
+            KR: "각도가 모자라면 착지할 때 앞발(노즈)을 축으로 나머지 각도를 비벼서(Pivot) 채우세요."
+        },
+        source: "Pro Coach"
+      }
   ]
 };
