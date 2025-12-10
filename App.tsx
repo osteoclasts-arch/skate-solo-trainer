@@ -263,13 +263,15 @@ const App: React.FC = () => {
         return (
             <div className="flex h-screen w-full flex-col items-center justify-center bg-white dark:bg-black font-sans relative overflow-hidden transition-colors duration-300">
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-crit-accent rounded-full blur-[150px] opacity-20 animate-pulse-slow"></div>
-                <div className="relative z-10 flex flex-col items-center gap-6">
-                    <div className="w-24 h-24 rounded-[2rem] bg-gray-50 dark:bg-crit-surface border border-gray-100 dark:border-white/10 flex items-center justify-center animate-slide-up shadow-glow">
-                        <Sparkles className="w-10 h-10 text-crit-accent fill-crit-accent" />
+                
+                {/* Text Logo Wordmark */}
+                <div className="relative z-10 flex flex-col items-center animate-slide-up">
+                    <div className="relative flex items-center justify-center">
+                        <h1 className="text-7xl md:text-9xl font-black text-black dark:text-white tracking-tighter leading-none z-10 select-none">
+                            crete
+                        </h1>
+                        <Sparkles className="absolute -top-4 -right-8 w-10 h-10 md:w-14 md:h-14 text-crit-accent fill-crit-accent z-20 animate-bounce-subtle" />
                     </div>
-                    <h1 className="text-5xl font-black text-black dark:text-white tracking-tighter animate-slide-up" style={{ animationDelay: '0.1s' }}>
-                        crete
-                    </h1>
                 </div>
 
                 {/* FOOTER */}
