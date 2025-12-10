@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { TRANSLATIONS, BASE_TRICKS } from '../constants';
-import { Play, BookOpen, Eye, Zap, Calendar, ArrowUpRight, TrendingUp, Target, Shield, Star, X, MapPin, Instagram, ListVideo, Settings, Sparkles, ChevronRight, Check, Flame, Trophy, Bell, MoreHorizontal, User, Moon, Sun, Edit2, List } from 'lucide-react';
+import { Play, BookOpen, Eye, Zap, Calendar, ArrowUpRight, TrendingUp, Target, Shield, Star, X, MapPin, Instagram, ListVideo, Settings, Sparkles, ChevronRight, Check, Flame, Trophy, Bell, MoreHorizontal, User, Moon, Sun, Edit2, List, Map } from 'lucide-react';
 import { SessionResult, Language, User as UserType, Quest, Trick } from '../types';
 import { dbService } from '../services/dbService';
 import CalendarModal from './CalendarModal';
@@ -106,6 +106,9 @@ const getRegion = (spot: string) => {
     return 'Seoul'; // Default
 };
 
+// Map Query Helper
+const getQueryName = (spot: string) => spot.split('(')[0].trim();
+
 const Dashboard: React.FC<Props> = ({ 
     onStart, 
     onLearning, 
@@ -144,8 +147,10 @@ const Dashboard: React.FC<Props> = ({
 
   // Spot Suggestion State
   const [suggestedSpot, setSuggestedSpot] = useState("");
-  // Updated to handle grouped spots
+  // Updated to handle grouped spots & View Mode
   const [spotListModal, setSpotListModal] = useState<{ title: string, groupedSpots: Record<string, string[]> } | null>(null);
+  const [spotListMode, setSpotListMode] = useState<'list' | 'map'>('list');
+  const [expandedMapSpot, setExpandedMapSpot] = useState<string | null>(null);
   
   // Daily Trick
   const [dailyTrick, setDailyTrick] = useState<Trick | null>(null);
@@ -236,7 +241,7 @@ const Dashboard: React.FC<Props> = ({
       }
   };
 
-  const openSpotList = () => {
+  const openSpotList = (mode: 'list' | 'map') => {
       let spots: string[] = [];
       if (selectedTab === 'Street') spots = STREET_SPOTS;
       else if (selectedTab === 'Park') spots = PARK_SPOTS;
@@ -262,10 +267,12 @@ const Dashboard: React.FC<Props> = ({
           if (grouped[key].length === 0) delete grouped[key];
       });
 
+      setSpotListMode(mode);
       setSpotListModal({
           title: selectedTab === 'All' ? 'All Spots' : `${selectedTab} Spots`,
           groupedSpots: grouped
       });
+      setExpandedMapSpot(null); // Reset expanded state
   };
 
   return (
@@ -323,14 +330,14 @@ const Dashboard: React.FC<Props> = ({
         </div>
       </header>
 
-      {/* Filter Tabs & List Button - Fixed Layout */}
-      <div className="flex items-center justify-between shrink-0 gap-2 overflow-hidden px-1 py-1">
-          <div className="flex-1 overflow-x-auto scrollbar-hide flex gap-2 min-w-0 pr-4">
+      {/* Filter Tabs & List Button - Layout Fixed with compact sizes */}
+      <div className="flex items-center shrink-0 gap-2 overflow-hidden px-1 py-1 relative">
+          <div className="flex-1 overflow-x-auto scrollbar-hide flex gap-1.5 min-w-0 pr-2">
             {['All', 'Street', 'Park', 'Indoor'].map((tab) => (
                 <button 
                     key={tab}
                     onClick={() => setSelectedTab(tab as any)}
-                    className={`px-4 py-2.5 rounded-full text-sm font-black transition-all whitespace-nowrap border-2 shrink-0 ${
+                    className={`px-3.5 py-2 rounded-full text-xs font-black transition-all whitespace-nowrap border-2 shrink-0 ${
                         selectedTab === tab 
                         ? 'bg-crit-accent text-black border-crit-accent shadow-[0_0_15px_rgba(230,255,0,0.4)]' 
                         : 'bg-transparent text-gray-500 border-gray-200 dark:border-zinc-800 hover:border-gray-400 dark:hover:border-zinc-600'
@@ -340,12 +347,18 @@ const Dashboard: React.FC<Props> = ({
                 </button>
             ))}
           </div>
-          <div className="flex items-center gap-2 shrink-0 pl-2 border-l border-gray-200 dark:border-zinc-800">
+          <div className="flex items-center gap-1 shrink-0 pl-2 border-l border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-crit-bg z-10">
              <button 
-                onClick={openSpotList}
-                className="w-10 h-10 rounded-full bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 flex items-center justify-center text-skate-black dark:text-white hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors shrink-0 shadow-sm"
+                onClick={() => openSpotList('list')}
+                className="w-9 h-9 rounded-full bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 flex items-center justify-center text-skate-black dark:text-white hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors shrink-0 shadow-sm"
              >
-                 <List className="w-5 h-5" />
+                 <List className="w-4 h-4" />
+             </button>
+             <button 
+                onClick={() => openSpotList('map')}
+                className="w-9 h-9 rounded-full bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 flex items-center justify-center text-skate-black dark:text-white hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors shrink-0 shadow-sm"
+             >
+                 <Map className="w-4 h-4" />
              </button>
           </div>
       </div>
@@ -507,29 +520,90 @@ const Dashboard: React.FC<Props> = ({
       {spotListModal && (
           <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-6 animate-fade-in">
               <div className="bg-white dark:bg-crit-surface w-full max-w-sm rounded-[2.5rem] p-6 text-black dark:text-white relative flex flex-col max-h-[80vh] border border-gray-200 dark:border-white/10 shadow-2xl">
+                  {/* Modal Header */}
                   <div className="flex justify-between items-center mb-6 shrink-0">
-                      <h3 className="text-xl font-black flex items-center gap-2">
-                         <MapPin className="text-crit-accent w-5 h-5" /> {spotListModal.title}
-                      </h3>
+                      <div className="flex items-center gap-2">
+                           <div className="bg-gray-100 dark:bg-zinc-800 p-1 rounded-full flex gap-1">
+                               <button 
+                                  onClick={() => setSpotListMode('list')}
+                                  className={`p-2 rounded-full transition-all ${spotListMode === 'list' ? 'bg-white dark:bg-black shadow-sm text-black dark:text-white' : 'text-gray-400 hover:text-gray-600'}`}
+                               >
+                                   <List className="w-4 h-4" />
+                               </button>
+                               <button 
+                                  onClick={() => setSpotListMode('map')}
+                                  className={`p-2 rounded-full transition-all ${spotListMode === 'map' ? 'bg-white dark:bg-black shadow-sm text-black dark:text-white' : 'text-gray-400 hover:text-gray-600'}`}
+                               >
+                                   <Map className="w-4 h-4" />
+                               </button>
+                           </div>
+                           <h3 className="text-xl font-black">
+                               {spotListModal.title}
+                           </h3>
+                      </div>
                       <button onClick={() => setSpotListModal(null)} className="p-2 bg-gray-100 dark:bg-white/5 rounded-full hover:bg-gray-200 dark:hover:bg-white/10 transition-colors"><X className="w-5 h-5" /></button>
                   </div>
                   
+                  {/* Content */}
                   <div className="overflow-y-auto space-y-6 pr-2">
-                      {Object.entries(spotListModal.groupedSpots).map(([region, spots]) => (
-                          <div key={region} className="space-y-3">
-                              <h4 className="text-xs font-black uppercase tracking-widest text-gray-400 dark:text-gray-500 sticky top-0 bg-white/95 dark:bg-crit-surface/95 py-2 backdrop-blur-sm z-10">{region}</h4>
-                              <div className="space-y-2">
-                                  {spots.map((spot, idx) => (
-                                      <div key={idx} className="p-4 bg-gray-50 dark:bg-white/5 rounded-2xl border border-gray-200 dark:border-white/5 flex items-start gap-3 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors">
-                                          <div className="w-6 h-6 rounded-full bg-crit-accent/20 flex items-center justify-center font-black text-[10px] text-crit-accent shrink-0 mt-0.5">
-                                              {idx + 1}
+                      {spotListMode === 'list' ? (
+                          // List View
+                          Object.entries(spotListModal.groupedSpots).map(([region, spots]) => (
+                              <div key={region} className="space-y-3">
+                                  <h4 className="text-xs font-black uppercase tracking-widest text-gray-400 dark:text-gray-500 sticky top-0 bg-white/95 dark:bg-crit-surface/95 py-2 backdrop-blur-sm z-10">{region}</h4>
+                                  <div className="space-y-2">
+                                      {spots.map((spot, idx) => (
+                                          <div key={idx} className="p-4 bg-gray-50 dark:bg-white/5 rounded-2xl border border-gray-200 dark:border-white/5 flex items-start gap-3 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors">
+                                              <div className="w-6 h-6 rounded-full bg-crit-accent/20 flex items-center justify-center font-black text-[10px] text-crit-accent shrink-0 mt-0.5">
+                                                  {idx + 1}
+                                              </div>
+                                              <span className="font-bold text-sm text-gray-700 dark:text-gray-200 leading-snug">{spot}</span>
                                           </div>
-                                          <span className="font-bold text-sm text-gray-700 dark:text-gray-200 leading-snug">{spot}</span>
-                                      </div>
-                                  ))}
+                                      ))}
+                                  </div>
                               </div>
-                          </div>
-                      ))}
+                          ))
+                      ) : (
+                          // Map View
+                          Object.entries(spotListModal.groupedSpots).map(([region, spots]) => (
+                              <div key={region} className="space-y-3">
+                                  <h4 className="text-xs font-black uppercase tracking-widest text-gray-400 dark:text-gray-500 sticky top-0 bg-white/95 dark:bg-crit-surface/95 py-2 backdrop-blur-sm z-10">{region}</h4>
+                                  <div className="space-y-3">
+                                      {spots.map((spot, idx) => (
+                                          <div key={idx} className={`rounded-2xl border transition-all overflow-hidden ${expandedMapSpot === spot ? 'bg-white dark:bg-zinc-900 border-crit-accent shadow-md' : 'bg-gray-50 dark:bg-white/5 border-gray-200 dark:border-white/5'}`}>
+                                              <div 
+                                                onClick={() => setExpandedMapSpot(expandedMapSpot === spot ? null : spot)}
+                                                className="p-4 flex items-center justify-between cursor-pointer"
+                                              >
+                                                  <div className="flex items-center gap-3">
+                                                      <MapPin className={`w-5 h-5 ${expandedMapSpot === spot ? 'text-crit-accent' : 'text-gray-400'}`} />
+                                                      <span className="font-bold text-sm text-gray-700 dark:text-gray-200 leading-snug">{spot}</span>
+                                                  </div>
+                                                  <ChevronRight className={`w-4 h-4 text-gray-400 transition-transform ${expandedMapSpot === spot ? 'rotate-90' : ''}`} />
+                                              </div>
+                                              
+                                              {/* Embedded Map */}
+                                              {expandedMapSpot === spot && (
+                                                  <div className="w-full h-48 bg-gray-100 dark:bg-black/50 border-t border-gray-200 dark:border-white/5">
+                                                      <iframe 
+                                                          width="100%" 
+                                                          height="100%" 
+                                                          frameBorder="0" 
+                                                          style={{ border: 0 }} 
+                                                          src={`https://maps.google.com/maps?q=${encodeURIComponent(getQueryName(spot))}&t=&z=15&ie=UTF8&iwloc=&output=embed`}
+                                                          allowFullScreen
+                                                          title={spot}
+                                                          className="grayscale contrast-125 opacity-80 hover:opacity-100 transition-opacity"
+                                                      ></iframe>
+                                                  </div>
+                                              )}
+                                          </div>
+                                      ))}
+                                  </div>
+                              </div>
+                          ))
+                      )}
+                      
                       {Object.keys(spotListModal.groupedSpots).length === 0 && (
                            <div className="text-center py-8 text-gray-400 text-sm font-bold">
                                No spots found for this category.
