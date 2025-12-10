@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { TRANSLATIONS } from '../constants';
-import { Play, BookOpen, Eye, Edit2, LogOut, CheckCircle, Zap, UserPlus, Calendar, ArrowUpRight, TrendingUp, Target, Shield, Check, Star, X, MapPin, Moon, Sun } from 'lucide-react';
+import { Play, BookOpen, Eye, Edit2, LogOut, CheckCircle, Zap, UserPlus, Calendar, ArrowUpRight, TrendingUp, Target, Shield, Check, Star, X, MapPin, Moon, Sun, Instagram } from 'lucide-react';
 import { SessionResult, Language, User as UserType, Quest } from '../types';
 import { dbService } from '../services/dbService';
 
@@ -58,7 +58,9 @@ const Dashboard: React.FC<Props> = ({
     isDarkMode,
     onToggleTheme
 }) => {
-  const t = TRANSLATIONS[language];
+  // Add fallback to avoid crash if language key is missing (e.g. initial load or corrupted state)
+  const t = TRANSLATIONS[language] || TRANSLATIONS['KR'];
+  
   const [isEditingDate, setIsEditingDate] = useState(false);
   const [tempDate, setTempDate] = useState(startDate);
 
@@ -282,6 +284,13 @@ const Dashboard: React.FC<Props> = ({
         </div>
         
         <div className="flex gap-2">
+            {/* Instagram Button */}
+            <button 
+                onClick={() => window.open('https://www.instagram.com', '_blank')}
+                className="w-10 h-10 rounded-full bg-white dark:bg-zinc-900 flex items-center justify-center text-xs font-bold text-skate-black dark:text-white shadow-sm border border-gray-100 dark:border-zinc-800 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors"
+            >
+                <Instagram className="w-5 h-5" />
+            </button>
              {/* Dark Mode Toggle */}
             <button 
                 onClick={onToggleTheme}

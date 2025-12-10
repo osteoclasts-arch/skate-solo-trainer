@@ -1,5 +1,3 @@
-
-
 declare var process: {
   env: {
     API_KEY: string;
@@ -434,6 +432,18 @@ const fileToPart = (file: File): Promise<{ inlineData: { data: string; mimeType:
 
 // --- VISION ANALYSIS ---
 
+// Expert Knowledge for specific tricks
+const OLLIE_GUIDE = `
+1. **발 위치**: 앞발은 앞 볼트 뒤 중앙/살짝 비스듬히. 뒷발은 테일 끝 중앙. 무게중심은 보드 중앙.
+2. **준비**: 가벼운 스쿼트. 상체가 뒤로 빠지지 않게 무릎과 어깨를 보드 위에 유지.
+3. **팝(Pop)**: 누르지 말고 스냅으로 '쳐라'. 약간 뒤쪽 대각선으로 밀어 차는 느낌.
+4. **점프 타이밍**: 팝과 동시에 점프. 앞발만 들지 말고 몸 전체가 떠야 함. 주행 시에는 약간 앞쪽으로 점프.
+5. **슬라이드**: 발목을 꺾어(제기차기) 신발 옆면으로 노즈 끝까지 밀어올리기.
+6. **뒷발 올리기**: 팝 직후 뒷발을 과감하게 들어올려(무릎 접기) 데크 수평 맞추기.
+7. **균형**: 어깨는 데크와 평행. 시선은 주행 방향.
+8. **흔한 실수**: 점프 없이 다리만 들기, 슬라이드 부족(보드 안 붙음), 상체 뒤로 빠짐.
+`;
+
 export const analyzeMedia = async (
     file: File, 
     language: Language, 
@@ -465,14 +475,28 @@ export const analyzeMedia = async (
         ? `IMPORTANT: Analyze the video strictly between timestamp ${startTime}s and ${endTime}s. IGNORE any actions before ${startTime}s or after ${endTime}s.`
         : "";
     
-    // Hint Logic
+    // Hint Logic & Expert Guide Injection
     let hintStr = "";
+    let expertGuide = "";
+
+    const isOllie = trickHint?.toLowerCase().includes('ollie') || trickHint?.includes('알리');
+
     if (trickHint) {
         hintStr = `USER CLAIM: The user states this trick is a "${trickHint}".
         INSTRUCTION: Treat "${trickHint}" as the Target Trick. 
         Do not guess what the trick is. Assume the user is attempting "${trickHint}".
-        Your job is to judge IF they landed "${trickHint}" and provide feedback on their form for THIS specific trick.
-        Only if the visual evidence is COMPLETELY unrelated (e.g. user says Kickflip but does a manual), then correct them. Otherwise, respect the user's claim.`;
+        Your job is to judge IF they landed "${trickHint}" and provide feedback on their form for THIS specific trick.`;
+
+        if (isOllie) {
+            expertGuide = `
+            \n*** EXPERT OLLIE GUIDELINES (USE THIS FOR CRITIQUE) ***
+            ${OLLIE_GUIDE}
+            INSTRUCTION: Compare the user's form strictly against these 8 points.
+            - If they don't slide ankle -> Cite point 5.
+            - If back foot hangs down -> Cite point 6.
+            - If they lean back -> Cite point 7.
+            `;
+        }
     } else {
         hintStr = "No trick name provided. Identify the trick from visual evidence.";
     }
@@ -494,6 +518,7 @@ You are an AI Skateboard Judge. You are provided with:
 **User Context:**
 - ${stanceStr}
 - ${hintStr}
+${expertGuide}
 
 **CRITICAL RULE:** 
 If the CSV says "BoardAngle" stayed near 0, it is NOT a flip, even if the video looks blurry.
@@ -536,8 +561,8 @@ IMPORTANT: 'feedbackText' and 'improvementTip' MUST be in ${langName}.
   "board_physics_desc": "String (${langCode}: Explain the physics seen in CSV/Video)",
   "score": 0-100,
   "heightMeters": 0.0-2.0,
-  "feedbackText": "String (${langCode}: Detailed coaching feedback. Explain WHY it is this trick and how to improve)",
-  "improvementTip": "String (${langCode}: One specific tip)"
+  "feedbackText": "String (${langCode}: Detailed coaching feedback. Explain WHY it is this trick and how to improve. If Ollie, reference the Expert Guidelines.)",
+  "improvementTip": "String (${langCode}: One specific tip based on the Expert Guidelines if applicable)"
 }
     `;
 

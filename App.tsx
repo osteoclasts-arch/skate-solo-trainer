@@ -29,8 +29,15 @@ const App: React.FC = () => {
 
   const [lastResult, setLastResult] = useState<SessionResult | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  
+  // Robust Language Initialization: Fixes 'undefined' errors
   const [language, setLanguage] = useState<Language>(() => {
-    return (localStorage.getItem('skate_app_language') as Language) || 'KR';
+    try {
+        const saved = localStorage.getItem('skate_app_language');
+        return (saved === 'EN' || saved === 'KR') ? (saved as Language) : 'KR';
+    } catch {
+        return 'KR';
+    }
   });
 
   // Dark Mode State

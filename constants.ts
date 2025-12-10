@@ -143,7 +143,7 @@ export const TRANSLATIONS = {
     ACTUAL_TRICK_NAME: "Actual Trick Name",
     ACTUAL_HEIGHT: "Actual Height (e.g. 50cm)",
     SEND_FEEDBACK: "Send Feedback",
-    FEEDBACK_THANKS: "Thanks! We'll learn from this.",
+    FEEDBACK_THANKS: "피드백 감사합니다! 학습에 반영하겠습니다.",
     SELECT_YOUR_STANCE: "Select Your Stance",
     SELECT_STANCE_DESC: "Essential for detecting Fakie, Nollie, and Switch.",
     TRACKING_BOARD: "Tracking Board Physics...",
@@ -421,11 +421,77 @@ export const BASE_TRICKS: Trick[] = [
 
 export const TRICK_TIPS_DB: Record<string, TrickTip[]> = {
   "Ollie": [
-    { text: { EN: "Pop HARD with your ankle, not your leg.", KR: "다리가 아닌 발목 스냅으로 강하게 팝을 차세요." }, source: "Pro Coach" },
-    { text: { EN: "Slide your front foot all the way to the nose.", KR: "앞발을 노즈 끝까지 확실하게 끌어올리세요." }, source: "Community" }
+    { text: { EN: "Pop HARD with a snap, not a press.", KR: "테일은 누르는 게 아니라, 발목 스냅으로 강하게 '쳐야' 합니다." }, source: "Pro Coach" },
+    { text: { EN: "Slide your front foot like 'Jegichagi' (ankle roll).", KR: "앞발을 제기차기하듯 눕혀서 노즈 끝까지 밀어 올리세요." }, source: "Pro Coach" },
+    { text: { EN: "Lift your back foot immediately after the pop.", KR: "팝을 찬 직후 뒷무릎을 가슴 쪽으로 당겨 보드 수평을 맞추세요." }, source: "Community" },
+    { text: { EN: "Jump WITH the pop, not after.", KR: "앞발만 들지 말고, 팝과 동시에 몸 전체가 점프해야 합니다." }, source: "Pro Coach" }
   ],
   "Kickflip": [
     { text: { EN: "Flick out, not down.", KR: "아래가 아니라 대각선 밖으로 플릭하세요." }, source: "Pro Coach" },
     { text: { EN: "Keep your shoulders parallel to the board.", KR: "어깨가 보드와 평행이 되도록 유지하세요." }, source: "Community" }
+  ],
+  "Fakie Ollie": [
+    { 
+      text: { 
+        EN: "Look over your back shoulder, commit to the pop and slide. Trust your feet, land it!", 
+        KR: "진행 방향(뒤쪽) 어깨를 열어 시선을 확보하고, 팝과 슬라이드를 과감하게 하세요. 발을 믿고 랜딩하세요!" 
+      }, 
+      source: "AI Coach" 
+    },
+    {
+      text: {
+        EN: "It's just an Ollie in reverse. Keep your weight centered, don't lean back.",
+        KR: "그냥 뒤로 가는 알리일 뿐입니다. 무게중심을 중앙에 두고, 뒤로 눕지 않도록 주의하세요."
+      },
+      source: "Community"
+    }
+  ],
+  "Pop Shuvit": [
+      {
+        text: {
+            EN: "Don't just press down; snap your back ankle 45 degrees diagonally backwards.",
+            KR: "뒷발은 누르지 말고, 발목 스냅을 이용해 45도 대각선 뒤로 '톡' 튕겨주세요."
+        },
+        source: "Pro Coach"
+      },
+      {
+        text: {
+            EN: "Pop and Scoop must happen simultaneously to keep the board level.",
+            KR: "팝과 스쿱을 따로 하지 말고 '동시에' 해야 데크가 수평으로 돕니다."
+        },
+        source: "Pro Coach"
+      },
+      {
+         text: {
+             EN: "Keep your front foot hovering as a guide, then catch the board when it completes 180.",
+             KR: "앞발은 회전을 방해하지 않게 가이드해주고, 180도가 돌았을 때 먼저 캐치하세요."
+         },
+         source: "Pro Coach"
+      },
+      {
+          text: {
+              EN: "Lean slightly towards your front foot to land smoothly.",
+              KR: "랜딩 시 무게중심을 앞발 쪽에 두면 뒷발이 자연스럽게 따라 올라옵니다."
+          },
+          source: "Community"
+      }
+  ],
+  "Shuvit": [
+      {
+        text: {
+            EN: "Scoop back with your back foot, don't pop. Jump slightly forward.",
+            KR: "팝을 주지 말고 뒷발로 뒤로 살짝 긁어주세요(Scoop). 몸은 살짝 앞으로 점프해야 보드를 잡기 쉽습니다."
+        },
+        source: "Pro Coach"
+      }
+  ],
+  "Frontside 180": [
+      {
+        text: {
+            EN: "Wind up your shoulders before popping. Turn your head and shoulders first.",
+            KR: "팝을 차기 전에 어깨를 반대로 감았다가(Wind up), 시선과 어깨를 먼저 돌리며 하체를 따라오게 하세요."
+        },
+        source: "Pro Coach"
+      }
   ]
 };
