@@ -8,9 +8,10 @@ export enum Stance {
 }
 
 export enum Difficulty {
-  EASY = 'Easy',
-  MEDIUM = 'Medium',
-  HARD = 'Hard',
+  BEGINNER = 'Beginner',
+  AMATEUR_1 = 'Amateur 1',
+  AMATEUR_2 = 'Amateur 2',
+  AMATEUR_3 = 'Amateur 3',
   PRO = 'Pro'
 }
 

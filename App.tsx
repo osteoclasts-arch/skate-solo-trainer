@@ -16,7 +16,7 @@ import { Home, BarChart2, BookOpen, Eye, Instagram, ArrowUpRight } from 'lucide-
 const App: React.FC = () => {
   const [view, setView] = useState<ViewState>('DASHBOARD');
   const [activeTricks, setActiveTricks] = useState<Trick[]>([]);
-  const [activeDifficulty, setActiveDifficulty] = useState<Difficulty>(Difficulty.MEDIUM);
+  const [activeDifficulty, setActiveDifficulty] = useState<Difficulty>(Difficulty.AMATEUR_1);
   
   // User Authentication State
   const [user, setUser] = useState<User | null>(null);

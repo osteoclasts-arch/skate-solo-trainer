@@ -120,9 +120,10 @@ const TrickLearning: React.FC<Props> = ({ language }) => {
 
   const getDifficultyColor = (diff: Difficulty) => {
       switch(diff) {
-          case Difficulty.EASY: return 'bg-skate-matcha text-skate-black';
-          case Difficulty.MEDIUM: return 'bg-skate-blue text-white';
-          case Difficulty.HARD: return 'bg-skate-deep text-white';
+          case Difficulty.BEGINNER: return 'bg-skate-matcha text-skate-black';
+          case Difficulty.AMATEUR_1: return 'bg-skate-blue text-white';
+          case Difficulty.AMATEUR_2: return 'bg-[#8B5CF6] text-white'; // Violet
+          case Difficulty.AMATEUR_3: return 'bg-skate-deep text-white';
           case Difficulty.PRO: return 'bg-skate-coral text-white';
           default: return 'bg-gray-200 text-gray-500';
       }
@@ -130,9 +131,10 @@ const TrickLearning: React.FC<Props> = ({ language }) => {
 
   const getDifficultyBg = (diff: Difficulty) => {
       switch(diff) {
-          case Difficulty.EASY: return 'bg-skate-matcha';
-          case Difficulty.MEDIUM: return 'bg-skate-blue';
-          case Difficulty.HARD: return 'bg-skate-deep';
+          case Difficulty.BEGINNER: return 'bg-skate-matcha';
+          case Difficulty.AMATEUR_1: return 'bg-skate-blue';
+          case Difficulty.AMATEUR_2: return 'bg-[#8B5CF6]'; // Violet
+          case Difficulty.AMATEUR_3: return 'bg-skate-deep';
           case Difficulty.PRO: return 'bg-skate-coral';
           default: return 'bg-gray-200 dark:bg-zinc-700';
       }

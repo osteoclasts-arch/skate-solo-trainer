@@ -13,7 +13,7 @@ interface Props {
 const SessionSetup: React.FC<Props> = ({ onStart, onBack, isGenerating, language }) => {
   const t = TRANSLATIONS[language];
   const [trickCount, setTrickCount] = useState(10);
-  const [difficulty, setDifficulty] = useState<Difficulty>(Difficulty.MEDIUM);
+  const [difficulty, setDifficulty] = useState<Difficulty>(Difficulty.AMATEUR_1);
   const [categories, setCategories] = useState<TrickCategory[]>([TrickCategory.FLATGROUND]);
   const [selectedStances, setSelectedStances] = useState<Stance[]>([Stance.REGULAR, Stance.FAKIE, Stance.SWITCH, Stance.NOLLIE]);
   const [useAI, setUseAI] = useState(false);
