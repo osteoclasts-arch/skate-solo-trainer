@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { TRANSLATIONS } from '../constants';
-import { Play, BookOpen, Eye, Edit2, LogOut, CheckCircle, Zap, UserPlus, Calendar, ArrowUpRight, TrendingUp, Target, Shield, Check, Star, X, MapPin, Moon, Sun, Instagram } from 'lucide-react';
+import { Play, BookOpen, Eye, Edit2, LogOut, CheckCircle, Zap, UserPlus, Calendar, ArrowUpRight, TrendingUp, Target, Shield, Check, Star, X, MapPin, Moon, Sun, Instagram, ListVideo } from 'lucide-react';
 import { SessionResult, Language, User as UserType, Quest } from '../types';
 import { dbService } from '../services/dbService';
 
 interface Props {
   onStart: () => void;
   onLearning: () => void;
+  onLineGen: () => void; // Added Prop
   history: SessionResult[];
   language: Language;
   onLanguageToggle: () => void;
@@ -50,6 +51,7 @@ const INDOOR_SPOTS = [
 const Dashboard: React.FC<Props> = ({ 
     onStart, 
     onLearning, 
+    onLineGen,
     history, 
     language, 
     onLanguageToggle,
@@ -413,17 +415,23 @@ const Dashboard: React.FC<Props> = ({
           </div>
 
           {/* Action Row */}
-          <div className="flex gap-4 h-40">
-              <button onClick={onStart} className="flex-[1.5] bg-white dark:bg-zinc-900 rounded-[2.5rem] p-6 shadow-pop pop-card relative overflow-hidden flex flex-col justify-between group dark:border-zinc-800">
+          <div className="grid grid-cols-2 gap-4 h-40">
+              <button onClick={onStart} className="col-span-1 bg-white dark:bg-zinc-900 rounded-[2.5rem] p-6 shadow-pop pop-card relative overflow-hidden flex flex-col justify-between group dark:border-zinc-800">
                   <div className="absolute top-0 right-0 w-24 h-24 bg-skate-black rounded-bl-[2.5rem] flex items-center justify-center group-hover:scale-105 transition-transform"><ArrowUpRight className="w-8 h-8 text-skate-yellow" /></div>
                   <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-zinc-800 flex items-center justify-center"><Play className="w-5 h-5 ml-1 text-skate-black dark:text-white" /></div>
-                  <div><h3 className="text-2xl font-black text-skate-black dark:text-white leading-none">Train</h3><p className="text-xs text-gray-400 font-bold mt-1">START SESSION</p></div>
+                  <div><h3 className="text-xl font-black text-skate-black dark:text-white leading-none">Train</h3><p className="text-[10px] text-gray-400 font-bold mt-1">SESSION</p></div>
               </button>
-              <button onClick={onLearning} className="flex-1 bg-skate-deep rounded-[2.5rem] p-6 shadow-pop pop-card relative overflow-hidden flex flex-col justify-between text-white group">
-                  <div className="absolute -right-4 -top-4 w-20 h-20 bg-white/10 rounded-full blur-xl"></div>
-                  <BookOpen className="w-8 h-8 text-white/80" />
-                  <div><h3 className="text-xl font-bold leading-none">Learn</h3><p className="text-[10px] text-white/60 font-bold mt-1 uppercase">Trick Guide</p></div>
-              </button>
+              
+              <div className="col-span-1 flex flex-col gap-4">
+                 <button onClick={onLineGen} className="flex-1 bg-white dark:bg-zinc-900 rounded-[2rem] p-4 shadow-pop pop-card relative overflow-hidden flex items-center gap-3 group dark:border-zinc-800">
+                    <div className="w-10 h-10 rounded-full bg-skate-yellow flex items-center justify-center text-skate-black font-black"><ListVideo className="w-5 h-5"/></div>
+                    <div><h3 className="text-sm font-bold leading-none text-skate-black dark:text-white">{t.LINE_GEN_TITLE || "Line Gen"}</h3></div>
+                 </button>
+                 <button onClick={onLearning} className="flex-1 bg-skate-deep rounded-[2rem] p-4 shadow-pop pop-card relative overflow-hidden flex items-center gap-3 text-white group">
+                    <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center"><BookOpen className="w-5 h-5"/></div>
+                    <div><h3 className="text-sm font-bold leading-none">{t.LEARNING || "Learn"}</h3></div>
+                 </button>
+              </div>
           </div>
 
           {/* Recent History */}

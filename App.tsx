@@ -7,6 +7,7 @@ import SessionSummary from './components/SessionSummary';
 import Analytics from './components/Analytics';
 import TrickLearning from './components/TrickLearning';
 import AIVision from './components/AIVision';
+import LineGenerator from './components/LineGenerator';
 import { BASE_TRICKS, TRANSLATIONS } from './constants';
 import { generateAISession } from './services/geminiService';
 import { loginAsGuest, logout, checkLocalSession } from './services/authService';
@@ -320,6 +321,7 @@ const App: React.FC = () => {
           <Dashboard 
             onStart={() => setView('SETUP')} 
             onLearning={() => setView('LEARNING')}
+            onLineGen={() => setView('LINE_GENERATOR')}
             history={sessionHistory}
             language={language}
             onLanguageToggle={() => setLanguage(l => {
@@ -382,6 +384,8 @@ const App: React.FC = () => {
         return <TrickLearning language={language} />;
       case 'AI_VISION':
         return <AIVision language={language} user={user} />;
+      case 'LINE_GENERATOR':
+        return <LineGenerator language={language} user={user} onBack={() => setView('DASHBOARD')} />;
       default:
         return null;
     }
@@ -391,7 +395,7 @@ const App: React.FC = () => {
     <div className={`h-screen w-full bg-skate-bg dark:bg-zinc-950 text-skate-black dark:text-white overflow-hidden font-sans relative transition-colors duration-300`}>
       {renderView()}
 
-      {!isAuthChecking && !showSplash && (view === 'DASHBOARD' || view === 'ANALYTICS' || view === 'LEARNING' || view === 'SUMMARY' || view === 'AI_VISION') && (
+      {!isAuthChecking && !showSplash && (view === 'DASHBOARD' || view === 'ANALYTICS' || view === 'LEARNING' || view === 'SUMMARY' || view === 'AI_VISION' || view === 'LINE_GENERATOR') && (
          <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 w-auto z-50">
             <nav className="glass-nav rounded-full px-6 py-4 flex items-center gap-6 shadow-pop">
                 <button 

@@ -1,3 +1,5 @@
+
+
 declare var process: {
   env: {
     API_KEY: string;
@@ -398,6 +400,67 @@ export const generatePersonalizedQuests = async (
         return [];
     }
 }
+
+export const generateSkateLine = async (
+    knownTricks: string[], 
+    obstacles: string[], 
+    style: string, 
+    language: Language
+): Promise<{ name: string, sequence: string[] }> => {
+    if (!apiKey) return { name: "Default Line", sequence: ["Ollie", "Push", "Manual", "Ollie"] };
+    
+    const ai = getAI();
+    const langInstruction = language === 'KR' 
+        ? "Respond in Korean (Hangul). Use natural skate terms like '알리', '킥플립'." 
+        : "Respond in English.";
+    
+    const contextTricks = knownTricks.length > 0 
+        ? `User's landed tricks: ${knownTricks.join(', ')}. Use these if possible, or simple variations.`
+        : `User is a beginner. Use very basic tricks (Ollie, Shuvit, Manual).`;
+
+    const prompt = `
+        Create a cool 3-4 trick skateboard line sequence.
+        Obstacles available: ${obstacles.join(', ')}.
+        Style/Vibe: ${style}.
+        ${contextTricks}
+        
+        The line should flow logically (e.g., set up tricks before obstacles, consistent stance).
+        Format "How about this line?":
+        1. A catchy Line Name.
+        2. An array of strings describing the sequence (e.g. "Ollie up the curb", "Backside 50-50").
+        
+        ${langInstruction}
+    `;
+
+    const lineSchema: Schema = {
+        type: Type.OBJECT,
+        properties: {
+            name: { type: Type.STRING },
+            sequence: { type: Type.ARRAY, items: { type: Type.STRING } }
+        },
+        required: ["name", "sequence"]
+    };
+
+    try {
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: lineSchema
+            }
+        });
+        
+        if (response.text) {
+             const cleaned = cleanJson(response.text);
+             return JSON.parse(cleaned);
+        }
+        return { name: "Basic Line", sequence: ["Push", "Ollie", "Powerslide"] };
+    } catch (e) {
+        console.error("Line Gen Error", e);
+        return { name: "Basic Line", sequence: ["Push", "Ollie", "Powerslide"] };
+    }
+};
 
 const fileToPart = (file: File): Promise<{ inlineData: { data: string; mimeType: string } }> => {
     return new Promise((resolve, reject) => {

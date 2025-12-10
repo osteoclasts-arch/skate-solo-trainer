@@ -179,7 +179,24 @@ export const TRANSLATIONS = {
     QUEST_PERFECT: "Clean Sheet (No S.K.A.T.E)",
     LEVEL_UP: "LEVEL UP!",
     LEVEL_UP_DESC: "You are getting stronger.",
-    QUEST_REFRESH: "Resets at midnight"
+    QUEST_REFRESH: "Resets at midnight",
+    // Line Generator
+    LINE_GEN_TITLE: "Line Generator",
+    LINE_GEN_DESC: "AI creates a flowy line based on tricks you can do.",
+    SELECT_OBSTACLES: "Select Obstacles",
+    MY_TRICKS: "My Tricks",
+    GENERATE_LINE: "Generate Line",
+    LINE_RESULT: "Recommended Line",
+    OBSTACLE_FLAT: "Flatground",
+    OBSTACLE_LEDGE: "Ledge",
+    OBSTACLE_RAIL: "Rail",
+    OBSTACLE_GAP: "Gap/Stairs",
+    OBSTACLE_MANUAL: "Manual Pad",
+    LINE_STYLE_TECH: "Tech",
+    LINE_STYLE_FLOW: "Flow",
+    LINE_STYLE_GNAR: "Gnar",
+    LINE_STYLE_CHILL: "Chill",
+    GENERATING_LINE: "Designing line..."
   },
   KR: {
     NEW_SESSION: "새로운 세션",
@@ -355,7 +372,24 @@ export const TRANSLATIONS = {
     QUEST_PERFECT: "퍼펙트 게임 (노 SKATE)",
     LEVEL_UP: "레벨 업!",
     LEVEL_UP_DESC: "점점 강해지고 있습니다.",
-    QUEST_REFRESH: "매일 자정에 초기화"
+    QUEST_REFRESH: "매일 자정에 초기화",
+    // Line Generator
+    LINE_GEN_TITLE: "라인 제너레이터",
+    LINE_GEN_DESC: "할 수 있는 기술을 바탕으로 멋진 라인을 짜드립니다.",
+    SELECT_OBSTACLES: "기물 선택",
+    MY_TRICKS: "내 기술 목록",
+    GENERATE_LINE: "라인 생성하기",
+    LINE_RESULT: "추천 라인",
+    OBSTACLE_FLAT: "플랫",
+    OBSTACLE_LEDGE: "렛지",
+    OBSTACLE_RAIL: "레일",
+    OBSTACLE_GAP: "계단/갭",
+    OBSTACLE_MANUAL: "매뉴얼 패드",
+    LINE_STYLE_TECH: "테크니컬",
+    LINE_STYLE_FLOW: "플로우",
+    LINE_STYLE_GNAR: "하드코어",
+    LINE_STYLE_CHILL: "칠(Chill)",
+    GENERATING_LINE: "라인 구상 중..."
   }
 };
 

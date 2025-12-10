@@ -158,6 +158,6 @@ export interface TrackingDataPoint {
   confidence: number;
 }
 
-export type ViewState = 'DASHBOARD' | 'ANALYTICS' | 'SETUP' | 'ACTIVE_SESSION' | 'SUMMARY' | 'LEARNING' | 'AI_VISION';
+export type ViewState = 'DASHBOARD' | 'ANALYTICS' | 'SETUP' | 'ACTIVE_SESSION' | 'SUMMARY' | 'LEARNING' | 'AI_VISION' | 'LINE_GENERATOR';
 
 export type Language = 'EN' | 'KR';
