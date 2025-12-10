@@ -56,7 +56,7 @@ const INDOOR_SPOTS = [
 const Dashboard: React.FC<Props> = ({ 
     onStart, 
     onLearning, 
-    onLineGen,
+    onLineGen, 
     onAnalytics,
     history, 
     language, 
@@ -186,49 +186,54 @@ const Dashboard: React.FC<Props> = ({
     <div className="flex flex-col h-full p-5 space-y-6 overflow-y-auto pb-48 relative animate-fade-in font-sans bg-gray-50 dark:bg-crit-bg text-black dark:text-white selection:bg-crit-accent selection:text-black transition-colors duration-300">
       
       {/* Header */}
-      <header className="flex justify-between items-start py-2 shrink-0">
-        <div className="flex flex-col gap-1">
-             <div className="flex items-center gap-2">
-                 <div 
-                    onClick={() => setShowProfileSetup(true)} 
-                    className={`px-3 py-1 rounded-full cursor-pointer shadow-glow flex items-center gap-2 transition-transform active:scale-95 ${user ? 'bg-gray-100 dark:bg-zinc-800' : 'bg-crit-accent'}`}
-                 >
-                    {user ? (
-                        <>
-                            <User className="w-3 h-3 text-black dark:text-white" />
-                            <span className="text-[10px] font-black text-black dark:text-white uppercase tracking-wider">{user.name}</span>
-                            <Edit2 className="w-3 h-3 text-gray-400" />
-                        </>
-                    ) : (
-                        <span className="text-[10px] font-black text-black uppercase tracking-wider">{t.LOGIN_GUEST}</span>
-                    )}
+      <header className="flex flex-col py-2 shrink-0 gap-2">
+        <div className="flex justify-between items-start gap-3">
+             <div className="flex flex-col gap-1 flex-1 min-w-0">
+                 <div className="flex items-center gap-2">
+                     <div 
+                        onClick={() => setShowProfileSetup(true)} 
+                        className={`px-3 py-1 rounded-full cursor-pointer shadow-glow flex items-center gap-2 transition-transform active:scale-95 ${user ? 'bg-gray-100 dark:bg-zinc-800' : 'bg-crit-accent'}`}
+                     >
+                        {user ? (
+                            <>
+                                <User className="w-3 h-3 text-black dark:text-white" />
+                                <span className="text-[10px] font-black text-black dark:text-white uppercase tracking-wider">{user.name}</span>
+                                <Edit2 className="w-3 h-3 text-gray-400" />
+                            </>
+                        ) : (
+                            <span className="text-[10px] font-black text-black uppercase tracking-wider">{t.LOGIN_GUEST}</span>
+                        )}
+                     </div>
                  </div>
+                 <h1 className="text-3xl font-black tracking-tighter leading-none mt-1">
+                     <span className="text-black dark:text-white">crete</span><br/>
+                     <span className="text-gray-300 dark:text-gray-600 flex items-center gap-1">
+                         Daily Skating <Sparkles className="w-5 h-5 text-gray-300 dark:text-gray-600 fill-gray-300 dark:fill-gray-600" />
+                     </span>
+                 </h1>
              </div>
-             <h1 className="text-3xl font-black tracking-tighter leading-none mt-1">
-                 <span className="text-black dark:text-white">crete</span><br/>
-                 <span className="text-gray-300 dark:text-gray-600 flex items-center gap-1">
-                     Daily Skating <Sparkles className="w-5 h-5 text-gray-300 dark:text-gray-600 fill-gray-300 dark:fill-gray-600" />
-                 </span>
-             </h1>
-             <div className="flex items-center gap-1.5 mt-2 opacity-80">
-                <MapPin className="w-3 h-3 text-black dark:text-white" />
-                <span className="text-xs font-bold tracking-wide text-gray-600 dark:text-gray-400">{suggestedSpot}</span>
+             
+             <div className="flex gap-2 shrink-0">
+                 <button 
+                    onClick={() => window.open('https://instagram.com/osteoclasts_', '_blank')}
+                    className="w-10 h-10 rounded-full bg-white dark:bg-crit-surface border border-gray-200 dark:border-white/5 flex items-center justify-center text-gray-400 hover:text-black dark:hover:text-white transition-all shadow-sm"
+                 >
+                    <Instagram className="w-4 h-4" />
+                 </button>
+                 <button onClick={onToggleTheme} className="w-10 h-10 rounded-full bg-white dark:bg-crit-surface border border-gray-200 dark:border-white/5 flex items-center justify-center text-gray-400 hover:text-black dark:hover:text-white transition-all shadow-sm"
+                 >
+                    {isDarkMode ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+                 </button>
+                 <button onClick={onLanguageToggle} className="w-10 h-10 rounded-full bg-white dark:bg-crit-surface border border-gray-200 dark:border-white/5 flex items-center justify-center text-[10px] font-black text-gray-400 hover:text-black dark:hover:text-white transition-all shadow-sm">
+                    {language}
+                 </button>
              </div>
         </div>
-        
-        <div className="flex gap-2">
-             <button 
-                onClick={() => window.open('https://instagram.com/osteoclasts_', '_blank')}
-                className="w-10 h-10 rounded-full bg-white dark:bg-crit-surface border border-gray-200 dark:border-white/5 flex items-center justify-center text-gray-400 hover:text-black dark:hover:text-white transition-all shadow-sm"
-             >
-                <Instagram className="w-4 h-4" />
-             </button>
-             <button onClick={onToggleTheme} className="w-10 h-10 rounded-full bg-white dark:bg-crit-surface border border-gray-200 dark:border-white/5 flex items-center justify-center text-gray-400 hover:text-black dark:hover:text-white transition-all shadow-sm">
-                {isDarkMode ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
-             </button>
-             <button onClick={onLanguageToggle} className="w-10 h-10 rounded-full bg-white dark:bg-crit-surface border border-gray-200 dark:border-white/5 flex items-center justify-center text-[10px] font-black text-gray-400 hover:text-black dark:hover:text-white transition-all shadow-sm">
-                {language}
-             </button>
+
+        {/* Location - Full width below title and buttons */}
+        <div className="flex items-center gap-1.5 opacity-80 w-full">
+            <MapPin className="w-3 h-3 text-black dark:text-white shrink-0" />
+            <span className="text-xs font-bold tracking-wide text-gray-600 dark:text-gray-400 whitespace-nowrap">{suggestedSpot}</span>
         </div>
       </header>
 
@@ -251,12 +256,15 @@ const Dashboard: React.FC<Props> = ({
 
       {/* Main Hero Card (Yellow) */}
       <div className="w-full bg-[#FFE500] rounded-[2.5rem] p-6 relative overflow-hidden shadow-pop text-black shrink-0">
-          {/* Top Right Badge */}
-          <div className="absolute top-6 right-6 px-3 py-1.5 bg-white/50 backdrop-blur-sm rounded-full z-10">
+          {/* Top Right Badge - Now clickable to fix date */}
+          <button 
+            onClick={() => setShowProfileSetup(true)}
+            className="absolute top-6 right-6 px-3 py-1.5 bg-white/50 backdrop-blur-sm rounded-full z-10 hover:bg-white/80 transition-colors cursor-pointer"
+          >
               <span className="text-[10px] font-black uppercase tracking-widest text-black/70">
                   {t.DAYS_SKATING}: {daysSkating}
               </span>
-          </div>
+          </button>
 
           <div className="mt-4 relative z-10">
               <div className="flex items-center gap-3 mb-2">

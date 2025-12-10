@@ -43,7 +43,13 @@ const App: React.FC = () => {
   });
 
   const [startDate, setStartDate] = useState<string>(() => {
-      return localStorage.getItem('skate_start_date') || new Date().toISOString().split('T')[0];
+      const saved = localStorage.getItem('skate_start_date');
+      if (saved) return saved;
+      
+      // Fix: Use local time for default start date to avoid timezone issues (e.g. UTC vs KST causing Day 2 instantly)
+      const date = new Date();
+      const offset = date.getTimezoneOffset() * 60000;
+      return new Date(date.getTime() - offset).toISOString().split('T')[0];
   });
 
   // Apply Theme Class
