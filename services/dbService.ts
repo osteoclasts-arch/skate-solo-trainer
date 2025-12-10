@@ -13,6 +13,7 @@ export interface UserProfileData {
   xp?: number;
   dailyQuests?: Quest[];
   lastQuestDate?: string;
+  skateDates?: string[];
 }
 
 const STORAGE_KEYS = {
@@ -73,6 +74,24 @@ export const dbService = {
   },
 
   /**
+   * Toggle a skate date in the user's profile
+   */
+  async toggleSkateDate(uid: string, date: string): Promise<string[]> {
+      const profile = await this.getUserProfile(uid);
+      const dates = profile?.skateDates || [];
+      let newDates;
+      
+      if (dates.includes(date)) {
+          newDates = dates.filter(d => d !== date);
+      } else {
+          newDates = [...dates, date];
+      }
+      
+      await this.updateUserProfile(uid, { skateDates: newDates });
+      return newDates;
+  },
+
+  /**
    * Fetch user profile (start date, etc.)
    */
   async getUserProfile(uid: string): Promise<UserProfileData | null> {
@@ -117,6 +136,7 @@ export const dbService = {
         // Init XP/Level if missing
         if (profile.level === undefined) profile.level = 1;
         if (profile.xp === undefined) profile.xp = 0;
+        if (profile.skateDates === undefined) profile.skateDates = [];
     }
     
     return profile || null;

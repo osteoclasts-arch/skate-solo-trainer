@@ -77,6 +77,7 @@ const App: React.FC = () => {
                     localUser.level = profile.level;
                     localUser.xp = profile.xp;
                     localUser.dailyQuests = profile.dailyQuests;
+                    localUser.skateDates = profile.skateDates;
                     setUser({ ...localUser }); 
                     
                     // Check Login Quest
@@ -108,7 +109,7 @@ const App: React.FC = () => {
       const profile = await dbService.getUserProfile(loggedInUser.uid);
       if (profile) {
          if(profile.startDate) setStartDate(profile.startDate);
-         setUser(prev => prev ? ({...prev, level: profile.level, xp: profile.xp, dailyQuests: profile.dailyQuests}) : null);
+         setUser(prev => prev ? ({...prev, level: profile.level, xp: profile.xp, dailyQuests: profile.dailyQuests, skateDates: profile.skateDates}) : null);
          if (profile.dailyQuests) await checkQuestProgress(profile.dailyQuests, 'login', loggedInUser.uid);
       }
       await dbService.migrateLegacySessions(loggedInUser.uid);
@@ -143,6 +144,13 @@ const App: React.FC = () => {
       start.setHours(0, 0, 0, 0);
       now.setHours(0, 0, 0, 0);
       return Math.max(1, Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+  };
+
+  const handleToggleSkateDate = async (date: string) => {
+      if (user) {
+          const newDates = await dbService.toggleSkateDate(user.uid, date);
+          setUser(prev => prev ? ({ ...prev, skateDates: newDates }) : null);
+      }
   };
 
   // Central Quest Logic
@@ -260,7 +268,7 @@ const App: React.FC = () => {
                         <Sparkles className="w-10 h-10 text-crit-accent fill-crit-accent" />
                     </div>
                     <h1 className="text-5xl font-black text-black dark:text-white tracking-tighter animate-slide-up" style={{ animationDelay: '0.1s' }}>
-                        CRIT
+                        crete
                     </h1>
                 </div>
 
@@ -296,6 +304,8 @@ const App: React.FC = () => {
             onRequestPro={handleRequestPro}
             isDarkMode={isDarkMode}
             onToggleTheme={toggleTheme}
+            skateDates={user?.skateDates}
+            onToggleDate={handleToggleSkateDate}
           />
         );
       case 'SETUP': return <SessionSetup onStart={startSession} onBack={() => setView('DASHBOARD')} isGenerating={isGenerating} language={language} />;

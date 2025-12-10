@@ -3,6 +3,7 @@ import { TRANSLATIONS, BASE_TRICKS } from '../constants';
 import { Play, BookOpen, Eye, Zap, Calendar, ArrowUpRight, TrendingUp, Target, Shield, Star, X, MapPin, Instagram, ListVideo, Settings, Sparkles, ChevronRight, Check, Flame, Trophy, Bell, MoreHorizontal, User, Moon, Sun, Edit2 } from 'lucide-react';
 import { SessionResult, Language, User as UserType, Quest, Trick } from '../types';
 import { dbService } from '../services/dbService';
+import CalendarModal from './CalendarModal';
 
 interface Props {
   onStart: () => void;
@@ -21,6 +22,9 @@ interface Props {
   onRequestPro: () => void;
   isDarkMode: boolean;
   onToggleTheme: () => void;
+  // New props for calendar
+  skateDates?: string[];
+  onToggleDate?: (date: string) => void;
 }
 
 const STREET_SPOTS = [
@@ -65,7 +69,9 @@ const Dashboard: React.FC<Props> = ({
     onLogout,
     onRequestPro,
     isDarkMode,
-    onToggleTheme
+    onToggleTheme,
+    skateDates = [],
+    onToggleDate
 }) => {
   const t = TRANSLATIONS[language] || TRANSLATIONS['KR'];
   
@@ -78,6 +84,7 @@ const Dashboard: React.FC<Props> = ({
   const [dailyQuests, setDailyQuests] = useState<Quest[]>([]);
   const [xp, setXp] = useState(0);
   const [showLevelModal, setShowLevelModal] = useState(false);
+  const [showCalendar, setShowCalendar] = useState(false);
   
   // Tabs for Spot Filter
   const [selectedTab, setSelectedTab] = useState<'All' | 'Street' | 'Park' | 'Indoor'>('All');
@@ -167,6 +174,14 @@ const Dashboard: React.FC<Props> = ({
 
   const handleSaveDate = () => { onUpdateStartDate(tempDate); setIsEditingDate(false); };
 
+  const handleCalendarClick = () => {
+      if (!user) {
+          setShowProfileSetup(true);
+      } else {
+          setShowCalendar(true);
+      }
+  };
+
   return (
     <div className="flex flex-col h-full p-5 space-y-6 overflow-y-auto pb-48 relative animate-fade-in font-sans bg-gray-50 dark:bg-crit-bg text-black dark:text-white selection:bg-crit-accent selection:text-black transition-colors duration-300">
       
@@ -190,7 +205,7 @@ const Dashboard: React.FC<Props> = ({
                  </div>
              </div>
              <h1 className="text-3xl font-black tracking-tighter leading-none mt-1">
-                 <span className="text-black dark:text-white">Skater's</span><br/>
+                 <span className="text-black dark:text-white">crete</span><br/>
                  <span className="text-gray-300 dark:text-gray-600 flex items-center gap-1">
                      Daily Skating <Sparkles className="w-5 h-5 text-gray-300 dark:text-gray-600 fill-gray-300 dark:fill-gray-600" />
                  </span>
@@ -271,8 +286,11 @@ const Dashboard: React.FC<Props> = ({
 
           <div className="flex justify-between items-end relative z-10">
               <div className="flex gap-2">
-                  <button onClick={onAnalytics} className="w-12 h-12 rounded-full bg-black/5 hover:bg-black/10 flex items-center justify-center transition-colors">
+                  <button onClick={handleCalendarClick} className="w-12 h-12 rounded-full bg-black/5 hover:bg-black/10 flex items-center justify-center transition-colors relative">
                       <Calendar className="w-5 h-5 text-black" />
+                      {user?.skateDates && user.skateDates.length > 0 && (
+                          <div className="absolute top-3 right-3 w-2 h-2 bg-black rounded-full"></div>
+                      )}
                   </button>
                   <button onClick={onAnalytics} className="w-12 h-12 rounded-full bg-black/5 hover:bg-black/10 flex items-center justify-center transition-colors">
                       <TrendingUp className="w-5 h-5 text-black" />
@@ -464,6 +482,16 @@ const Dashboard: React.FC<Props> = ({
                   </div>
               </div>
           </div>
+      )}
+
+      {/* Calendar Modal */}
+      {showCalendar && (
+          <CalendarModal 
+              onClose={() => setShowCalendar(false)} 
+              skateDates={skateDates} 
+              onToggleDate={onToggleDate || (() => {})} 
+              language={language} 
+          />
       )}
 
     </div>

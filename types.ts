@@ -46,6 +46,20 @@ export interface User {
   xp?: number;
   dailyQuests?: Quest[];
   lastQuestDate?: string;
+  skateDates?: string[]; // Array of YYYY-MM-DD
+}
+
+export interface UserProfileData {
+  startDate: string;
+  lastLogin?: string;
+  isPro?: boolean;
+  proRequestStatus?: 'none' | 'pending' | 'rejected';
+  age?: number;
+  level?: number;
+  xp?: number;
+  dailyQuests?: Quest[];
+  lastQuestDate?: string;
+  skateDates?: string[];
 }
 
 export interface StanceContent {
