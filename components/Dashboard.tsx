@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { TRANSLATIONS, BASE_TRICKS } from '../constants';
-import { Play, BookOpen, Eye, Zap, Calendar, ArrowUpRight, TrendingUp, Target, Shield, Star, X, MapPin, Instagram, ListVideo, Settings, Sparkles, ChevronRight, Check, Flame, Trophy, Bell, MoreHorizontal, User, Moon, Sun, Edit2 } from 'lucide-react';
+import { Play, BookOpen, Eye, Zap, Calendar, ArrowUpRight, TrendingUp, Target, Shield, Star, X, MapPin, Instagram, ListVideo, Settings, Sparkles, ChevronRight, Check, Flame, Trophy, Bell, MoreHorizontal, User, Moon, Sun, Edit2, List } from 'lucide-react';
 import { SessionResult, Language, User as UserType, Quest, Trick } from '../types';
 import { dbService } from '../services/dbService';
 import CalendarModal from './CalendarModal';
@@ -32,7 +32,32 @@ const STREET_SPOTS = [
   "용두공원 (Yongdu Park)", 
   "코엑스 앞 (Coex)", 
   "서울대 정문 (SNU Gate)", 
-  "낙성대 공원 (Nakseongdae)"
+  "서울대 잔디광장 지하 (SNU Lawn Plaza Basement)",
+  "낙성대 공원 (Nakseongdae)",
+  "미추홀공원 (Michuhol Park)",
+  "만석공원 (Manseok Park)",
+  "펍지 성수 (PUBG Seongsu)",
+  "망우역 이노시티앞 (Mangu Station Innocity)",
+  "노을공원 (Noeul Park)",
+  "투사스케이트보드 앞 (Tussa Skateboard)",
+  "해그늘생활체육공원 (Haegneul Park)",
+  "열린송현녹지광장 (Songhyeon Green Plaza)",
+  "서울대 폐수영장 (SNU Abandoned Pool)",
+  "여의도 물빛광장 (Yeouido Mulbit Square)",
+  "영등포공원 (Yeongdeungpo Park)",
+  "노원중앙도서관 뒤 (Nowon Central Library)",
+  "잠실한강공원 통로 (Jamsil Han River Passage)",
+  "메가박스 신촌 (Megabox Sinchon)",
+  "성북천 분수광장 (Seongbukcheon Fountain Plaza)",
+  "신림 별빛내린천 (Sillim Starlight Stream)",
+  "스타벅스 고대안암병원점 지하 (Starbucks Korea Univ. Hospital)",
+  "신논현역 8번출구 (Sinnonhyeon Stn Exit 8)",
+  "동대문디자인플라자 (DDP)",
+  "성동구민종합체육센터앞 (Seongdong Sports Center)",
+  "용답역 2번출구 (Yongdap Stn Exit 2)",
+  "한양대역 3번출구 (Hanyang Univ. Stn Exit 3)",
+  "제주 북수구광장 (Jeju Buksugu Plaza)",
+  "제주 탐라문화광장 (Jeju Tamla Culture Plaza)"
 ];
 
 const PARK_SPOTS = [
@@ -43,15 +68,43 @@ const PARK_SPOTS = [
   "컬트 (Cult Park)", 
   "난지 파크 (Nanji)", 
   "신대방 (Sindaebang)", 
-  "디디미 (Didimi)"
+  "디디미 (Didimi)",
+  "탄천 x게임장 (Tancheon X-Game)",
+  "평화의공원 평화광장 (Peace Park Plaza)",
+  "은평 x게임장 (Eunpyeong X-Game)",
+  "운정건강공원 x게임장 (Unjeong Health Park)",
+  "마리미공원 x게임장 (Marimi Park)",
+  "논현포대근린공원 x게임장 (Nonhyeon Podae Park)",
+  "안산호수공원 x게임장 (Ansan Lake Park)",
+  "죽마체육공원 x게임장 (Jukma Park)",
+  "광나루 스케이트파크 (Gwangnaru Skatepark)",
+  "보정동 x파크 공원 (Bojeong-dong X-Park)",
+  "노해 x-top (Nohae X-Top)"
 ];
 
 const INDOOR_SPOTS = [
   "로프라운지 (Loaf)",
   "K88", 
   "트랜지션 정글 (Jungle)", 
-  "크래프터 평택 (Crafter)"
+  "크래프터 평택 (Crafter)",
+  "보문파크뷰자이 지하 (Bomun Parkview Xi Basement)",
+  "플립보드스쿨 (Flip Board School)",
+  "고속터미널역 지하통로 (Express Bus Terminal Underground)",
+  "오버헤드 (Overhead)",
+  "대구 플레이그라운드 스케이트파크 (Daegu Playground)",
+  "그레이 스케이트보드파크 (Gray Skateboard Park)"
 ];
+
+// Region Helper
+const getRegion = (spot: string) => {
+    const s = spot.toLowerCase();
+    if (s.includes('제주')) return 'Jeju';
+    if (s.includes('대구')) return 'Daegu';
+    if (s.includes('부산') || s.includes('오버헤드')) return 'Busan';
+    if (s.includes('인천') || s.includes('미추홀') || s.includes('논현포대')) return 'Incheon';
+    if (s.includes('경기') || s.includes('수원') || s.includes('만석') || s.includes('운정') || s.includes('마리미') || s.includes('안산') || s.includes('죽마') || s.includes('보정') || s.includes('평택') || s.includes('크래프터') || s.includes('로프') || s.includes('k88') || s.includes('정글') || s.includes('그레이')) return 'Gyeonggi';
+    return 'Seoul'; // Default
+};
 
 const Dashboard: React.FC<Props> = ({ 
     onStart, 
@@ -91,7 +144,8 @@ const Dashboard: React.FC<Props> = ({
 
   // Spot Suggestion State
   const [suggestedSpot, setSuggestedSpot] = useState("");
-  const [spotListModal, setSpotListModal] = useState<{ title: string, spots: string[] } | null>(null);
+  // Updated to handle grouped spots
+  const [spotListModal, setSpotListModal] = useState<{ title: string, groupedSpots: Record<string, string[]> } | null>(null);
   
   // Daily Trick
   const [dailyTrick, setDailyTrick] = useState<Trick | null>(null);
@@ -182,6 +236,38 @@ const Dashboard: React.FC<Props> = ({
       }
   };
 
+  const openSpotList = () => {
+      let spots: string[] = [];
+      if (selectedTab === 'Street') spots = STREET_SPOTS;
+      else if (selectedTab === 'Park') spots = PARK_SPOTS;
+      else if (selectedTab === 'Indoor') spots = INDOOR_SPOTS;
+      else spots = [...STREET_SPOTS, ...PARK_SPOTS, ...INDOOR_SPOTS];
+
+      // Group by region
+      const grouped: Record<string, string[]> = {
+          'Seoul': [],
+          'Gyeonggi/Incheon': [],
+          'Others': []
+      };
+
+      spots.forEach(spot => {
+          const region = getRegion(spot);
+          if (region === 'Seoul') grouped['Seoul'].push(spot);
+          else if (region === 'Gyeonggi' || region === 'Incheon') grouped['Gyeonggi/Incheon'].push(spot);
+          else grouped['Others'].push(spot);
+      });
+
+      // Remove empty groups
+      Object.keys(grouped).forEach(key => {
+          if (grouped[key].length === 0) delete grouped[key];
+      });
+
+      setSpotListModal({
+          title: selectedTab === 'All' ? 'All Spots' : `${selectedTab} Spots`,
+          groupedSpots: grouped
+      });
+  };
+
   return (
     <div className="flex flex-col h-full p-5 space-y-6 overflow-y-auto pb-48 relative animate-fade-in font-sans bg-gray-50 dark:bg-crit-bg text-black dark:text-white selection:bg-crit-accent selection:text-black transition-colors duration-300">
       
@@ -237,21 +323,31 @@ const Dashboard: React.FC<Props> = ({
         </div>
       </header>
 
-      {/* Filter Tabs - Visible & Yellow Accent */}
-      <div className="flex gap-2 overflow-x-auto scrollbar-hide px-1 py-1 shrink-0">
-          {['All', 'Street', 'Park', 'Indoor'].map((tab) => (
-              <button 
-                key={tab}
-                onClick={() => setSelectedTab(tab as any)}
-                className={`px-5 py-2.5 rounded-full text-sm font-black transition-all whitespace-nowrap border-2 ${
-                    selectedTab === tab 
-                    ? 'bg-crit-accent text-black border-crit-accent shadow-[0_0_15px_rgba(230,255,0,0.4)]' 
-                    : 'bg-transparent text-gray-500 border-gray-200 dark:border-zinc-800 hover:border-gray-400 dark:hover:border-zinc-600'
-                }`}
-              >
-                  {tab}
-              </button>
-          ))}
+      {/* Filter Tabs & List Button - Fixed Layout */}
+      <div className="flex items-center justify-between shrink-0 gap-2 overflow-hidden px-1 py-1">
+          <div className="flex-1 overflow-x-auto scrollbar-hide flex gap-2 min-w-0 pr-4">
+            {['All', 'Street', 'Park', 'Indoor'].map((tab) => (
+                <button 
+                    key={tab}
+                    onClick={() => setSelectedTab(tab as any)}
+                    className={`px-4 py-2.5 rounded-full text-sm font-black transition-all whitespace-nowrap border-2 shrink-0 ${
+                        selectedTab === tab 
+                        ? 'bg-crit-accent text-black border-crit-accent shadow-[0_0_15px_rgba(230,255,0,0.4)]' 
+                        : 'bg-transparent text-gray-500 border-gray-200 dark:border-zinc-800 hover:border-gray-400 dark:hover:border-zinc-600'
+                    }`}
+                >
+                    {tab}
+                </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-2 shrink-0 pl-2 border-l border-gray-200 dark:border-zinc-800">
+             <button 
+                onClick={openSpotList}
+                className="w-10 h-10 rounded-full bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 flex items-center justify-center text-skate-black dark:text-white hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors shrink-0 shadow-sm"
+             >
+                 <List className="w-5 h-5" />
+             </button>
+          </div>
       </div>
 
       {/* Main Hero Card (Yellow) */}
@@ -407,25 +503,38 @@ const Dashboard: React.FC<Props> = ({
            </a>
       </div>
 
-      {/* Spot List Modal */}
+      {/* Spot List Modal - Region Grouped */}
       {spotListModal && (
           <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-6 animate-fade-in">
-              <div className="bg-white dark:bg-crit-surface w-full max-w-sm rounded-[2.5rem] p-6 text-black dark:text-white relative flex flex-col max-h-[70vh] border border-gray-200 dark:border-white/10">
+              <div className="bg-white dark:bg-crit-surface w-full max-w-sm rounded-[2.5rem] p-6 text-black dark:text-white relative flex flex-col max-h-[80vh] border border-gray-200 dark:border-white/10 shadow-2xl">
                   <div className="flex justify-between items-center mb-6 shrink-0">
                       <h3 className="text-xl font-black flex items-center gap-2">
                          <MapPin className="text-crit-accent w-5 h-5" /> {spotListModal.title}
                       </h3>
-                      <button onClick={() => setSpotListModal(null)} className="p-2 bg-gray-100 dark:bg-white/5 rounded-full hover:bg-gray-200 dark:hover:bg-white/10"><X className="w-5 h-5" /></button>
+                      <button onClick={() => setSpotListModal(null)} className="p-2 bg-gray-100 dark:bg-white/5 rounded-full hover:bg-gray-200 dark:hover:bg-white/10 transition-colors"><X className="w-5 h-5" /></button>
                   </div>
-                  <div className="overflow-y-auto space-y-2 pr-2">
-                      {spotListModal.spots.map((spot, idx) => (
-                          <div key={idx} className="p-4 bg-gray-50 dark:bg-white/5 rounded-2xl border border-gray-200 dark:border-white/5 flex items-center gap-3">
-                              <div className="w-6 h-6 rounded-full bg-crit-accent/20 flex items-center justify-center font-black text-[10px] text-crit-accent shrink-0">
-                                  {idx + 1}
+                  
+                  <div className="overflow-y-auto space-y-6 pr-2">
+                      {Object.entries(spotListModal.groupedSpots).map(([region, spots]) => (
+                          <div key={region} className="space-y-3">
+                              <h4 className="text-xs font-black uppercase tracking-widest text-gray-400 dark:text-gray-500 sticky top-0 bg-white/95 dark:bg-crit-surface/95 py-2 backdrop-blur-sm z-10">{region}</h4>
+                              <div className="space-y-2">
+                                  {spots.map((spot, idx) => (
+                                      <div key={idx} className="p-4 bg-gray-50 dark:bg-white/5 rounded-2xl border border-gray-200 dark:border-white/5 flex items-start gap-3 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors">
+                                          <div className="w-6 h-6 rounded-full bg-crit-accent/20 flex items-center justify-center font-black text-[10px] text-crit-accent shrink-0 mt-0.5">
+                                              {idx + 1}
+                                          </div>
+                                          <span className="font-bold text-sm text-gray-700 dark:text-gray-200 leading-snug">{spot}</span>
+                                      </div>
+                                  ))}
                               </div>
-                              <span className="font-bold text-sm text-gray-600 dark:text-gray-200">{spot}</span>
                           </div>
                       ))}
+                      {Object.keys(spotListModal.groupedSpots).length === 0 && (
+                           <div className="text-center py-8 text-gray-400 text-sm font-bold">
+                               No spots found for this category.
+                           </div>
+                      )}
                   </div>
               </div>
           </div>
