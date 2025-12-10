@@ -87,7 +87,7 @@ const ActiveSession: React.FC<Props> = ({ tricks, difficulty, onComplete, onAbor
   }));
 
   if (isFinished) return (
-      <div className="flex items-center justify-center h-full bg-skate-bg dark:bg-zinc-950">
+      <div className="flex items-center justify-center h-full bg-gray-50 dark:bg-zinc-950">
           <div className="relative">
              <div className="absolute inset-0 bg-skate-yellow blur-xl opacity-40 animate-pulse"></div>
              <div className="animate-spin h-12 w-12 border-4 border-skate-black dark:border-white rounded-full border-t-transparent relative z-10"></div>
@@ -96,7 +96,7 @@ const ActiveSession: React.FC<Props> = ({ tricks, difficulty, onComplete, onAbor
   );
 
   return (
-    <div className="flex flex-col h-full bg-skate-bg dark:bg-zinc-950 relative font-sans overflow-hidden transition-colors duration-300">
+    <div className="flex flex-col h-full bg-gray-50 dark:bg-zinc-950 relative font-sans overflow-hidden transition-colors duration-300">
         
         {/* Header */}
         <div className="relative z-10 p-6 flex justify-between items-center">

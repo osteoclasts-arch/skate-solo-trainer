@@ -279,7 +279,7 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
   const togglePreviewPlay = () => { if (!videoRef.current) return; if (videoRef.current.paused) { if (videoRef.current.currentTime >= trimEnd) videoRef.current.currentTime = trimStart; videoRef.current.play(); } else videoRef.current.pause(); };
 
   return (
-    <div className="flex flex-col h-full p-6 pb-32 overflow-y-auto animate-fade-in relative bg-skate-bg dark:bg-zinc-950 font-sans transition-colors duration-300">
+    <div className="flex flex-col h-full p-6 pb-32 overflow-y-auto animate-fade-in relative bg-gray-50 dark:bg-zinc-950 font-sans transition-colors duration-300">
       
       {/* HEADER */}
       <div className="flex items-center justify-between mb-6 mt-2">

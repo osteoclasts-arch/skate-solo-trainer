@@ -66,7 +66,7 @@ const Analytics: React.FC<Props> = ({ history, language, daysSkating = 1, user, 
   }, [history.length]);
 
   return (
-    <div className="flex flex-col h-full p-6 space-y-6 overflow-y-auto pb-32 animate-fade-in font-sans bg-skate-bg dark:bg-zinc-950 transition-colors duration-300" ref={containerRef}>
+    <div className="flex flex-col h-full p-6 space-y-6 overflow-y-auto pb-32 animate-fade-in font-sans bg-gray-50 dark:bg-zinc-950 transition-colors duration-300" ref={containerRef}>
         
         {/* LOCK SCREEN */}
         {!user && (
@@ -83,15 +83,15 @@ const Analytics: React.FC<Props> = ({ history, language, daysSkating = 1, user, 
         )}
 
         {/* Header */}
-        <div className="flex items-center justify-between shrink-0">
-            <h2 className="text-3xl font-black text-skate-black dark:text-white">{t.ANALYTICS}</h2>
-            <button className="p-3 bg-white dark:bg-zinc-900 rounded-full hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors shadow-sm border border-gray-100 dark:border-zinc-800">
+        <div className="flex items-center justify-between shrink-0 pt-2">
+            <h2 className="text-3xl font-black text-skate-black dark:text-white tracking-tighter">{t.ANALYTICS}</h2>
+            <button className="p-3 bg-white dark:bg-zinc-900 rounded-full hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors shadow-sm border border-gray-200 dark:border-zinc-800">
                 <Instagram className="w-5 h-5 text-skate-black dark:text-white" />
             </button>
         </div>
 
-        {/* AI Insight Card (Moved to Top) */}
-        <div className="pop-card p-6 bg-white dark:bg-zinc-900 border-2 border-skate-black dark:border-zinc-700 flex-shrink-0 relative">
+        {/* AI Insight Card */}
+        <div className="pop-card p-6 bg-white dark:bg-zinc-900 rounded-[2.5rem] border border-gray-200 dark:border-zinc-700 shadow-pop flex-shrink-0 relative">
             <div className="flex items-center gap-3 mb-4">
                 <BrainCircuit className="w-6 h-6 text-skate-black dark:text-white" />
                 <h3 className="text-lg font-bold text-skate-black dark:text-white">AI Diagnosis</h3>
@@ -100,7 +100,7 @@ const Analytics: React.FC<Props> = ({ history, language, daysSkating = 1, user, 
             {!insight ? (
                 <div className="text-center py-6">
                     {history.length > 0 ? (
-                         <button onClick={handleGenerateInsight} className="w-full py-3 bg-gray-50 dark:bg-zinc-800 text-skate-black dark:text-white shadow-sm rounded-xl font-bold hover:bg-gray-100 dark:hover:bg-zinc-700 transition-colors flex items-center justify-center gap-2 border border-gray-100 dark:border-zinc-700">
+                         <button onClick={handleGenerateInsight} className="w-full py-3 bg-gray-50 dark:bg-zinc-800 text-skate-black dark:text-white shadow-sm rounded-xl font-bold hover:bg-gray-100 dark:hover:bg-zinc-700 transition-colors flex items-center justify-center gap-2 border border-gray-200 dark:border-zinc-700">
                              <Sparkles className="w-4 h-4 text-skate-yellow fill-skate-yellow" />
                              {isGenerating ? "Analyzing..." : "Generate Report"}
                          </button>
@@ -128,7 +128,7 @@ const Analytics: React.FC<Props> = ({ history, language, daysSkating = 1, user, 
         </div>
 
         {/* Chart Card */}
-        <div className="w-full bg-white dark:bg-zinc-900 rounded-[2.5rem] p-6 shadow-pop relative overflow-hidden flex-shrink-0 dark:border dark:border-zinc-800">
+        <div className="w-full bg-white dark:bg-zinc-900 rounded-[2.5rem] p-6 shadow-pop relative overflow-hidden flex-shrink-0 border border-gray-200 dark:border-zinc-800">
              <div className="flex justify-between items-center mb-8 relative z-10">
                  <div>
                     <p className="text-gray-400 text-sm font-bold uppercase tracking-widest mb-1">{t.AVG_SUCCESS}</p>
@@ -176,7 +176,7 @@ const Analytics: React.FC<Props> = ({ history, language, daysSkating = 1, user, 
         {/* Metric Cards Grid */}
         <div className="grid grid-cols-2 gap-4 flex-shrink-0">
              {/* Total Sessions */}
-             <div className="pop-card bg-white dark:bg-zinc-900 dark:border-zinc-800 p-6 flex flex-col justify-between h-40">
+             <div className="pop-card bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-[2.5rem] p-6 flex flex-col justify-between h-40 shadow-sm">
                  <div className="w-10 h-10 rounded-full bg-skate-deep dark:bg-skate-yellow dark:text-skate-black text-white flex items-center justify-center mb-2">
                      <Target className="w-5 h-5" />
                  </div>
@@ -187,7 +187,7 @@ const Analytics: React.FC<Props> = ({ history, language, daysSkating = 1, user, 
              </div>
 
              {/* Total Landed */}
-             <div className="pop-card bg-skate-yellow p-6 flex flex-col justify-between h-40">
+             <div className="pop-card bg-skate-yellow rounded-[2.5rem] p-6 flex flex-col justify-between h-40 shadow-pop">
                  <div className="w-10 h-10 rounded-full bg-white/40 text-skate-black flex items-center justify-center mb-2">
                      <Trophy className="w-5 h-5" />
                  </div>

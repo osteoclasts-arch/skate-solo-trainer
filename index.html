@@ -3,47 +3,58 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-    <title>보드탈래말래</title>
+    <title>CRIT 크리트</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
     <script>
       tailwind.config = {
-        darkMode: 'class', // Enable class-based dark mode
+        darkMode: 'class',
         theme: {
           extend: {
             fontFamily: {
-              sans: ['Pretendard', 'Inter', '-apple-system', 'system-ui', 'sans-serif'],
+              sans: ['Pretendard', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'Roboto', 'Helvetica Neue', 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', 'sans-serif'],
               display: ['Pretendard', 'sans-serif'],
-              mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', "Liberation Mono", "Courier New", 'monospace'],
             },
             colors: {
+              crit: {
+                bg: '#000000', // True Black
+                surface: '#121212', // Off Black
+                paper: '#1E1E1E',
+                accent: '#E6FF00', // Pure Neon Yellow (Reference Style)
+                accentDim: '#D9EF00',
+                pink: '#FF4D8D',   // Neon Pink
+                blue: '#2D68FF',   // Electric Blue
+                orange: '#FF6B00',
+                text: '#FFFFFF',
+                textDim: '#888888'
+              },
+              // Legacy mapping
               skate: {
-                bg: '#FFFDF5', // Warm Cream Background (Light)
-                white: '#FFFFFF',
-                black: '#1C1917', // Warm Black
-                deep: '#4A3B32', // Coffee Brown (Secondary)
-                yellow: '#FFE500', // Gen Z Yellow (Primary)
-                orange: '#FF6B00', // Vibrant Orange
-                deepOrange: '#C2410C', // Dark Orange (Shadow)
-                gray: '#A8A29E', // Warm Gray
-                lightGray: '#F5F5F4',
-                matcha: '#B6E388', 
-                coral: '#F87171', 
-                blue: '#60A5FA', 
+                bg: '#000000',
+                black: '#121212',
+                yellow: '#E6FF00', // Map to new Yellow
+                deep: '#2D68FF',
+                matcha: '#E6FF00', // Override green with yellow
+                blue: '#2D68FF',
+                coral: '#FF4D8D'
               }
             },
             boxShadow: {
-              'cute': '0 8px 30px rgba(0,0,0,0.04)',
-              'pop': '0 10px 40px -10px rgba(0,0,0,0.08)',
-              'sticker': '0 4px 0px rgba(0,0,0,0.1)',
+              'glow': '0 0 25px rgba(230, 255, 0, 0.3)',
+              'pop': '0 10px 40px -10px rgba(0,0,0,0.8)',
+              'glass': '0 8px 32px 0 rgba(0, 0, 0, 0.3)',
+              'sharp': '4px 4px 0px rgba(230, 255, 0, 1)'
+            },
+            backgroundImage: {
+              'noise': "url('https://grainy-gradients.vercel.app/noise.svg')",
+              'gradient-dark': 'linear-gradient(180deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0) 100%)',
+              'yellow-gradient': 'linear-gradient(135deg, #E6FF00 0%, #D4E600 100%)'
             },
             animation: {
-              'bounce-slow': 'bounce 3s infinite',
-              'fade-in': 'fadeIn 0.5s ease-out forwards',
-              'slide-up': 'slideUp 0.4s ease-out forwards',
-              'pulse-soft': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-              'key-press': 'keyPress 2s infinite',
+              'fade-in': 'fadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+              'slide-up': 'slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+              'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+              'bounce-subtle': 'bounceSubtle 2s infinite',
             },
             keyframes: {
               fadeIn: {
@@ -54,9 +65,9 @@
                 '0%': { transform: 'translateY(20px)', opacity: '0' },
                 '100%': { transform: 'translateY(0)', opacity: '1' },
               },
-              keyPress: {
-                '0%, 100%': { transform: 'translateY(0)' },
-                '50%': { transform: 'translateY(12px)' }, 
+              bounceSubtle: {
+                '0%, 100%': { transform: 'translateY(-2%)' },
+                '50%': { transform: 'translateY(0)' },
               }
             }
           }
@@ -65,64 +76,64 @@
     </script>
     <style>
       body {
-        background-color: #FFFDF5;
-        color: #1C1917;
+        /* Default to light mode colors, overridden by dark class */
+        background-color: #f9fafb; 
+        color: #000000;
         overscroll-behavior: none;
-        font-family: "Pretendard", "Inter", -apple-system, sans-serif;
+        font-family: "Pretendard", -apple-system, sans-serif;
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
-        transition: background-color 0.3s ease, color 0.3s ease;
       }
       
-      /* Dark mode body override via class on html/body */
       .dark body {
-        background-color: #09090b; /* Zinc 950 */
+        background-color: #000000;
         color: #ffffff;
       }
 
-      /* Hide scrollbar */
-      ::-webkit-scrollbar {
-        width: 0px;
-        background: transparent;
+      /* Premium Glassmorphism */
+      .glass-panel {
+        background: rgba(255, 255, 255, 0.6);
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
+        border: 1px solid rgba(0, 0, 0, 0.05);
       }
+      .dark .glass-panel {
+        background: rgba(30, 30, 30, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      
+      .pop-card {
+        transition: transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      }
+      .pop-card:active {
+        transform: scale(0.96);
+      }
+
+      /* Floating Nav Bar */
+      .glass-nav {
+        background: rgba(255, 255, 255, 0.85);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(0, 0, 0, 0.05);
+        box-shadow: 0 10px 30px -5px rgba(0,0,0,0.1);
+      }
+      .dark .glass-nav {
+        background: rgba(18, 18, 18, 0.85);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        box-shadow: 0 20px 50px -10px rgba(0,0,0,0.9);
+      }
+
+      /* Utility */
+      .bg-noise {
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+      }
+
       .scrollbar-hide::-webkit-scrollbar {
           display: none;
       }
       .scrollbar-hide {
           -ms-overflow-style: none;
           scrollbar-width: none;
-      }
-      
-      .safe-area-pb {
-        padding-bottom: env(safe-area-inset-bottom);
-      }
-
-      /* Pop Card Utilities */
-      .pop-card {
-        border-radius: 2.5rem;
-        box-shadow: 0 8px 30px rgba(0,0,0,0.04);
-        border: 1px solid rgba(0,0,0,0.02);
-        transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
-      }
-      .dark .pop-card {
-        box-shadow: 0 8px 30px rgba(0,0,0,0.3); /* Darker shadow for dark mode */
-        border: 1px solid rgba(255,255,255,0.05); /* Subtle white border */
-      }
-
-      .pop-card:active {
-        transform: scale(0.98);
-      }
-      
-      .glass-nav {
-        background: rgba(28, 25, 23, 0.95); /* Nearly black */
-        backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
-        box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-        border: 1px solid rgba(255,255,255,0.1);
-      }
-      .dark .glass-nav {
-        background: rgba(9, 9, 11, 0.85); /* Zinc 950 alpha */
-        border: 1px solid rgba(255,255,255,0.1);
       }
     </style>
 <script type="importmap">

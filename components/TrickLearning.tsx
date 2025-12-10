@@ -148,12 +148,12 @@ const TrickLearning: React.FC<Props> = ({ language }) => {
       const isFavorite = favorites.includes(selectedTrick.id);
 
       return (
-        <div className="flex flex-col h-full pb-32 overflow-y-auto animate-slide-up relative z-20 bg-skate-bg dark:bg-zinc-950 font-sans transition-colors duration-300">
+        <div className="flex flex-col h-full pb-32 overflow-y-auto animate-slide-up relative z-20 bg-gray-50 dark:bg-zinc-950 font-sans transition-colors duration-300">
            {/* Header */}
-           <div className="flex justify-between items-start mb-4 px-6 pt-6 sticky top-0 bg-skate-bg/95 dark:bg-zinc-950/95 backdrop-blur z-20 pb-4">
+           <div className="flex justify-between items-start mb-4 px-6 pt-6 sticky top-0 bg-gray-50/95 dark:bg-zinc-950/95 backdrop-blur z-20 pb-4">
                 <button 
                     onClick={() => setSelectedTrick(null)}
-                    className="p-3 bg-white dark:bg-zinc-900 rounded-full hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors shadow-sm border border-gray-100 dark:border-zinc-800"
+                    className="p-3 bg-white dark:bg-zinc-900 rounded-full hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors shadow-sm border border-gray-200 dark:border-zinc-800"
                 >
                     <X className="w-6 h-6 text-skate-black dark:text-white" />
                 </button>
@@ -190,7 +190,7 @@ const TrickLearning: React.FC<Props> = ({ language }) => {
                            className={`px-5 py-2.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all whitespace-nowrap border flex-shrink-0 ${
                                isActive 
                                  ? 'bg-skate-black dark:bg-white text-white dark:text-black shadow-md' 
-                                 : 'bg-white dark:bg-zinc-900 text-gray-400 dark:text-gray-500 border-gray-100 dark:border-zinc-800'
+                                 : 'bg-white dark:bg-zinc-900 text-gray-400 dark:text-gray-500 border-gray-200 dark:border-zinc-800'
                            }`}
                        >
                            {/* @ts-ignore */}
@@ -204,7 +204,7 @@ const TrickLearning: React.FC<Props> = ({ language }) => {
            <div className="px-6 space-y-6">
                
                {/* Description */}
-               <div className="bg-white dark:bg-zinc-900 p-6 rounded-[2rem] shadow-pop dark:border dark:border-zinc-800">
+               <div className="bg-white dark:bg-zinc-900 p-6 rounded-[2rem] shadow-sm border border-gray-200 dark:border-zinc-800">
                     <div className="flex items-center space-x-2 mb-2">
                         <Info className="w-4 h-4 text-skate-deep dark:text-skate-yellow" />
                         <h3 className="text-skate-deep dark:text-skate-yellow font-bold uppercase text-[10px] tracking-widest">{t.DESCRIPTION || "DESCRIPTION"}</h3>
@@ -227,7 +227,7 @@ const TrickLearning: React.FC<Props> = ({ language }) => {
                     {activeTips.length > 0 ? (
                         <div className="space-y-3">
                             {activeTips.map((tip, idx) => (
-                                <div key={idx} className="bg-white dark:bg-zinc-900 p-5 rounded-3xl border border-gray-100 dark:border-zinc-800 shadow-cute relative overflow-hidden">
+                                <div key={idx} className="bg-white dark:bg-zinc-900 p-5 rounded-3xl border border-gray-200 dark:border-zinc-800 shadow-sm relative overflow-hidden">
                                     <div className="absolute left-0 top-0 bottom-0 w-2 bg-skate-yellow"></div>
                                     <h4 className="text-skate-black dark:text-white font-bold mb-2 flex items-center text-sm">
                                         <span className="w-5 h-5 rounded-full bg-skate-yellow text-skate-black flex items-center justify-center text-[10px] font-black mr-3">
@@ -297,7 +297,7 @@ const TrickLearning: React.FC<Props> = ({ language }) => {
 
   // --- LIST VIEW ---
   return (
-    <div className="flex flex-col h-full p-6 pb-32 overflow-y-auto animate-fade-in bg-skate-bg dark:bg-zinc-950 transition-colors duration-300">
+    <div className="flex flex-col h-full p-6 pb-32 overflow-y-auto animate-fade-in bg-gray-50 dark:bg-zinc-950 transition-colors duration-300">
         <div className="space-y-8">
           <div className="flex items-center space-x-3 mt-2">
             <BookOpen className="text-skate-black dark:text-white w-8 h-8" />
@@ -318,7 +318,7 @@ const TrickLearning: React.FC<Props> = ({ language }) => {
                     <button
                         key={`fav-${trick.id}`}
                         onClick={() => handleTrickSelect(trick)}
-                        className="flex items-center justify-between p-5 bg-white dark:bg-zinc-900 rounded-[2rem] shadow-pop hover:shadow-lg transition-all group active:scale-[0.98] border border-gray-50 dark:border-zinc-800"
+                        className="flex items-center justify-between p-5 bg-white dark:bg-zinc-900 rounded-[2rem] shadow-sm hover:shadow-lg transition-all group active:scale-[0.98] border border-gray-200 dark:border-zinc-800"
                     >
                         <div className="flex items-center space-x-4">
                             <div className={`w-1.5 h-12 rounded-full ${getDifficultyBg(trick.difficulty)}`} />
@@ -347,7 +347,7 @@ const TrickLearning: React.FC<Props> = ({ language }) => {
           {/* GROUPS */}
           {Object.entries(groupedTricks).map(([difficulty, tricks]) => (
             <div key={difficulty} className="space-y-3">
-              <h3 className="text-gray-400 text-xs font-bold uppercase tracking-widest pl-2 sticky top-0 bg-skate-bg/95 dark:bg-zinc-950/95 backdrop-blur py-2 z-10">
+              <h3 className="text-gray-400 text-xs font-bold uppercase tracking-widest pl-2 sticky top-0 bg-gray-50/95 dark:bg-zinc-950/95 backdrop-blur py-2 z-10">
                 {/* @ts-ignore */}
                 {t[difficulty] || difficulty}
               </h3>
@@ -358,7 +358,7 @@ const TrickLearning: React.FC<Props> = ({ language }) => {
                     <button
                         key={trick.id}
                         onClick={() => handleTrickSelect(trick)}
-                        className="flex items-center justify-between p-5 bg-white dark:bg-zinc-900 rounded-[2rem] shadow-pop hover:shadow-lg transition-all group active:scale-[0.98] border border-gray-50 dark:border-zinc-800"
+                        className="flex items-center justify-between p-5 bg-white dark:bg-zinc-900 rounded-[2rem] shadow-sm hover:shadow-lg transition-all group active:scale-[0.98] border border-gray-200 dark:border-zinc-800"
                     >
                         <div className="flex items-center space-x-4">
                             <div className={`w-1.5 h-12 rounded-full ${getDifficultyBg(trick.difficulty)}`} />

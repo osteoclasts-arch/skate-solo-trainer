@@ -12,65 +12,55 @@ import { BASE_TRICKS, TRANSLATIONS } from './constants';
 import { generateAISession } from './services/geminiService';
 import { loginAsGuest, logout, checkLocalSession } from './services/authService';
 import { dbService } from './services/dbService';
-import { Home, BarChart2, BookOpen, Eye, Instagram, ArrowUpRight } from 'lucide-react';
+import { Home, BarChart2, BookOpen, Eye, ListVideo, Sparkles, User as UserIcon, Instagram } from 'lucide-react';
 
 const App: React.FC = () => {
   const [view, setView] = useState<ViewState>('DASHBOARD');
   const [activeTricks, setActiveTricks] = useState<Trick[]>([]);
   const [activeDifficulty, setActiveDifficulty] = useState<Difficulty>(Difficulty.AMATEUR_1);
   
-  // User Authentication State
   const [user, setUser] = useState<User | null>(null);
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [showSplash, setShowSplash] = useState(true);
-
-  // Initialize session history from localStorage (Default for Guest fallback)
   const [sessionHistory, setSessionHistory] = useState<SessionResult[]>([]);
-
   const [lastResult, setLastResult] = useState<SessionResult | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   
-  // Robust Language Initialization: Fixes 'undefined' errors
+  // Theme State
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+      // Default to true (Dark) if not set, or check preference
+      const saved = localStorage.getItem('skate_app_theme');
+      if (saved) return saved === 'dark';
+      return true; 
+  });
+  
   const [language, setLanguage] = useState<Language>(() => {
     try {
         const saved = localStorage.getItem('skate_app_language');
         return (saved === 'EN' || saved === 'KR') ? (saved as Language) : 'KR';
-    } catch {
-        return 'KR';
-    }
+    } catch { return 'KR'; }
   });
 
-  // Dark Mode State
-  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
-    return localStorage.getItem('skate_app_theme') === 'dark';
-  });
-
-  // Profile State
   const [startDate, setStartDate] = useState<string>(() => {
       return localStorage.getItem('skate_start_date') || new Date().toISOString().split('T')[0];
   });
 
-  // Apply Dark Mode Class
+  // Apply Theme Class
   useEffect(() => {
     if (isDarkMode) {
       document.documentElement.classList.add('dark');
-      localStorage.setItem('skate_app_theme', 'dark');
     } else {
       document.documentElement.classList.remove('dark');
-      localStorage.setItem('skate_app_theme', 'light');
     }
+    localStorage.setItem('skate_app_theme', isDarkMode ? 'dark' : 'light');
   }, [isDarkMode]);
 
-  // Minimum Splash Screen Duration
   useEffect(() => {
-    const timer = setTimeout(() => {
-        setShowSplash(false);
-    }, 2800); 
+    const timer = setTimeout(() => { setShowSplash(false); }, 2000); 
     return () => clearTimeout(timer);
   }, []);
 
-  // Handle Authentication & Data Migration
   useEffect(() => {
     const initAuth = async () => {
         const localUser = checkLocalSession();
@@ -78,87 +68,46 @@ const App: React.FC = () => {
             setUser(localUser);
             setIsLoadingData(true);
             try {
-                // 1. Load Profile
                 const profile = await dbService.getUserProfile(localUser.uid);
                 if (profile) {
-                    if (profile.startDate) {
-                        setStartDate(profile.startDate);
-                    }
+                    if (profile.startDate) setStartDate(profile.startDate);
                     localUser.isPro = profile.isPro;
                     localUser.proRequestStatus = profile.proRequestStatus;
                     localUser.age = profile.age; 
                     localUser.level = profile.level;
                     localUser.xp = profile.xp;
                     localUser.dailyQuests = profile.dailyQuests;
-                    
-                    // Mark login quest as complete if exists
-                    if (localUser.dailyQuests) {
-                        const loginQuest = localUser.dailyQuests.find(q => q.type === 'login');
-                        if (loginQuest && !loginQuest.isCompleted) {
-                            // We just set progress to 1/1 here, user claims it in UI
-                             const questIdx = localUser.dailyQuests.indexOf(loginQuest);
-                             const newQuests = [...localUser.dailyQuests];
-                             newQuests[questIdx] = { ...loginQuest, progress: 1 };
-                             localUser.dailyQuests = newQuests;
-                             await dbService.updateUserProfile(localUser.uid, { dailyQuests: newQuests });
-                        }
-                    }
-
                     setUser({ ...localUser }); 
                 }
-
-                // 2. MIGRATE LEGACY DATA (Crucial for updates)
-                // This ensures if the user had data before the DB structure update, it gets moved to their UID
                 await dbService.migrateLegacySessions(localUser.uid);
-
-                // 3. Load Sessions (from DB)
                 const cloudSessions = await dbService.getUserSessions(localUser.uid);
                 setSessionHistory(cloudSessions);
-                
-            } catch (e) {
-                console.error("Error loading user data", e);
-            } finally {
-                setIsLoadingData(false);
-            }
+            } catch (e) { console.error("Error loading user data", e); } 
+            finally { setIsLoadingData(false); }
         }
         setIsAuthChecking(false);
     };
-
     initAuth();
   }, []);
+
+  const toggleTheme = () => setIsDarkMode(prev => !prev);
 
   const handleLogin = async (data?: { name: string; age: number; startDate: string }) => {
     const loggedInUser = await loginAsGuest(data?.name, data?.age);
     if (loggedInUser) {
       setUser(loggedInUser);
       setIsLoadingData(true);
+      if (data?.startDate) await updateStartDate(data.startDate);
+      if (data) await dbService.updateUserProfile(loggedInUser.uid, { startDate: data.startDate, age: data.age });
       
-      // Update Start Date if provided
-      if (data?.startDate) {
-          await updateStartDate(data.startDate);
-      }
-      
-      // Save profile to DB
-      if (data) {
-          await dbService.updateUserProfile(loggedInUser.uid, {
-              startDate: data.startDate,
-              age: data.age
-          });
-      }
-
-      // Refresh Data
       const profile = await dbService.getUserProfile(loggedInUser.uid);
       if (profile) {
          if(profile.startDate) setStartDate(profile.startDate);
          setUser(prev => prev ? ({...prev, level: profile.level, xp: profile.xp, dailyQuests: profile.dailyQuests}) : null);
       }
-      
-      // Attempt migration just in case
       await dbService.migrateLegacySessions(loggedInUser.uid);
-
       const sessions = await dbService.getUserSessions(loggedInUser.uid);
       setSessionHistory(sessions);
-      
       setIsLoadingData(false);
     }
   };
@@ -172,10 +121,7 @@ const App: React.FC = () => {
   const updateStartDate = async (date: string) => {
       setStartDate(date);
       localStorage.setItem('skate_start_date', date);
-      
-      if (user) {
-          await dbService.updateUserProfile(user.uid, { startDate: date });
-      }
+      if (user) await dbService.updateUserProfile(user.uid, { startDate: date });
   };
 
   const handleRequestPro = async () => {
@@ -190,29 +136,16 @@ const App: React.FC = () => {
       const now = new Date();
       start.setHours(0, 0, 0, 0);
       now.setHours(0, 0, 0, 0);
-      
-      const diffTime = now.getTime() - start.getTime();
-      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-      
-      return Math.max(1, diffDays + 1);
+      return Math.max(1, Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
   };
 
   const startSession = async (settings: SessionSettings) => {
     setIsGenerating(true);
     let tricks: Trick[] = [];
-
     setActiveDifficulty(settings.difficulty);
-
-    if (settings.useAI) {
-       tricks = await generateAISession(settings);
-    } else {
-       tricks = generateLocalTricks(settings);
-    }
-    
-    if (tricks.length === 0) {
-        tricks = generateLocalTricks(settings);
-    }
-
+    if (settings.useAI) tricks = await generateAISession(settings);
+    else tricks = generateLocalTricks(settings);
+    if (tricks.length === 0) tricks = generateLocalTricks(settings);
     setActiveTricks(tricks);
     setIsGenerating(false);
     setView('ACTIVE_SESSION');
@@ -221,26 +154,16 @@ const App: React.FC = () => {
   const generateLocalTricks = (settings: SessionSettings): Trick[] => {
       let filtered = BASE_TRICKS.filter(t => settings.categories.includes(t.category));
       filtered = filtered.filter(t => t.difficulty === settings.difficulty);
-      
-      if (filtered.length === 0) {
-          filtered = BASE_TRICKS;
-      }
-
+      if (filtered.length === 0) filtered = BASE_TRICKS;
       const shuffled = [...filtered].sort(() => 0.5 - Math.random());
       const selectedTricks = shuffled.slice(0, settings.trickCount);
-
       while (selectedTricks.length < settings.trickCount) {
           const randomTrick = filtered[Math.floor(Math.random() * filtered.length)];
           selectedTricks.push(randomTrick);
       }
-
       return selectedTricks.map((trick, index) => {
           const randomStance = settings.selectedStances[Math.floor(Math.random() * settings.selectedStances.length)];
-          return {
-              ...trick,
-              id: `${trick.id}-${index}-${Date.now()}`,
-              stance: randomStance
-          };
+          return { ...trick, id: `${trick.id}-${index}-${Date.now()}`, stance: randomStance };
       });
   };
 
@@ -248,68 +171,40 @@ const App: React.FC = () => {
     const newHistory = [result, ...sessionHistory];
     setSessionHistory(newHistory);
     setLastResult(result);
-    
     if (user) {
         await dbService.saveSession(user.uid, result);
-        
         if (user.dailyQuests) {
-            let updatedQuests = [...user.dailyQuests];
-            let hasUpdates = false;
-
-            const sessionQuestIdx = updatedQuests.findIndex(q => q.type === 'session' && !q.isCompleted);
-            if (sessionQuestIdx !== -1) {
-                updatedQuests[sessionQuestIdx].progress += 1;
-                hasUpdates = true;
-            }
-
-            const landQuestIdx = updatedQuests.findIndex(q => q.type === 'land_tricks' && !q.isCompleted);
-            if (landQuestIdx !== -1) {
-                updatedQuests[landQuestIdx].progress += result.landedCount;
-                hasUpdates = true;
-            }
-
-            const perfectQuestIdx = updatedQuests.findIndex(q => q.type === 'perfect_session' && !q.isCompleted);
-            if (perfectQuestIdx !== -1 && result.letters === '') { 
-                updatedQuests[perfectQuestIdx].progress += 1;
-                hasUpdates = true;
-            }
-
-            if (hasUpdates) {
-                await dbService.updateUserProfile(user.uid, { dailyQuests: updatedQuests });
-                setUser(prev => prev ? ({ ...prev, dailyQuests: updatedQuests }) : null);
-            }
+             const updatedQuests = [...user.dailyQuests];
+             await dbService.updateUserProfile(user.uid, { dailyQuests: updatedQuests });
+             setUser(prev => prev ? ({ ...prev, dailyQuests: updatedQuests }) : null);
         }
     } else {
         localStorage.setItem('skate_session_history', JSON.stringify(newHistory));
     }
-
     setView('SUMMARY');
   };
 
   const renderView = () => {
     if (isAuthChecking || showSplash) {
         return (
-            <div className="flex h-screen w-full flex-col items-center justify-center bg-[#E5E5E5] space-y-4 font-sans select-none overflow-hidden">
-                <div className="grid grid-cols-2 gap-4">
-                    <div className="w-32 h-32 relative group animate-key-press" style={{ animationDelay: '0s' }}>
-                        <div className="absolute inset-x-0 bottom-0 h-full rounded-[2rem] bg-[#D1D5DB]"></div>
-                        <div className="absolute inset-x-0 top-0 h-[85%] rounded-[2rem] bg-[#F3F4F6] flex items-center justify-center shadow-sm">
-                            <span className="text-4xl font-black text-[#1C1917] font-mono tracking-tighter">Do</span>
-                        </div>
+            <div className="flex h-screen w-full flex-col items-center justify-center bg-white dark:bg-black font-sans relative overflow-hidden transition-colors duration-300">
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-crit-accent rounded-full blur-[150px] opacity-20 animate-pulse-slow"></div>
+                <div className="relative z-10 flex flex-col items-center gap-6">
+                    <div className="w-24 h-24 rounded-[2rem] bg-gray-50 dark:bg-crit-surface border border-gray-100 dark:border-white/10 flex items-center justify-center animate-slide-up shadow-glow">
+                        <Sparkles className="w-10 h-10 text-crit-accent fill-crit-accent" />
                     </div>
-                    <div className="w-32 h-32 relative group animate-key-press" style={{ animationDelay: '0.2s' }}>
-                        <div className="absolute inset-x-0 bottom-0 h-full rounded-[2rem] bg-[#D1D5DB]"></div>
-                        <div className="absolute inset-x-0 top-0 h-[85%] rounded-[2rem] bg-[#F3F4F6] flex items-center justify-center shadow-sm">
-                            <span className="text-4xl font-black text-[#1C1917] font-mono tracking-tighter">A</span>
-                        </div>
-                    </div>
+                    <h1 className="text-5xl font-black text-black dark:text-white tracking-tighter animate-slide-up" style={{ animationDelay: '0.1s' }}>
+                        CRIT
+                    </h1>
                 </div>
-                <div className="w-[17rem] h-32 relative group animate-key-press" style={{ animationDelay: '0.4s' }}>
-                    <div className="absolute inset-x-0 bottom-0 h-full rounded-[2rem] bg-skate-deepOrange"></div>
-                    <div className="absolute inset-x-0 top-0 h-[85%] rounded-[2rem] bg-skate-orange flex items-center justify-center shadow-sm flex-col gap-1">
-                        <span className="text-4xl font-black text-white font-mono tracking-tight italic">Kickflip!</span>
-                        <ArrowUpRight className="w-8 h-8 text-white/80" />
-                    </div>
+
+                {/* FOOTER */}
+                <div className="absolute bottom-10 z-20 flex flex-col items-center animate-fade-in text-gray-400 dark:text-gray-600 text-[10px] font-bold tracking-widest delay-300">
+                    <span className="opacity-50">CREATED BY</span>
+                    <a href="https://instagram.com/osteoclasts_" target="_blank" rel="noreferrer" className="mt-2 flex items-center gap-1.5 text-black dark:text-white hover:text-crit-accent dark:hover:text-crit-accent transition-colors">
+                        <Instagram className="w-3 h-3" />
+                        <span>@osteoclasts_</span>
+                    </a>
                 </div>
             </div>
         );
@@ -322,13 +217,10 @@ const App: React.FC = () => {
             onStart={() => setView('SETUP')} 
             onLearning={() => setView('LEARNING')}
             onLineGen={() => setView('LINE_GENERATOR')}
+            onAnalytics={() => setView('ANALYTICS')}
             history={sessionHistory}
             language={language}
-            onLanguageToggle={() => setLanguage(l => {
-                const next = l === 'EN' ? 'KR' : 'EN';
-                localStorage.setItem('skate_app_language', next);
-                return next;
-            })}
+            onLanguageToggle={() => setLanguage(l => { const next = l === 'EN' ? 'KR' : 'EN'; localStorage.setItem('skate_app_language', next); return next; })}
             daysSkating={calculateDaysSkating()}
             startDate={startDate}
             onUpdateStartDate={updateStartDate}
@@ -337,91 +229,50 @@ const App: React.FC = () => {
             onLogout={handleLogout}
             onRequestPro={handleRequestPro}
             isDarkMode={isDarkMode}
-            onToggleTheme={() => setIsDarkMode(!isDarkMode)}
+            onToggleTheme={toggleTheme}
           />
         );
-      case 'SETUP':
-        return (
-          <SessionSetup 
-            onStart={startSession} 
-            onBack={() => setView('DASHBOARD')}
-            isGenerating={isGenerating}
-            language={language}
-          />
-        );
-      case 'ACTIVE_SESSION':
-        return (
-          <ActiveSession 
-            tricks={activeTricks} 
-            difficulty={activeDifficulty}
-            onComplete={handleSessionComplete} 
-            onAbort={() => setView('DASHBOARD')} 
-            language={language}
-          />
-        );
-      case 'SUMMARY':
-        return lastResult ? (
-          <SessionSummary 
-            result={lastResult} 
-            onHome={() => setView('DASHBOARD')}
-            language={language}
-          />
-        ) : null;
-      case 'ANALYTICS':
-        return (
-          <Analytics 
-            history={sessionHistory} 
-            language={language}
-            daysSkating={calculateDaysSkating()}
-            user={user}
-            onLogin={() => {
-                setView('DASHBOARD');
-            }}
-            onRequestPro={handleRequestPro}
-          />
-        );
-      case 'LEARNING':
-        return <TrickLearning language={language} />;
-      case 'AI_VISION':
-        return <AIVision language={language} user={user} />;
-      case 'LINE_GENERATOR':
-        return <LineGenerator language={language} user={user} onBack={() => setView('DASHBOARD')} />;
-      default:
-        return null;
+      case 'SETUP': return <SessionSetup onStart={startSession} onBack={() => setView('DASHBOARD')} isGenerating={isGenerating} language={language} />;
+      case 'ACTIVE_SESSION': return <ActiveSession tricks={activeTricks} difficulty={activeDifficulty} onComplete={handleSessionComplete} onAbort={() => setView('DASHBOARD')} language={language} />;
+      case 'SUMMARY': return lastResult ? <SessionSummary result={lastResult} onHome={() => setView('DASHBOARD')} language={language} /> : null;
+      case 'ANALYTICS': return <Analytics history={sessionHistory} language={language} daysSkating={calculateDaysSkating()} user={user} onLogin={() => setView('DASHBOARD')} onRequestPro={handleRequestPro} />;
+      case 'LEARNING': return <TrickLearning language={language} />;
+      case 'AI_VISION': return <AIVision language={language} user={user} />;
+      case 'LINE_GENERATOR': return <LineGenerator language={language} user={user} onBack={() => setView('DASHBOARD')} />;
+      default: return null;
     }
   };
 
   return (
-    <div className={`h-screen w-full bg-skate-bg dark:bg-zinc-950 text-skate-black dark:text-white overflow-hidden font-sans relative transition-colors duration-300`}>
+    <div className="h-screen w-full bg-gray-50 dark:bg-crit-bg text-black dark:text-white overflow-hidden font-sans relative selection:bg-crit-accent transition-colors duration-300">
       {renderView()}
 
       {!isAuthChecking && !showSplash && (view === 'DASHBOARD' || view === 'ANALYTICS' || view === 'LEARNING' || view === 'SUMMARY' || view === 'AI_VISION' || view === 'LINE_GENERATOR') && (
-         <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 w-auto z-50">
-            <nav className="glass-nav rounded-full px-6 py-4 flex items-center gap-6 shadow-pop">
-                <button 
-                    onClick={() => setView('DASHBOARD')}
-                    className={`transition-all duration-300 p-2 rounded-full ${view === 'DASHBOARD' ? 'bg-skate-yellow text-skate-black' : 'text-gray-400 hover:text-white'}`}
-                >
-                    <Home className="w-5 h-5" />
-                </button>
-                <button 
-                    onClick={() => setView('LEARNING')}
-                    className={`transition-all duration-300 p-2 rounded-full ${view === 'LEARNING' ? 'bg-skate-yellow text-skate-black' : 'text-gray-400 hover:text-white'}`}
-                >
-                    <BookOpen className="w-5 h-5" />
-                </button>
-                 <button 
-                    onClick={() => setView('AI_VISION')}
-                    className={`transition-all duration-300 p-2 rounded-full ${view === 'AI_VISION' ? 'bg-skate-yellow text-skate-black' : 'text-gray-400 hover:text-white'}`}
-                >
-                    <Eye className="w-5 h-5" />
-                </button>
-                <button 
-                    onClick={() => setView('ANALYTICS')}
-                    className={`transition-all duration-300 p-2 rounded-full ${view === 'ANALYTICS' ? 'bg-skate-yellow text-skate-black' : 'text-gray-400 hover:text-white'}`}
-                >
-                    <BarChart2 className="w-5 h-5" />
-                </button>
+         <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50 w-full max-w-[300px]">
+            <nav className="glass-nav rounded-[2rem] px-2 py-2 flex items-center justify-between shadow-2xl transition-all duration-300">
+                {[
+                  { id: 'DASHBOARD', icon: Home, label: 'Home' },
+                  { id: 'LEARNING', icon: BookOpen, label: 'Guide' },
+                  { id: 'AI_VISION', icon: Eye, label: 'Vision' },
+                  { id: 'ANALYTICS', icon: BarChart2, label: 'Stats' }
+                ].map((item) => (
+                    <button 
+                        key={item.id}
+                        onClick={() => setView(item.id as ViewState)}
+                        className={`p-3.5 rounded-full transition-all duration-300 relative group ${
+                            view === item.id 
+                            ? 'bg-crit-accent text-black shadow-[0_0_15px_rgba(230,255,0,0.4)]' 
+                            : 'text-gray-400 dark:text-gray-500 hover:text-black dark:hover:text-white'
+                        }`}
+                    >
+                        <item.icon className={`w-5 h-5 ${view === item.id ? 'stroke-[3px]' : 'stroke-2'}`} />
+                        {view === item.id && (
+                          <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-[10px] font-bold text-crit-accent dark:text-crit-accent opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap bg-black/80 px-2 py-1 rounded-md pointer-events-none">
+                            {item.label}
+                          </span>
+                        )}
+                    </button>
+                ))}
             </nav>
          </div>
       )}

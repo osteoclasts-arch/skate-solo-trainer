@@ -32,7 +32,7 @@ const SessionSummary: React.FC<Props> = ({ result, onHome, language }) => {
   // Let's stick to the yellow/white scheme.
 
   return (
-    <div className="flex flex-col h-full bg-skate-bg dark:bg-zinc-950 text-skate-black dark:text-white p-6 overflow-y-auto font-sans relative transition-colors duration-300">
+    <div className="flex flex-col h-full bg-gray-50 dark:bg-zinc-950 text-skate-black dark:text-white p-6 overflow-y-auto font-sans relative transition-colors duration-300">
       
       <div className="relative z-10 flex-1 flex flex-col items-center space-y-8 pb-10">
         
@@ -95,9 +95,9 @@ const SessionSummary: React.FC<Props> = ({ result, onHome, language }) => {
             
             {/* Ticket Perforation */}
             <div className="relative h-4 bg-gray-50 dark:bg-zinc-800 flex items-center justify-between px-2">
-                <div className="w-6 h-6 rounded-full bg-skate-bg dark:bg-zinc-950 -ml-4"></div>
+                <div className="w-6 h-6 rounded-full bg-gray-50 dark:bg-zinc-950 -ml-4"></div>
                 <div className="border-t-2 border-dashed border-gray-300 dark:border-zinc-600 w-full mx-2"></div>
-                <div className="w-6 h-6 rounded-full bg-skate-bg dark:bg-zinc-950 -mr-4"></div>
+                <div className="w-6 h-6 rounded-full bg-gray-50 dark:bg-zinc-950 -mr-4"></div>
             </div>
 
             {/* AI Feedback Section */}
@@ -143,7 +143,7 @@ const SessionSummary: React.FC<Props> = ({ result, onHome, language }) => {
         </div>
       </div>
 
-      <div className="relative z-20 pt-4 bg-gradient-to-t from-skate-bg dark:from-zinc-950 via-skate-bg dark:via-zinc-950 to-transparent">
+      <div className="relative z-20 pt-4 bg-gradient-to-t from-gray-50 dark:from-zinc-950 via-gray-50 dark:via-zinc-950 to-transparent">
         <button 
             onClick={onHome} 
             className="w-full py-5 bg-skate-black dark:bg-white text-white dark:text-black rounded-[2.5rem] font-bold text-lg uppercase tracking-widest hover:bg-gray-800 dark:hover:bg-zinc-200 transition-colors shadow-pop flex items-center justify-center gap-2"

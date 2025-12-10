@@ -1,5 +1,3 @@
-
-
 import { Difficulty, Stance, Trick, TrickCategory, TrickTip } from "./types";
 
 export const SKATE_LETTERS = ['S', 'K', 'A', 'T', 'E'];
@@ -110,7 +108,7 @@ export const TRANSLATIONS = {
     RANKING_DESC: "Based on Hard/Pro tricks landed",
     // Auth
     LOGIN_GUEST: "Create Profile",
-    LOGOUT: "Reset Profile",
+    LOGOUT: "Sign Out",
     GUEST: "Guest",
     PROFILE_SETUP: "Profile Setup",
     NICKNAME: "Nickname",
@@ -196,7 +194,21 @@ export const TRANSLATIONS = {
     LINE_STYLE_FLOW: "Flow",
     LINE_STYLE_GNAR: "Gnar",
     LINE_STYLE_CHILL: "Chill",
-    GENERATING_LINE: "Designing line..."
+    GENERATING_LINE: "Designing line...",
+    // Dashboard New Keys
+    HI_SKATER: "Hi, Skater",
+    LETS_SKATE: "Let's Skate",
+    DAILY_GOAL: "Daily Goal",
+    AI_GEN: "AI Gen",
+    LINE_MAKER: "Line Maker",
+    LIBRARY: "Library",
+    TRICK_GUIDE_TITLE: "Trick Guide",
+    STREAK: "Streak",
+    SESSIONS: "Sessions",
+    SIGN_IN_QUESTS: "Sign in to unlock quests",
+    START_SESSION_TITLE: "START\nSESSION",
+    LINE_MAKER_TITLE: "LINE\nMAKER",
+    TRICK_GUIDE_TITLE_MAIN: "TRICK GUIDE"
   },
   KR: {
     NEW_SESSION: "새로운 세션",
@@ -303,7 +315,7 @@ export const TRANSLATIONS = {
     RANKING_DESC: "상급/프로 기술 성공 횟수 기준",
     // Auth
     LOGIN_GUEST: "프로필 생성",
-    LOGOUT: "프로필 초기화",
+    LOGOUT: "로그아웃",
     GUEST: "게스트",
     PROFILE_SETUP: "프로필 설정",
     NICKNAME: "닉네임",
@@ -389,7 +401,21 @@ export const TRANSLATIONS = {
     LINE_STYLE_FLOW: "플로우",
     LINE_STYLE_GNAR: "하드코어",
     LINE_STYLE_CHILL: "칠(Chill)",
-    GENERATING_LINE: "라인 구상 중..."
+    GENERATING_LINE: "라인 구상 중...",
+    // Dashboard New Keys
+    HI_SKATER: "안녕, 스케이터",
+    LETS_SKATE: "스케이트 타자",
+    DAILY_GOAL: "일일 목표",
+    AI_GEN: "AI 생성",
+    LINE_MAKER: "라인 메이커",
+    LIBRARY: "라이브러리",
+    TRICK_GUIDE_TITLE: "트릭 가이드",
+    STREAK: "연속",
+    SESSIONS: "세션",
+    SIGN_IN_QUESTS: "로그인하고 퀘스트 잠금해제",
+    START_SESSION_TITLE: "세션\n시작",
+    LINE_MAKER_TITLE: "라인\n메이커",
+    TRICK_GUIDE_TITLE_MAIN: "트릭 가이드"
   }
 };
 

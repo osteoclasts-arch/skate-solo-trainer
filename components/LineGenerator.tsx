@@ -66,7 +66,7 @@ const LineGenerator: React.FC<Props> = ({ onBack, language, user }) => {
   };
 
   return (
-    <div className="flex flex-col h-full p-6 space-y-6 overflow-y-auto pb-32 animate-fade-in relative bg-skate-bg dark:bg-zinc-950 font-sans transition-colors duration-300">
+    <div className="flex flex-col h-full p-6 space-y-6 overflow-y-auto pb-32 animate-fade-in relative bg-gray-50 dark:bg-zinc-950 font-sans transition-colors duration-300">
        
        <div className="flex items-center gap-4 pt-2 mb-2">
         <button onClick={onBack} className="p-3 rounded-full bg-white dark:bg-zinc-900 shadow-sm border border-gray-100 dark:border-zinc-800 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors">
