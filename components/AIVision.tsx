@@ -279,17 +279,17 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
   const togglePreviewPlay = () => { if (!videoRef.current) return; if (videoRef.current.paused) { if (videoRef.current.currentTime >= trimEnd) videoRef.current.currentTime = trimStart; videoRef.current.play(); } else videoRef.current.pause(); };
 
   return (
-    <div className="flex flex-col h-full p-6 pb-32 overflow-y-auto animate-fade-in relative bg-skate-bg font-sans">
+    <div className="flex flex-col h-full p-6 pb-32 overflow-y-auto animate-fade-in relative bg-skate-bg dark:bg-zinc-950 font-sans transition-colors duration-300">
       
       {/* HEADER */}
       <div className="flex items-center justify-between mb-6 mt-2">
         <div className="flex items-center space-x-3">
-            <Eye className="text-skate-black w-8 h-8" />
-            <h2 className="text-3xl font-black text-skate-black leading-none tracking-tighter">{t.AI_VISION_TITLE}</h2>
+            <Eye className="text-skate-black dark:text-white w-8 h-8" />
+            <h2 className="text-3xl font-black text-skate-black dark:text-white leading-none tracking-tighter">{t.AI_VISION_TITLE}</h2>
         </div>
         <button 
             onClick={() => setShowAlgoInfo(true)}
-            className="flex items-center space-x-1 px-3 py-1.5 rounded-full bg-white shadow-sm border border-gray-100 text-gray-500 hover:text-skate-black transition-colors"
+            className="flex items-center space-x-1 px-3 py-1.5 rounded-full bg-white dark:bg-zinc-900 shadow-sm border border-gray-100 dark:border-zinc-800 text-gray-500 hover:text-skate-black dark:hover:text-white transition-colors"
         >
             <HelpCircle className="w-4 h-4" />
         </button>
@@ -297,9 +297,9 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
 
       {/* INFO BANNER */}
       {!analysisResult && !isAnalyzing && (
-          <div className="bg-white p-4 rounded-3xl mb-6 flex items-start space-x-3 border border-gray-100 shadow-sm">
-              <Info className="w-5 h-5 text-skate-deep shrink-0 mt-0.5" />
-              <p className="text-xs text-skate-deep leading-relaxed font-bold">
+          <div className="bg-white dark:bg-zinc-900 p-4 rounded-3xl mb-6 flex items-start space-x-3 border border-gray-100 dark:border-zinc-800 shadow-sm">
+              <Info className="w-5 h-5 text-skate-deep dark:text-skate-yellow shrink-0 mt-0.5" />
+              <p className="text-xs text-skate-deep dark:text-white leading-relaxed font-bold">
                   {language === 'KR' 
                     ? "팁: 슬로우 모션으로 45도 각도에서 촬영하면 분석이 훨씬 정확해집니다." 
                     : "Tip: Use Slow Motion and film from a 45° angle for best results."}
@@ -312,13 +312,13 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
         {!previewUrl && (
             <div 
                 onClick={() => fileInputRef.current?.click()}
-                className="border-2 border-dashed border-gray-200 rounded-[2.5rem] p-10 flex flex-col items-center justify-center text-center space-y-4 hover:bg-white hover:border-skate-yellow hover:shadow-lg transition-all cursor-pointer min-h-[350px] group bg-white/50"
+                className="border-2 border-dashed border-gray-200 dark:border-zinc-800 rounded-[2.5rem] p-10 flex flex-col items-center justify-center text-center space-y-4 hover:bg-white dark:hover:bg-zinc-900 hover:border-skate-yellow hover:shadow-lg transition-all cursor-pointer min-h-[350px] group bg-white/50 dark:bg-zinc-900/50"
             >
                 <div className="w-24 h-24 bg-skate-yellow rounded-full flex items-center justify-center group-hover:scale-110 transition-transform duration-500 shadow-pop">
                     <Upload className="w-10 h-10 text-skate-black" />
                 </div>
                 <div>
-                    <h3 className="text-2xl font-black text-skate-black mb-2 tracking-tight">{t.UPLOAD_MEDIA}</h3>
+                    <h3 className="text-2xl font-black text-skate-black dark:text-white mb-2 tracking-tight">{t.UPLOAD_MEDIA}</h3>
                     <p className="text-gray-400 text-sm max-w-xs mx-auto font-medium">{t.AI_VISION_DESC}</p>
                 </div>
                 <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="video/*,video/mp4,video/quicktime" className="hidden" />
@@ -327,7 +327,7 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
 
         {previewUrl && !analysisResult && (
             <div className="space-y-6 animate-fade-in">
-                <div className="relative rounded-[2rem] overflow-hidden bg-black shadow-pop border border-gray-100 group aspect-[9/16] md:aspect-video max-h-[60vh] mx-auto">
+                <div className="relative rounded-[2rem] overflow-hidden bg-black shadow-pop border border-gray-100 dark:border-zinc-800 group aspect-[9/16] md:aspect-video max-h-[60vh] mx-auto">
                     <video 
                         ref={videoRef} src={previewUrl} className="w-full h-full object-contain" playsInline onLoadedMetadata={handleMetadataLoaded} onTimeUpdate={handleTimeUpdate} onError={handleVideoError}
                     />
@@ -346,7 +346,7 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
                 </div>
 
                 {/* Timeline */}
-                <div className="bg-white p-6 rounded-[2rem] shadow-pop border border-gray-50 space-y-4">
+                <div className="bg-white dark:bg-zinc-900 p-6 rounded-[2rem] shadow-pop border border-gray-50 dark:border-zinc-800 space-y-4">
                     <div className="flex items-center justify-between text-gray-400 px-1">
                         <span className="text-xs font-bold uppercase tracking-widest">{t.TRIM_RANGE}</span>
                         <span className="text-xs font-mono font-black text-skate-black bg-skate-yellow px-2 py-1 rounded-md">
@@ -356,7 +356,7 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
 
                     <div 
                         ref={timelineRef}
-                        className="relative h-12 bg-gray-100 rounded-xl w-full select-none touch-none overflow-hidden cursor-pointer group"
+                        className="relative h-12 bg-gray-100 dark:bg-zinc-800 rounded-xl w-full select-none touch-none overflow-hidden cursor-pointer group"
                         onMouseDown={(e) => {
                              const rect = e.currentTarget.getBoundingClientRect();
                              const x = e.clientX - rect.left;
@@ -372,8 +372,8 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
                              if(time < trimStart || time > trimEnd) if(videoRef.current) videoRef.current.currentTime = time;
                         }}
                     >
-                        <div className="absolute left-0 top-0 bottom-0 bg-gray-300/50 pointer-events-none z-10" style={{ width: `${(trimStart / videoDuration) * 100}%` }} />
-                        <div className="absolute right-0 top-0 bottom-0 bg-gray-300/50 pointer-events-none z-10" style={{ width: `${100 - (trimEnd / videoDuration) * 100}%` }} />
+                        <div className="absolute left-0 top-0 bottom-0 bg-gray-300/50 dark:bg-black/50 pointer-events-none z-10" style={{ width: `${(trimStart / videoDuration) * 100}%` }} />
+                        <div className="absolute right-0 top-0 bottom-0 bg-gray-300/50 dark:bg-black/50 pointer-events-none z-10" style={{ width: `${100 - (trimEnd / videoDuration) * 100}%` }} />
                         <div className="absolute top-0 bottom-0 border-y-4 border-skate-yellow z-20 pointer-events-none" style={{ left: `${(trimStart / videoDuration) * 100}%`, right: `${100 - (trimEnd / videoDuration) * 100}%` }}>
                             <div className="absolute left-0 top-0 bottom-0 w-6 bg-skate-yellow flex items-center justify-center cursor-ew-resize pointer-events-auto -translate-x-1/2 rounded-l-md shadow-sm" onMouseDown={(e) => { e.stopPropagation(); setIsDragging('start'); }} onTouchStart={(e) => { e.stopPropagation(); setIsDragging('start'); }}>
                                 <ChevronLeft className="w-4 h-4 text-skate-black" />
@@ -382,13 +382,13 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
                                 <ChevronRight className="w-4 h-4 text-skate-black" />
                             </div>
                         </div>
-                        <div className="absolute top-0 bottom-0 w-0.5 bg-skate-black z-30 pointer-events-none" style={{ left: `${(currentTime / videoDuration) * 100}%` }}>
-                            <div className="absolute -top-1 -translate-x-1/2 w-3 h-3 bg-skate-black rounded-full shadow-md"></div>
+                        <div className="absolute top-0 bottom-0 w-0.5 bg-skate-black dark:bg-white z-30 pointer-events-none" style={{ left: `${(currentTime / videoDuration) * 100}%` }}>
+                            <div className="absolute -top-1 -translate-x-1/2 w-3 h-3 bg-skate-black dark:bg-white rounded-full shadow-md"></div>
                         </div>
                     </div>
                     
                     <div className="flex justify-center">
-                        <button onClick={() => { setTrimStart(0); setTrimEnd(videoDuration); }} className="text-[10px] font-bold text-gray-400 hover:text-skate-black flex items-center bg-gray-50 px-3 py-1.5 rounded-full transition-colors">
+                        <button onClick={() => { setTrimStart(0); setTrimEnd(videoDuration); }} className="text-[10px] font-bold text-gray-400 hover:text-skate-black dark:hover:text-white flex items-center bg-gray-50 dark:bg-zinc-800 px-3 py-1.5 rounded-full transition-colors">
                              <RotateCcw className="w-3 h-3 mr-1" /> RESET
                         </button>
                     </div>
@@ -396,14 +396,14 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
 
                 {/* Loading UI */}
                 {isAnalyzing && (
-                    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-white/95 backdrop-blur-xl transition-all animate-fade-in">
+                    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-white/95 dark:bg-zinc-950/95 backdrop-blur-xl transition-all animate-fade-in">
                         <div className="relative mb-8">
                             <div className="w-32 h-32 rounded-full bg-skate-yellow blur-xl animate-pulse absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"></div>
                             <div className="w-24 h-24 rounded-full bg-black flex items-center justify-center relative z-10 animate-bounce">
                                 <Sparkles className="w-10 h-10 text-skate-yellow animate-spin-slow" />
                             </div>
                         </div>
-                        <h3 className="text-3xl font-black text-skate-black mb-2 tracking-tight">AI ANALYSIS</h3>
+                        <h3 className="text-3xl font-black text-skate-black dark:text-white mb-2 tracking-tight">AI ANALYSIS</h3>
                         <p key={thinkingStep} className="text-skate-black font-bold text-sm uppercase tracking-widest animate-slide-up bg-skate-yellow px-4 py-2 rounded-full">
                             {/* @ts-ignore */}
                             {THINKING_STEPS[thinkingStep].text[language]}
@@ -414,28 +414,28 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
                 {/* Analysis Config */}
                 {!isAnalyzing && (
                     <div className="space-y-4">
-                        <div className="bg-white p-5 rounded-[2rem] shadow-pop flex items-center justify-between border border-gray-50">
+                        <div className="bg-white dark:bg-zinc-900 p-5 rounded-[2rem] shadow-pop flex items-center justify-between border border-gray-50 dark:border-zinc-800">
                              <div className="flex items-center space-x-2 text-gray-400">
                                 <Footprints className="w-5 h-5" />
                                 <span className="text-xs font-bold uppercase tracking-widest">{t.SELECT_YOUR_STANCE || "STANCE"}</span>
                              </div>
-                             <div className="flex space-x-2 bg-gray-100 rounded-xl p-1">
-                                <button onClick={() => setStance('Regular')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${stance === 'Regular' ? 'bg-skate-black text-white shadow-sm' : 'text-gray-400'}`}>REGULAR</button>
-                                <button onClick={() => setStance('Goofy')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${stance === 'Goofy' ? 'bg-skate-black text-white shadow-sm' : 'text-gray-400'}`}>GOOFY</button>
+                             <div className="flex space-x-2 bg-gray-100 dark:bg-zinc-800 rounded-xl p-1">
+                                <button onClick={() => setStance('Regular')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${stance === 'Regular' ? 'bg-skate-black text-white shadow-sm' : 'text-gray-400 dark:text-gray-500'}`}>REGULAR</button>
+                                <button onClick={() => setStance('Goofy')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${stance === 'Goofy' ? 'bg-skate-black text-white shadow-sm' : 'text-gray-400 dark:text-gray-500'}`}>GOOFY</button>
                              </div>
                         </div>
 
-                        <div className="bg-white p-5 rounded-[2rem] flex items-center space-x-3 shadow-pop border border-gray-50">
+                        <div className="bg-white dark:bg-zinc-900 p-5 rounded-[2rem] flex items-center space-x-3 shadow-pop border border-gray-50 dark:border-zinc-800">
                             <Info className="w-5 h-5 text-gray-300" />
-                            <input type="text" placeholder={t.ENTER_TRICK_NAME} value={trickNameHint} onChange={(e) => setTrickNameHint(e.target.value)} className="bg-transparent border-none outline-none text-skate-black placeholder-gray-400 flex-1 text-sm font-bold" />
+                            <input type="text" placeholder={t.ENTER_TRICK_NAME} value={trickNameHint} onChange={(e) => setTrickNameHint(e.target.value)} className="bg-transparent border-none outline-none text-skate-black dark:text-white placeholder-gray-400 flex-1 text-sm font-bold" />
                         </div>
                         
                         <button
                             onClick={processVideo}
                             disabled={isVideoError}
-                            className={`w-full py-5 bg-skate-black hover:bg-gray-800 text-skate-yellow text-xl font-black uppercase rounded-[2rem] shadow-lg transform active:scale-[0.98] transition-all flex items-center justify-center space-x-3 ${isVideoError ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            className={`w-full py-5 bg-skate-black dark:bg-white hover:bg-gray-800 dark:hover:bg-gray-100 text-skate-yellow dark:text-black text-xl font-black uppercase rounded-[2rem] shadow-lg transform active:scale-[0.98] transition-all flex items-center justify-center space-x-3 ${isVideoError ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
-                            <Zap className="w-6 h-6 fill-skate-yellow" />
+                            <Zap className="w-6 h-6 fill-skate-yellow dark:fill-black" />
                             <span>{t.ANALYZE_TRICK}</span>
                         </button>
                     </div>
@@ -446,7 +446,7 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
         {/* RESULTS */}
         {analysisResult && (
             <div className="space-y-6 animate-slide-up pb-10">
-                <div className="relative rounded-[2rem] overflow-hidden bg-black border border-gray-100 shadow-pop mx-auto">
+                <div className="relative rounded-[2rem] overflow-hidden bg-black border border-gray-100 dark:border-zinc-800 shadow-pop mx-auto">
                     <video ref={resultVideoRef} src={previewUrl!} className="w-full h-auto max-h-[60vh] object-contain opacity-90" playsInline muted loop onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} />
                     <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none" width={resultVideoRef.current?.videoWidth} height={resultVideoRef.current?.videoHeight} />
                     <div className="absolute bottom-6 left-6 right-6 flex items-center justify-between bg-white/90 backdrop-blur-md rounded-2xl p-3 shadow-lg">
@@ -462,14 +462,14 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
                 </div>
 
                 {/* Score Card */}
-                <div className="bg-white p-6 rounded-[2.5rem] shadow-pop border border-gray-50 relative overflow-hidden">
+                <div className="bg-white dark:bg-zinc-900 p-6 rounded-[2.5rem] shadow-pop border border-gray-50 dark:border-zinc-800 relative overflow-hidden">
                     <div className="absolute top-0 right-0 w-32 h-32 bg-skate-yellow rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 opacity-50"></div>
                     <div className="flex justify-between items-start mb-6 relative z-10">
                         <div>
                             <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 block">{t.TRICK_DETECTED}</span>
-                            <h2 className="text-3xl font-black text-skate-black leading-none">{analysisResult.trickName}</h2>
+                            <h2 className="text-3xl font-black text-skate-black dark:text-white leading-none">{analysisResult.trickName}</h2>
                         </div>
-                        <div className={`px-4 py-2 rounded-full ${analysisResult.isLanded ? 'bg-skate-black text-skate-yellow' : 'bg-gray-100 text-gray-500'}`}>
+                        <div className={`px-4 py-2 rounded-full ${analysisResult.isLanded ? 'bg-skate-black text-skate-yellow' : 'bg-gray-100 dark:bg-zinc-800 text-gray-500'}`}>
                             <span className="font-black uppercase tracking-wider text-sm flex items-center gap-1">
                                 {analysisResult.isLanded ? <CheckCircle className="w-4 h-4" /> : <X className="w-4 h-4" />}
                                 {analysisResult.isLanded ? 'LANDED' : 'MISSED'}
@@ -478,17 +478,17 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
                     </div>
 
                     <div className="grid grid-cols-2 gap-4 relative z-10">
-                        <div className="bg-gray-50 rounded-[1.5rem] p-5">
+                        <div className="bg-gray-50 dark:bg-zinc-800 rounded-[1.5rem] p-5">
                             <span className="text-gray-400 text-[10px] font-bold uppercase tracking-widest">{t.FORM_SCORE}</span>
                             <div className="flex items-baseline mt-2">
-                                <span className="text-4xl font-black text-skate-black">{analysisResult.score}</span>
+                                <span className="text-4xl font-black text-skate-black dark:text-white">{analysisResult.score}</span>
                                 <span className="text-sm text-gray-400 font-bold ml-1">/100</span>
                             </div>
                         </div>
-                        <div className="bg-gray-50 rounded-[1.5rem] p-5">
+                        <div className="bg-gray-50 dark:bg-zinc-800 rounded-[1.5rem] p-5">
                             <span className="text-gray-400 text-[10px] font-bold uppercase tracking-widest">{t.HEIGHT_EST}</span>
                             <div className="flex items-baseline mt-2">
-                                <span className="text-4xl font-black text-skate-black">{analysisResult.heightMeters}</span>
+                                <span className="text-4xl font-black text-skate-black dark:text-white">{analysisResult.heightMeters}</span>
                                 <span className="text-sm text-gray-400 font-bold ml-1">m</span>
                             </div>
                         </div>
@@ -498,21 +498,21 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
                 {/* Feedback */}
                 <div className="space-y-4">
                     {analysisResult.boardPhysics && (
-                         <div className="bg-white p-6 rounded-[2.5rem] border border-gray-50 shadow-pop">
+                         <div className="bg-white dark:bg-zinc-900 p-6 rounded-[2.5rem] border border-gray-50 dark:border-zinc-800 shadow-pop">
                              <div className="flex items-center space-x-2 mb-3">
-                                 <Rotate3d className="w-5 h-5 text-skate-deep" />
+                                 <Rotate3d className="w-5 h-5 text-skate-deep dark:text-skate-yellow" />
                                  <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest">{t.PHYSICS_ANALYSIS}</h3>
                              </div>
-                             <p className="text-gray-600 text-sm leading-relaxed italic border-l-4 border-skate-deep pl-3 font-medium">"{analysisResult.boardPhysics.description}"</p>
+                             <p className="text-gray-600 dark:text-gray-300 text-sm leading-relaxed italic border-l-4 border-skate-deep dark:border-skate-yellow pl-3 font-medium">"{analysisResult.boardPhysics.description}"</p>
                         </div>
                     )}
                     
-                    <div className="bg-white p-6 rounded-[2.5rem] shadow-pop border-2 border-skate-black">
+                    <div className="bg-white dark:bg-zinc-900 p-6 rounded-[2.5rem] shadow-pop border-2 border-skate-black dark:border-zinc-700">
                         <div className="flex items-center space-x-2 mb-3">
-                            <Activity className="w-5 h-5 text-skate-black" />
+                            <Activity className="w-5 h-5 text-skate-black dark:text-white" />
                             <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest">{t.POSTURE_ANALYSIS}</h3>
                         </div>
-                        <p className="text-skate-black text-sm leading-relaxed whitespace-pre-wrap font-medium">{analysisResult.feedbackText}</p>
+                        <p className="text-skate-black dark:text-white text-sm leading-relaxed whitespace-pre-wrap font-medium">{analysisResult.feedbackText}</p>
                     </div>
 
                     <div className="bg-skate-yellow p-6 rounded-[2.5rem] shadow-lg">
@@ -524,7 +524,7 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
                     </div>
                 </div>
 
-                <button onClick={() => { setAnalysisResult(null); setTrackingData([]); }} className="w-full py-5 bg-white text-skate-black rounded-[2rem] font-bold text-lg uppercase tracking-wide hover:bg-gray-50 transition-colors shadow-lg border border-gray-100">
+                <button onClick={() => { setAnalysisResult(null); setTrackingData([]); }} className="w-full py-5 bg-white dark:bg-zinc-900 text-skate-black dark:text-white rounded-[2rem] font-bold text-lg uppercase tracking-wide hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors shadow-lg border border-gray-100 dark:border-zinc-800">
                     ANALYZE NEW VIDEO
                 </button>
             </div>
@@ -534,13 +534,13 @@ const AIVision: React.FC<Props> = ({ language, user }) => {
       {/* ALGO MODAL */}
       {showAlgoInfo && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-6 animate-fade-in">
-              <div className="bg-white p-8 rounded-[2.5rem] w-full max-w-sm relative shadow-2xl">
-                  <button onClick={() => setShowAlgoInfo(false)} className="absolute top-6 right-6 p-2 bg-gray-100 rounded-full hover:bg-gray-200"><X className="w-4 h-4 text-skate-black"/></button>
-                  <h3 className="text-2xl font-black text-skate-black mb-6">AI Algorithm</h3>
+              <div className="bg-white dark:bg-zinc-900 p-8 rounded-[2.5rem] w-full max-w-sm relative shadow-2xl dark:border dark:border-zinc-800">
+                  <button onClick={() => setShowAlgoInfo(false)} className="absolute top-6 right-6 p-2 bg-gray-100 dark:bg-zinc-800 rounded-full hover:bg-gray-200 dark:hover:bg-zinc-700"><X className="w-4 h-4 text-skate-black dark:text-white"/></button>
+                  <h3 className="text-2xl font-black text-skate-black dark:text-white mb-6">AI Algorithm</h3>
                   <div className="space-y-6">
-                      <div className="pl-4 border-l-2 border-skate-yellow"><h4 className="text-skate-black font-black text-xs uppercase mb-1">Step 1. Tracking</h4><p className="text-gray-500 text-sm font-medium">MediaPipe tracks joints & board physics (0.03s).</p></div>
-                      <div className="pl-4 border-l-2 border-skate-deep"><h4 className="text-skate-deep font-black text-xs uppercase mb-1">Step 2. Analysis</h4><p className="text-gray-500 text-sm font-medium">Gemini 2.5 Flash analyzes visual style & data.</p></div>
-                      <div className="pl-4 border-l-2 border-gray-300"><h4 className="text-gray-400 font-black text-xs uppercase mb-1">Step 3. Result</h4><p className="text-gray-500 text-sm font-medium">Cross-validates for accurate scoring.</p></div>
+                      <div className="pl-4 border-l-2 border-skate-yellow"><h4 className="text-skate-black dark:text-white font-black text-xs uppercase mb-1">Step 1. Tracking</h4><p className="text-gray-500 text-sm font-medium">MediaPipe tracks joints & board physics (0.03s).</p></div>
+                      <div className="pl-4 border-l-2 border-skate-deep dark:border-white"><h4 className="text-skate-deep dark:text-white font-black text-xs uppercase mb-1">Step 2. Analysis</h4><p className="text-gray-500 text-sm font-medium">Gemini 2.5 Flash analyzes visual style & data.</p></div>
+                      <div className="pl-4 border-l-2 border-gray-300 dark:border-zinc-700"><h4 className="text-gray-400 font-black text-xs uppercase mb-1">Step 3. Result</h4><p className="text-gray-500 text-sm font-medium">Cross-validates for accurate scoring.</p></div>
                   </div>
               </div>
           </div>

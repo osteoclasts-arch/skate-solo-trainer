@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect } from 'react';
 import { ViewState, SessionSettings, Trick, SessionResult, Difficulty, Language, Stance, User } from './types';
 import Dashboard from './components/Dashboard';
@@ -35,10 +33,26 @@ const App: React.FC = () => {
     return (localStorage.getItem('skate_app_language') as Language) || 'KR';
   });
 
+  // Dark Mode State
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+    return localStorage.getItem('skate_app_theme') === 'dark';
+  });
+
   // Profile State
   const [startDate, setStartDate] = useState<string>(() => {
       return localStorage.getItem('skate_start_date') || new Date().toISOString().split('T')[0];
   });
+
+  // Apply Dark Mode Class
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('skate_app_theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('skate_app_theme', 'light');
+    }
+  }, [isDarkMode]);
 
   // Minimum Splash Screen Duration
   useEffect(() => {
@@ -142,12 +156,6 @@ const App: React.FC = () => {
   };
 
   const handleLogout = async () => {
-    // Note: logout() in authService clears localStorage keys. 
-    // If you want to PERSIST data even after "logout" (since it's a local app), 
-    // you might want to modify authService.logout to only clear the auth key, not the data keys.
-    // However, for privacy, usually logout implies clearing local access.
-    // Since this request is about preserving data across *updates*, explicit logout clearing is expected behavior.
-    
     await logout();
     setUser(null);
     window.location.reload(); 
@@ -172,14 +180,12 @@ const App: React.FC = () => {
   const calculateDaysSkating = () => {
       const start = new Date(startDate);
       const now = new Date();
-      // Normalize to midnight to ensure accurate day calculation based on calendar days
       start.setHours(0, 0, 0, 0);
       now.setHours(0, 0, 0, 0);
       
       const diffTime = now.getTime() - start.getTime();
       const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
       
-      // Add 1 so the first day is Day 1
       return Math.max(1, diffDays + 1);
   };
 
@@ -235,32 +241,27 @@ const App: React.FC = () => {
     setSessionHistory(newHistory);
     setLastResult(result);
     
-    // Save to DB & Update Quests
     if (user) {
         await dbService.saveSession(user.uid, result);
         
-        // Update Daily Quests
         if (user.dailyQuests) {
             let updatedQuests = [...user.dailyQuests];
             let hasUpdates = false;
 
-            // 1. Session Count Quest
             const sessionQuestIdx = updatedQuests.findIndex(q => q.type === 'session' && !q.isCompleted);
             if (sessionQuestIdx !== -1) {
                 updatedQuests[sessionQuestIdx].progress += 1;
                 hasUpdates = true;
             }
 
-            // 2. Land Tricks Quest
             const landQuestIdx = updatedQuests.findIndex(q => q.type === 'land_tricks' && !q.isCompleted);
             if (landQuestIdx !== -1) {
                 updatedQuests[landQuestIdx].progress += result.landedCount;
                 hasUpdates = true;
             }
 
-            // 3. Perfect Session Quest
             const perfectQuestIdx = updatedQuests.findIndex(q => q.type === 'perfect_session' && !q.isCompleted);
-            if (perfectQuestIdx !== -1 && result.letters === '') { // No letters = Clean sheet
+            if (perfectQuestIdx !== -1 && result.letters === '') { 
                 updatedQuests[perfectQuestIdx].progress += 1;
                 hasUpdates = true;
             }
@@ -271,7 +272,6 @@ const App: React.FC = () => {
             }
         }
     } else {
-        // Fallback for purely local guest without UID
         localStorage.setItem('skate_session_history', JSON.stringify(newHistory));
     }
 
@@ -327,6 +327,8 @@ const App: React.FC = () => {
             onLogin={handleLogin}
             onLogout={handleLogout}
             onRequestPro={handleRequestPro}
+            isDarkMode={isDarkMode}
+            onToggleTheme={() => setIsDarkMode(!isDarkMode)}
           />
         );
       case 'SETUP':
@@ -379,7 +381,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="h-screen w-full bg-skate-bg text-skate-black overflow-hidden font-sans relative">
+    <div className={`h-screen w-full bg-skate-bg dark:bg-zinc-950 text-skate-black dark:text-white overflow-hidden font-sans relative transition-colors duration-300`}>
       {renderView()}
 
       {!isAuthChecking && !showSplash && (view === 'DASHBOARD' || view === 'ANALYTICS' || view === 'LEARNING' || view === 'SUMMARY' || view === 'AI_VISION') && (

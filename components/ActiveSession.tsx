@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect } from 'react';
 import { Trick, SessionResult, TrickAttempt, Language, TrickTip, Difficulty } from '../types';
 import { Check, X, Lightbulb, Video, AlertTriangle } from 'lucide-react';
@@ -89,32 +87,32 @@ const ActiveSession: React.FC<Props> = ({ tricks, difficulty, onComplete, onAbor
   }));
 
   if (isFinished) return (
-      <div className="flex items-center justify-center h-full bg-skate-bg">
+      <div className="flex items-center justify-center h-full bg-skate-bg dark:bg-zinc-950">
           <div className="relative">
              <div className="absolute inset-0 bg-skate-yellow blur-xl opacity-40 animate-pulse"></div>
-             <div className="animate-spin h-12 w-12 border-4 border-skate-black rounded-full border-t-transparent relative z-10"></div>
+             <div className="animate-spin h-12 w-12 border-4 border-skate-black dark:border-white rounded-full border-t-transparent relative z-10"></div>
           </div>
       </div>
   );
 
   return (
-    <div className="flex flex-col h-full bg-skate-bg relative font-sans overflow-hidden">
+    <div className="flex flex-col h-full bg-skate-bg dark:bg-zinc-950 relative font-sans overflow-hidden transition-colors duration-300">
         
         {/* Header */}
         <div className="relative z-10 p-6 flex justify-between items-center">
-             <div className="bg-white px-4 py-2 rounded-full flex items-center gap-2 border border-gray-100 shadow-sm">
-                <span className="text-skate-black font-black text-xl leading-none pt-0.5">
+             <div className="bg-white dark:bg-zinc-900 px-4 py-2 rounded-full flex items-center gap-2 border border-gray-100 dark:border-zinc-800 shadow-sm">
+                <span className="text-skate-black dark:text-white font-black text-xl leading-none pt-0.5">
                     {currentIndex + 1}
                 </span>
-                <span className="text-gray-300 text-xs">/</span>
-                <span className="text-gray-400 font-bold text-lg leading-none pt-0.5">
+                <span className="text-gray-300 dark:text-zinc-600 text-xs">/</span>
+                <span className="text-gray-400 dark:text-zinc-500 font-bold text-lg leading-none pt-0.5">
                     {tricks.length}
                 </span>
              </div>
              
              <button 
                 onClick={onAbort} 
-                className="px-4 py-2 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 text-xs font-bold uppercase tracking-widest transition-colors"
+                className="px-4 py-2 rounded-full bg-gray-100 dark:bg-zinc-800 hover:bg-gray-200 dark:hover:bg-zinc-700 text-gray-500 dark:text-gray-400 text-xs font-bold uppercase tracking-widest transition-colors"
             >
                 {t.ABORT}
             </button>
@@ -129,7 +127,7 @@ const ActiveSession: React.FC<Props> = ({ tricks, difficulty, onComplete, onAbor
                         className={`flex-1 aspect-[3/4] rounded-xl flex items-center justify-center border-2 transition-all duration-500 ${
                             l.active 
                                 ? 'bg-skate-black text-skate-yellow border-skate-black shadow-lg scale-105' 
-                                : 'bg-white border-gray-100 text-gray-200'
+                                : 'bg-white dark:bg-zinc-900 border-gray-100 dark:border-zinc-800 text-gray-200 dark:text-zinc-700'
                         }`}
                     >
                         <span className="font-display font-black text-3xl">{l.char}</span>
@@ -154,18 +152,18 @@ const ActiveSession: React.FC<Props> = ({ tricks, difficulty, onComplete, onAbor
             {/* Trick Card */}
             <div className="w-full text-center space-y-4">
                 {currentTrick.stance && (
-                     <span className="inline-block px-4 py-1.5 bg-white border border-gray-100 rounded-full text-skate-black font-bold tracking-widest uppercase text-xs mb-2">
+                     <span className="inline-block px-4 py-1.5 bg-white dark:bg-zinc-900 border border-gray-100 dark:border-zinc-800 rounded-full text-skate-black dark:text-white font-bold tracking-widest uppercase text-xs mb-2">
                         {/* @ts-ignore */}
                         {t[currentTrick.stance] || currentTrick.stance}
                     </span>
                 )}
 
-                <h1 className="text-5xl md:text-7xl font-display font-black text-skate-black leading-[1] tracking-tight">
+                <h1 className="text-5xl md:text-7xl font-display font-black text-skate-black dark:text-white leading-[1] tracking-tight">
                     {currentTrick.name}
                 </h1>
                 
                 <div className="flex items-center justify-center gap-3">
-                    <div className="px-3 py-1 rounded-full bg-white border border-gray-100 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                    <div className="px-3 py-1 rounded-full bg-white dark:bg-zinc-900 border border-gray-100 dark:border-zinc-800 text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
                          {/* @ts-ignore */}
                         {t[currentTrick.category] || currentTrick.category}
                     </div>
@@ -179,13 +177,13 @@ const ActiveSession: React.FC<Props> = ({ tricks, difficulty, onComplete, onAbor
             {/* Tip Card */}
             <div className="w-full max-w-md min-h-[100px] flex items-center justify-center">
                 {tip ? (
-                     <div className="w-full bg-white rounded-3xl p-5 animate-slide-up border border-gray-100 relative overflow-hidden shadow-pop">
+                     <div className="w-full bg-white dark:bg-zinc-900 rounded-3xl p-5 animate-slide-up border border-gray-100 dark:border-zinc-800 relative overflow-hidden shadow-pop">
                         <div className="flex gap-4">
                              <div className="mt-1">
                                 <Lightbulb className="w-5 h-5 text-skate-yellow fill-skate-yellow" />
                              </div>
                              <div className="flex-1">
-                                <p className="text-skate-black text-base font-bold leading-snug mb-2">"{tip.text[language]}"</p>
+                                <p className="text-skate-black dark:text-white text-base font-bold leading-snug mb-2">"{tip.text[language]}"</p>
                                 <div className="flex justify-between items-center">
                                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{tip.source}</span>
                                      {tip.video && <div className="flex items-center gap-1 text-gray-400 text-[10px] font-bold uppercase"><Video className="w-3 h-3" /> <span>Video</span></div>}
@@ -197,10 +195,10 @@ const ActiveSession: React.FC<Props> = ({ tricks, difficulty, onComplete, onAbor
                     <button 
                         onClick={fetchTip}
                         disabled={isLoadingTip}
-                        className="group flex items-center gap-3 px-6 py-3 rounded-full bg-white hover:bg-gray-50 transition-all shadow-sm border border-gray-100"
+                        className="group flex items-center gap-3 px-6 py-3 rounded-full bg-white dark:bg-zinc-900 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-all shadow-sm border border-gray-100 dark:border-zinc-800"
                     >
-                        <Lightbulb className={`w-4 h-4 text-gray-400 group-hover:text-skate-yellow transition-colors ${isLoadingTip ? 'animate-pulse' : ''}`} />
-                        <span className="text-xs font-bold text-gray-400 uppercase tracking-widest group-hover:text-skate-black transition-colors">
+                        <Lightbulb className={`w-4 h-4 text-gray-400 dark:text-gray-500 group-hover:text-skate-yellow transition-colors ${isLoadingTip ? 'animate-pulse' : ''}`} />
+                        <span className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest group-hover:text-skate-black dark:group-hover:text-white transition-colors">
                             {isLoadingTip ? t.ASKING_COACH : t.GET_TIP}
                         </span>
                     </button>
@@ -213,7 +211,7 @@ const ActiveSession: React.FC<Props> = ({ tricks, difficulty, onComplete, onAbor
             <div className="flex items-center gap-4 h-24">
                 <button 
                     onClick={() => handleAttempt(false)}
-                    className="flex-1 h-full rounded-[2.5rem] bg-gray-200 text-gray-400 hover:bg-gray-300 hover:text-white active:scale-95 transition-all flex flex-col items-center justify-center gap-1 group relative overflow-hidden"
+                    className="flex-1 h-full rounded-[2.5rem] bg-gray-200 dark:bg-zinc-800 text-gray-400 dark:text-zinc-500 hover:bg-gray-300 dark:hover:bg-zinc-700 hover:text-white active:scale-95 transition-all flex flex-col items-center justify-center gap-1 group relative overflow-hidden"
                 >
                     <X className="w-8 h-8 relative z-10 stroke-[3px]" />
                     <span className="text-[10px] font-black uppercase tracking-widest relative z-10">{t.FAILED}</span>

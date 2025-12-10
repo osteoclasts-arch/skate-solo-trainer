@@ -9,6 +9,7 @@
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
     <script>
       tailwind.config = {
+        darkMode: 'class', // Enable class-based dark mode
         theme: {
           extend: {
             fontFamily: {
@@ -18,7 +19,7 @@
             },
             colors: {
               skate: {
-                bg: '#FFFDF5', // Warm Cream Background
+                bg: '#FFFDF5', // Warm Cream Background (Light)
                 white: '#FFFFFF',
                 black: '#1C1917', // Warm Black
                 deep: '#4A3B32', // Coffee Brown (Secondary)
@@ -70,8 +71,15 @@
         font-family: "Pretendard", "Inter", -apple-system, sans-serif;
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
+        transition: background-color 0.3s ease, color 0.3s ease;
       }
       
+      /* Dark mode body override via class on html/body */
+      .dark body {
+        background-color: #09090b; /* Zinc 950 */
+        color: #ffffff;
+      }
+
       /* Hide scrollbar */
       ::-webkit-scrollbar {
         width: 0px;
@@ -96,6 +104,11 @@
         border: 1px solid rgba(0,0,0,0.02);
         transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
       }
+      .dark .pop-card {
+        box-shadow: 0 8px 30px rgba(0,0,0,0.3); /* Darker shadow for dark mode */
+        border: 1px solid rgba(255,255,255,0.05); /* Subtle white border */
+      }
+
       .pop-card:active {
         transform: scale(0.98);
       }
@@ -105,6 +118,10 @@
         backdrop-filter: blur(20px);
         -webkit-backdrop-filter: blur(20px);
         box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        border: 1px solid rgba(255,255,255,0.1);
+      }
+      .dark .glass-nav {
+        background: rgba(9, 9, 11, 0.85); /* Zinc 950 alpha */
         border: 1px solid rgba(255,255,255,0.1);
       }
     </style>
