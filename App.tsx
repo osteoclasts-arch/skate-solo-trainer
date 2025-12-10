@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ViewState, SessionSettings, Trick, SessionResult, Difficulty, Language, Stance, User } from './types';
+import { ViewState, SessionSettings, Trick, SessionResult, Difficulty, Language, Stance, User, Quest } from './types';
 import Dashboard from './components/Dashboard';
 import SessionSetup from './components/SessionSetup';
 import ActiveSession from './components/ActiveSession';
@@ -78,6 +78,11 @@ const App: React.FC = () => {
                     localUser.xp = profile.xp;
                     localUser.dailyQuests = profile.dailyQuests;
                     setUser({ ...localUser }); 
+                    
+                    // Check Login Quest
+                    if (profile.dailyQuests) {
+                        await checkQuestProgress(profile.dailyQuests, 'login', localUser.uid);
+                    }
                 }
                 await dbService.migrateLegacySessions(localUser.uid);
                 const cloudSessions = await dbService.getUserSessions(localUser.uid);
@@ -104,6 +109,7 @@ const App: React.FC = () => {
       if (profile) {
          if(profile.startDate) setStartDate(profile.startDate);
          setUser(prev => prev ? ({...prev, level: profile.level, xp: profile.xp, dailyQuests: profile.dailyQuests}) : null);
+         if (profile.dailyQuests) await checkQuestProgress(profile.dailyQuests, 'login', loggedInUser.uid);
       }
       await dbService.migrateLegacySessions(loggedInUser.uid);
       const sessions = await dbService.getUserSessions(loggedInUser.uid);
@@ -139,6 +145,63 @@ const App: React.FC = () => {
       return Math.max(1, Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
   };
 
+  // Central Quest Logic
+  const checkQuestProgress = async (
+      currentQuests: Quest[], 
+      triggerType: 'login' | 'session' | 'practice' | 'land_tricks' | 'perfect_session',
+      uid: string,
+      details?: { result?: SessionResult, trickId?: string }
+  ) => {
+      let updated = false;
+      const newQuests = currentQuests.map(q => {
+          if (q.isCompleted) return q;
+          
+          let increment = 0;
+          if (triggerType === 'login' && q.type === 'login') increment = 1;
+          
+          if (triggerType === 'session' && q.type === 'session') increment = 1;
+
+          if (triggerType === 'perfect_session' && q.type === 'perfect_session') {
+               if (details?.result?.letters === '') increment = 1;
+          }
+
+          if (triggerType === 'land_tricks' && q.type === 'land_tricks' && details?.result) {
+               if (q.targetTrickId) {
+                   // Count specific trick lands
+                   const count = details.result.trickHistory.filter(t => t.landed && t.trick.id === q.targetTrickId).length;
+                   increment = count;
+               } else {
+                   // Count any trick lands
+                   increment = details.result.landedCount;
+               }
+          }
+
+          if (triggerType === 'practice' && q.type === 'practice' && details?.trickId) {
+               if (!q.targetTrickId || q.targetTrickId === details.trickId) {
+                   increment = 1;
+               }
+          }
+
+          if (increment > 0) {
+              updated = true;
+              const newProgress = Math.min(q.target, q.progress + increment);
+              return { ...q, progress: newProgress };
+          }
+          return q;
+      });
+
+      if (updated) {
+          await dbService.updateUserProfile(uid, { dailyQuests: newQuests });
+          setUser(prev => prev ? ({ ...prev, dailyQuests: newQuests }) : null);
+      }
+  };
+
+  const handleTrickPractice = async (trickId: string) => {
+      if (user && user.dailyQuests) {
+          await checkQuestProgress(user.dailyQuests, 'practice', user.uid, { trickId });
+      }
+  }
+
   const startSession = async (settings: SessionSettings) => {
     setIsGenerating(true);
     let tricks: Trick[] = [];
@@ -173,10 +236,13 @@ const App: React.FC = () => {
     setLastResult(result);
     if (user) {
         await dbService.saveSession(user.uid, result);
+        
+        // Update Quests
         if (user.dailyQuests) {
-             const updatedQuests = [...user.dailyQuests];
-             await dbService.updateUserProfile(user.uid, { dailyQuests: updatedQuests });
-             setUser(prev => prev ? ({ ...prev, dailyQuests: updatedQuests }) : null);
+            // Trigger 3 types of updates
+            await checkQuestProgress(user.dailyQuests, 'session', user.uid, { result });
+            await checkQuestProgress(user.dailyQuests, 'land_tricks', user.uid, { result });
+            await checkQuestProgress(user.dailyQuests, 'perfect_session', user.uid, { result });
         }
     } else {
         localStorage.setItem('skate_session_history', JSON.stringify(newHistory));
@@ -236,7 +302,7 @@ const App: React.FC = () => {
       case 'ACTIVE_SESSION': return <ActiveSession tricks={activeTricks} difficulty={activeDifficulty} onComplete={handleSessionComplete} onAbort={() => setView('DASHBOARD')} language={language} />;
       case 'SUMMARY': return lastResult ? <SessionSummary result={lastResult} onHome={() => setView('DASHBOARD')} language={language} /> : null;
       case 'ANALYTICS': return <Analytics history={sessionHistory} language={language} daysSkating={calculateDaysSkating()} user={user} onLogin={() => setView('DASHBOARD')} onRequestPro={handleRequestPro} />;
-      case 'LEARNING': return <TrickLearning language={language} />;
+      case 'LEARNING': return <TrickLearning language={language} onPractice={handleTrickPractice} />;
       case 'AI_VISION': return <AIVision language={language} user={user} />;
       case 'LINE_GENERATOR': return <LineGenerator language={language} user={user} onBack={() => setView('DASHBOARD')} />;
       default: return null;

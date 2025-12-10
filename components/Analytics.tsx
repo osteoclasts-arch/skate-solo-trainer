@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { SessionResult, Language, AnalyticsInsight, User } from '../types';
 import { TRANSLATIONS } from '../constants';
 import { ResponsiveContainer, AreaChart, Area, XAxis, Tooltip, CartesianGrid } from 'recharts';
-import { Trophy, Target, BrainCircuit, Sparkles, Instagram, Lock } from 'lucide-react';
+import { Trophy, Target, BrainCircuit, Sparkles, Instagram, Lock, BarChart } from 'lucide-react';
 import { getAnalyticsInsight } from '../services/geminiService';
 
 interface Props {
@@ -26,10 +26,13 @@ const Analytics: React.FC<Props> = ({ history, language, daysSkating = 1, user, 
       rate: Math.round((h.landedCount / h.totalTricks) * 100)
   }));
 
-  const chartData = progressData.length > 0 ? progressData : [
+  // Only show mock data if user is NOT logged in (preview mode behind lock screen)
+  const chartData = progressData.length > 0 
+    ? progressData 
+    : (user ? [] : [
       { date: 'Mon', rate: 20 }, { date: 'Tue', rate: 45 }, { date: 'Wed', rate: 30 }, 
       { date: 'Thu', rate: 70 }, { date: 'Fri', rate: 55 }, { date: 'Sat', rate: 85 }
-  ];
+  ]);
 
   const totalSessions = history.length;
   const totalLanded = history.reduce((acc, curr) => acc + curr.landedCount, 0);
@@ -139,37 +142,44 @@ const Analytics: React.FC<Props> = ({ history, language, daysSkating = 1, user, 
                  </div>
              </div>
 
-             <div className="h-48 w-full -mx-2">
-                <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={chartData}>
-                        <defs>
-                            <linearGradient id="colorRate" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#FFE500" stopOpacity={0.4}/>
-                                <stop offset="95%" stopColor="#FFE500" stopOpacity={0}/>
-                            </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" strokeOpacity={0.2} />
-                        <XAxis 
-                            dataKey="date" 
-                            axisLine={false} 
-                            tickLine={false} 
-                            tick={{fill: '#A8A29E', fontSize: 10, fontWeight: 700}} 
-                            dy={10}
-                        />
-                        <Tooltip 
-                            contentStyle={{ backgroundColor: '#1C1917', border: 'none', borderRadius: '12px', color: '#fff', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}
-                            itemStyle={{ color: '#FFE500', fontWeight: 'bold' }}
-                            cursor={{ stroke: '#FFE500', strokeWidth: 2 }}
-                        />
-                        <Area 
-                            type="monotone" 
-                            dataKey="rate" 
-                            stroke="#EAB308" 
-                            strokeWidth={4} 
-                            fill="url(#colorRate)" 
-                        />
-                    </AreaChart>
-                </ResponsiveContainer>
+             <div className="h-48 w-full -mx-2 flex items-center justify-center">
+                {chartData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={chartData}>
+                            <defs>
+                                <linearGradient id="colorRate" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="#FFE500" stopOpacity={0.4}/>
+                                    <stop offset="95%" stopColor="#FFE500" stopOpacity={0}/>
+                                </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" strokeOpacity={0.2} />
+                            <XAxis 
+                                dataKey="date" 
+                                axisLine={false} 
+                                tickLine={false} 
+                                tick={{fill: '#A8A29E', fontSize: 10, fontWeight: 700}} 
+                                dy={10}
+                            />
+                            <Tooltip 
+                                contentStyle={{ backgroundColor: '#1C1917', border: 'none', borderRadius: '12px', color: '#fff', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}
+                                itemStyle={{ color: '#FFE500', fontWeight: 'bold' }}
+                                cursor={{ stroke: '#FFE500', strokeWidth: 2 }}
+                            />
+                            <Area 
+                                type="monotone" 
+                                dataKey="rate" 
+                                stroke="#EAB308" 
+                                strokeWidth={4} 
+                                fill="url(#colorRate)" 
+                            />
+                        </AreaChart>
+                    </ResponsiveContainer>
+                ) : (
+                    <div className="flex flex-col items-center justify-center opacity-40">
+                        <BarChart className="w-12 h-12 text-gray-400 dark:text-gray-600 mb-2" />
+                        <p className="text-gray-400 dark:text-gray-600 font-bold text-sm">No session data yet</p>
+                    </div>
+                )}
              </div>
         </div>
 

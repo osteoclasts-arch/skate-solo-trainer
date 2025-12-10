@@ -88,11 +88,12 @@ export const dbService = {
             
             // 1. Gather User Context for AI
             const uniqueLanded = await this.getUniqueLandedTricks(uid);
+            const uniqueFailed = await this.getUniqueFailedTricks(uid);
             const userLevelString = (profile.level || 0) <= 60 ? "Beginner" : (profile.level || 0) <= 180 ? "Amateur" : "Pro";
             const lang = (localStorage.getItem('skate_app_language') || 'KR') as any;
 
             // 2. Try AI Generation
-            let newQuests = await generatePersonalizedQuests(uniqueLanded, userLevelString, lang);
+            let newQuests = await generatePersonalizedQuests(uniqueLanded, uniqueFailed, userLevelString, lang);
             
             // 3. Fallback if AI failed
             if (!newQuests || newQuests.length === 0) {
@@ -136,6 +137,23 @@ export const dbService = {
           });
       });
       return Array.from(landedSet);
+  },
+
+  /**
+   * Helper: Get list of unique tricks user has failed often
+   */
+  async getUniqueFailedTricks(uid: string): Promise<string[]> {
+      const sessions = await this.getUserSessions(uid);
+      const failedSet = new Set<string>();
+      
+      sessions.forEach(session => {
+          session.trickHistory.forEach(attempt => {
+              if (!attempt.landed) {
+                  failedSet.add(attempt.trick.name);
+              }
+          });
+      });
+      return Array.from(failedSet);
   },
 
   /**

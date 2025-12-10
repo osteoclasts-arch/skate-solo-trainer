@@ -421,6 +421,9 @@ export const TRANSLATIONS = {
 
 export const BASE_TRICKS: Trick[] = [
   // Beginner (Basic) - Was Easy
+  { id: 'tic-tac', name: 'Tic-Tac', category: TrickCategory.FLATGROUND, difficulty: Difficulty.BEGINNER, videoUrl: 'https://www.youtube.com/watch?v=F_Yd1qj_v_Q', description: { EN: "Moving the board side to side to gain speed.", KR: "보드 노즈를 좌우로 흔들며 앞으로 나아가는 기초 기술입니다." } },
+  { id: 'pushing', name: 'Pushing', category: TrickCategory.FLATGROUND, difficulty: Difficulty.BEGINNER, videoUrl: 'https://www.youtube.com/watch?v=9g0t1t_e3uM', description: { EN: "Pushing the ground to move.", KR: "뒷발로 땅을 차며 주행하는 가장 기본적인 동작입니다." } },
+  { id: 'kickturn', name: 'Kickturn', category: TrickCategory.FLATGROUND, difficulty: Difficulty.BEGINNER, videoUrl: 'https://www.youtube.com/watch?v=5D8X6X8X8X8', description: { EN: "Lifting the nose to turn the board.", KR: "노즈를 들어 방향을 전환하는 기술입니다." } },
   { id: 'ollie', name: 'Ollie', category: TrickCategory.FLATGROUND, difficulty: Difficulty.BEGINNER, videoUrl: 'https://www.youtube.com/watch?v=arQV9_seXl0', description: { EN: "The foundation of street skating. Pop the tail and slide your front foot up.", KR: "스케이트보딩의 가장 기본이 되는 기술입니다. 테일을 팝하고 앞발을 끌어올려 점프합니다." } },
   { id: 'shuvit', name: 'Shuvit', category: TrickCategory.FLATGROUND, difficulty: Difficulty.BEGINNER, videoUrl: 'https://www.youtube.com/watch?v=4270O2pD9Rg', description: { EN: "Spin the board 180 degrees without popping.", KR: "팝 없이 보드만 180도 회전시키는 기술입니다." } },
   { id: 'fs-180', name: 'Frontside 180', category: TrickCategory.FLATGROUND, difficulty: Difficulty.BEGINNER, videoUrl: 'https://www.youtube.com/watch?v=_4O9Lh5x80s', description: { EN: "Rotate your body and board 180 degrees facing forward.", KR: "몸과 보드를 앞쪽 방향으로 180도 회전합니다." } },

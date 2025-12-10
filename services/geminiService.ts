@@ -309,44 +309,54 @@ export const getAnalyticsInsight = async (
 
 export const generatePersonalizedQuests = async (
     userLandedTricks: string[],
+    userFailedTricks: string[],
     userLevel: string, // "Beginner", "Amateur", "Pro"
     language: Language
 ): Promise<Quest[]> => {
     if (!apiKey) {
-        // Fallback to empty (will use default logic in dbService)
         return []; 
     }
 
     const ai = getAI();
     const langInstruction = language === 'KR' ? "Outputs must be in Korean (Hangul)." : "Outputs must be in English.";
     
-    // Provide full list of tricks for AI context
-    const allTrickNames = BASE_TRICKS.map(t => t.name).join(", ");
+    // Create mapping of trick names to IDs for reference
+    const trickMap = BASE_TRICKS.map(t => `${t.name} (id: ${t.id})`).join(", ");
 
     const prompt = `
         You are a skateboard gamification engine. Generate 3 unique Daily Quests for a skater.
         
         User Profile:
         - Level: ${userLevel}
-        - Tricks they have LANDED before: [${userLandedTricks.join(', ')}]
-        - All available tricks in database: [${allTrickNames}]
+        - Landed Tricks (Good at): [${userLandedTricks.join(', ')}]
+        - Failed Tricks (Needs practice): [${userFailedTricks.join(', ')}]
+        - All available tricks: [${trickMap}]
         
-        Goal:
-        1. Login Quest (Always included, just label it creatively)
-        2. "First Steps" or "Challenge" Quest:
-           - If they have NEVER landed a basic trick (like Ollie, Shuvit, Nollie), suggest "First Steps: Try [Trick]".
-           - If they are advanced, suggest a hard variation or "Land 3 [Hard Trick]".
-           - Make it fun!
-        3. Consistency Quest: Suggest landing a trick they ALREADY know multiple times (e.g. "Land 10 Kickflips").
-        
+        Logic for Quests:
+        1. Login Quest: Always included. Title example: "Daily Check-in".
+        2. Practice Quest (Based on FAILURES): 
+           - Pick a trick from the 'Failed Tricks' list. 
+           - If empty or user is Beginner, pick simple tricks like 'Tic-Tac', 'Pushing', 'Kickturn' or 'Ollie'.
+           - Title: "Practice [Trick Name] in Guide". 
+           - Type: 'practice'.
+           - targetTrickId: The exact ID of the trick.
+        3. Consistency Quest (Based on LANDED): 
+           - Pick a trick they have landed.
+           - Challenge them to land it X times (e.g., 5 or 10).
+           - Title: "Land [Trick Name] 5 times".
+           - Type: 'land_tricks'.
+           - targetTrickId: The exact ID of the trick.
+           - If no landed tricks, suggest "Land 10 Tic-Tacs".
+
         ${langInstruction}
         
         Return JSON Array of 3 Quest Objects:
         [{
-           "title": "String (Short, Fun Title, e.g. 'First Nollie Attempt' or 'Ollie Master')",
+           "title": "String",
            "xp": Integer (20-100),
-           "target": Integer (Amount to do, e.g. 1, 5, 10),
-           "type": String (Enum: 'login', 'session', 'practice', 'land_tricks', 'perfect_session')
+           "target": Integer (Amount to do),
+           "type": String (Enum: 'login', 'session', 'practice', 'land_tricks', 'perfect_session'),
+           "targetTrickId": "String (The exact trick ID found in list, e.g. 'kickflip', 'ollie', 'tic-tac')"
         }]
     `;
 
@@ -358,7 +368,8 @@ export const generatePersonalizedQuests = async (
                 title: { type: Type.STRING },
                 xp: { type: Type.INTEGER },
                 target: { type: Type.INTEGER },
-                type: { type: Type.STRING, enum: ['login', 'session', 'practice', 'land_tricks', 'perfect_session'] }
+                type: { type: Type.STRING, enum: ['login', 'session', 'practice', 'land_tricks', 'perfect_session'] },
+                targetTrickId: { type: Type.STRING }
             },
             required: ["title", "xp", "target", "type"]
         }
@@ -379,7 +390,6 @@ export const generatePersonalizedQuests = async (
                 const cleaned = cleanJson(response.text);
                 const rawQuests = JSON.parse(cleaned);
                 
-                // Add IDs and progress fields
                 return rawQuests.map((q: any, idx: number) => ({
                     id: `ai-quest-${Date.now()}-${idx}`,
                     title: q.title,
@@ -387,7 +397,8 @@ export const generatePersonalizedQuests = async (
                     target: q.target,
                     type: q.type,
                     progress: 0,
-                    isCompleted: false
+                    isCompleted: false,
+                    targetTrickId: q.targetTrickId
                 }));
             } catch (e) {
                 console.error("Failed to parse AI Quests", e);

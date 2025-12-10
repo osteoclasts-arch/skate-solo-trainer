@@ -360,7 +360,7 @@ const Dashboard: React.FC<Props> = ({
                           </div>
                       );
                   }) : (
-                      <div onClick={user ? undefined : onLogin} className="p-8 text-center bg-white dark:bg-crit-surface rounded-[2rem] border border-dashed border-gray-300 dark:border-white/5 cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+                      <div onClick={user ? undefined : () => setShowProfileSetup(true)} className="p-8 text-center bg-white dark:bg-crit-surface rounded-[2rem] border border-dashed border-gray-300 dark:border-white/5 cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
                           <p className="text-gray-400 dark:text-gray-500 text-xs font-bold">{t.SIGN_IN_QUESTS}</p>
                       </div>
                   )}

@@ -5,6 +5,7 @@ import { Video, BookOpen, ChevronRight, X, Check, Info, Star, PlayCircle } from 
 
 interface Props {
   language: Language;
+  onPractice?: (trickId: string) => void;
 }
 
 const YouTubePlayer = ({ videoUrl, trickName }: { videoUrl?: string, trickName: string }) => {
@@ -42,7 +43,7 @@ const YouTubePlayer = ({ videoUrl, trickName }: { videoUrl?: string, trickName: 
   );
 };
 
-const TrickLearning: React.FC<Props> = ({ language }) => {
+const TrickLearning: React.FC<Props> = ({ language, onPractice }) => {
   const t = TRANSLATIONS[language];
   const [selectedTrick, setSelectedTrick] = useState<Trick | null>(null);
   const [selectedStance, setSelectedStance] = useState<Stance>(Stance.REGULAR);
@@ -59,6 +60,7 @@ const TrickLearning: React.FC<Props> = ({ language }) => {
   useEffect(() => {
     if (selectedTrick) {
         setSelectedStance(Stance.REGULAR);
+        if (onPractice) onPractice(selectedTrick.id);
     }
   }, [selectedTrick]);
 

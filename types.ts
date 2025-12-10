@@ -31,6 +31,7 @@ export interface Quest {
   type: 'login' | 'session' | 'practice' | 'land_tricks' | 'perfect_session';
   progress: number;
   target: number;
+  targetTrickId?: string; // Optional: If the quest is about a specific trick
 }
 
 export interface User {
