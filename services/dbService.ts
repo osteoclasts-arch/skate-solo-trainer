@@ -1,6 +1,7 @@
 
 
 import { SessionResult, VisionAnalysis, Quest } from "../types";
+import { generatePersonalizedQuests } from "./geminiService";
 
 export interface UserProfileData {
   startDate: string;
@@ -25,8 +26,8 @@ const STORAGE_KEYS = {
 // Helper to simulate DB delay
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Generate default daily quests with randomized targets
-const generateDailyQuests = (): Quest[] => {
+// Generate default daily quests with randomized targets (Fallback)
+const generateDefaultDailyQuests = (): Quest[] => {
     const quests: Quest[] = [
         // 1. Always Login Quest
         { id: 'q_login', title: 'QUEST_LOGIN', xp: 20, isCompleted: false, type: 'login', progress: 0, target: 1 },
@@ -59,9 +60,11 @@ export const dbService = {
     // Check Date for Quests
     const today = new Date().toISOString().split('T')[0];
     if (updated.lastQuestDate !== today) {
-        // Keep existing quests if same day, otherwise reset
-        updated.dailyQuests = generateDailyQuests();
+        // We defer Quest generation to getUserProfile for async handling if needed
+        // But if updating manually, reset date so next fetch triggers it
         updated.lastQuestDate = today;
+        // Fallback default just in case
+        if(!updated.dailyQuests) updated.dailyQuests = generateDefaultDailyQuests();
     }
 
     users[uid] = updated;
@@ -78,25 +81,61 @@ export const dbService = {
     let profile = users[uid];
     
     if (profile) {
-        // Daily Quest Logic on Fetch
         const today = new Date().toISOString().split('T')[0];
         
-        // Ensure quests exist and are up to date
+        // REFRESH DAILY QUESTS if new day
         if (profile.lastQuestDate !== today || !profile.dailyQuests) {
-            profile.dailyQuests = generateDailyQuests();
+            
+            // 1. Gather User Context for AI
+            const uniqueLanded = await this.getUniqueLandedTricks(uid);
+            const userLevelString = (profile.level || 0) <= 60 ? "Beginner" : (profile.level || 0) <= 180 ? "Amateur" : "Pro";
+            const lang = (localStorage.getItem('skate_app_language') || 'KR') as any;
+
+            // 2. Try AI Generation
+            let newQuests = await generatePersonalizedQuests(uniqueLanded, userLevelString, lang);
+            
+            // 3. Fallback if AI failed
+            if (!newQuests || newQuests.length === 0) {
+                newQuests = generateDefaultDailyQuests();
+            }
+
+            // 4. Force one Login quest if missing (AI might skip it)
+            if (!newQuests.some(q => q.type === 'login')) {
+                newQuests.unshift({ id: 'q_login', title: 'QUEST_LOGIN', xp: 20, isCompleted: false, type: 'login', progress: 0, target: 1 });
+                if(newQuests.length > 3) newQuests.pop(); // Keep to max 3
+            }
+
+            profile.dailyQuests = newQuests;
             profile.lastQuestDate = today;
             
-            // Save back to DB immediately to persist the generated quests
+            // Save back to DB
             users[uid] = profile;
             localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
         }
         
-        // Init XP/Level if missing (Migration for existing users)
+        // Init XP/Level if missing
         if (profile.level === undefined) profile.level = 1;
         if (profile.xp === undefined) profile.xp = 0;
     }
     
     return profile || null;
+  },
+
+  /**
+   * Helper: Get list of unique tricks user has landed ever
+   */
+  async getUniqueLandedTricks(uid: string): Promise<string[]> {
+      const sessions = await this.getUserSessions(uid);
+      const landedSet = new Set<string>();
+      
+      sessions.forEach(session => {
+          session.trickHistory.forEach(attempt => {
+              if (attempt.landed) {
+                  landedSet.add(attempt.trick.name);
+              }
+          });
+      });
+      return Array.from(landedSet);
   },
 
   /**

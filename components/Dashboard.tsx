@@ -21,6 +21,27 @@ interface Props {
   onRequestPro: () => void;
 }
 
+const STREET_SPOTS = [
+  "용두공원", 
+  "코엑스 앞", 
+  "서울대 정문", 
+  "낙성대 공원", 
+  "신대방 (다리 밑)", 
+  "디디미 (다리 밑)", 
+  "이촌 한강공원"
+];
+
+const PARK_SPOTS = [
+  "뚝섬 한강공원", 
+  "보라매 x게임장 (헬멧 필수)", 
+  "서울숲 스케이트파크", 
+  "컬트 (훈련원 공원)", 
+  "난지 파크", 
+  "K88 (실내 파크)", 
+  "트랜지션 정글 (실내 파크)", 
+  "크래프터 평택 (실내 파크)"
+];
+
 const Dashboard: React.FC<Props> = ({ 
     onStart, 
     onLearning, 
@@ -52,6 +73,9 @@ const Dashboard: React.FC<Props> = ({
 
   // Location Suggestion State
   const [suggestedSpot, setSuggestedSpot] = useState("");
+  
+  // Spot List Modal State
+  const [spotListModal, setSpotListModal] = useState<{ title: string, spots: string[] } | null>(null);
 
   useEffect(() => {
     if (language === 'KR') {
@@ -295,6 +319,31 @@ const Dashboard: React.FC<Props> = ({
            </div>
       )}
 
+      {/* Spot List Modal */}
+      {spotListModal && (
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-6 animate-fade-in">
+              <div className="bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl relative overflow-hidden flex flex-col max-h-[80vh]">
+                  <div className="flex justify-between items-center mb-6 shrink-0">
+                      <h3 className="text-2xl font-black flex items-center gap-2 text-skate-black">
+                         <MapPin className="text-skate-deep fill-skate-deep w-6 h-6" /> {spotListModal.title}
+                      </h3>
+                      <button onClick={() => setSpotListModal(null)} className="p-2 bg-gray-100 rounded-full hover:bg-gray-200"><X className="w-5 h-5 text-skate-black" /></button>
+                  </div>
+                  
+                  <div className="overflow-y-auto space-y-3 pr-2">
+                      {spotListModal.spots.map((spot, idx) => (
+                          <div key={idx} className="p-4 bg-gray-50 rounded-2xl border border-gray-100 flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-full bg-skate-yellow flex items-center justify-center font-black text-xs text-skate-black shrink-0">
+                                  {idx + 1}
+                              </div>
+                              <span className="font-bold text-skate-black text-sm">{spot}</span>
+                          </div>
+                      ))}
+                  </div>
+              </div>
+          </div>
+      )}
+
       {/* Header */}
       <header className="flex justify-between items-start shrink-0 pt-2">
         <div>
@@ -334,10 +383,24 @@ const Dashboard: React.FC<Props> = ({
 
       {/* Chips */}
       <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide shrink-0">
-          <button className="px-5 py-2 rounded-full bg-skate-black text-white text-sm font-bold shadow-md whitespace-nowrap">All</button>
-          <button className="px-5 py-2 rounded-full bg-white text-gray-400 text-sm font-bold border border-gray-100 whitespace-nowrap">Street</button>
-          <button className="px-5 py-2 rounded-full bg-white text-gray-400 text-sm font-bold border border-gray-100 whitespace-nowrap">Park</button>
-          <button className="px-5 py-2 rounded-full bg-white text-gray-400 text-sm font-bold border border-gray-100 whitespace-nowrap">Freestyle</button>
+          <button 
+            onClick={() => setSpotListModal(null)}
+            className="px-5 py-2 rounded-full bg-skate-black text-white text-sm font-bold shadow-md whitespace-nowrap active:scale-95 transition-transform"
+          >
+            All
+          </button>
+          <button 
+            onClick={() => setSpotListModal({ title: language === 'KR' ? '스트릿 스팟' : 'Street Spots', spots: STREET_SPOTS })}
+            className="px-5 py-2 rounded-full bg-white text-gray-400 text-sm font-bold border border-gray-100 whitespace-nowrap active:scale-95 transition-transform hover:bg-gray-50 hover:text-skate-black"
+          >
+            Street
+          </button>
+          <button 
+            onClick={() => setSpotListModal({ title: language === 'KR' ? '스케이트 파크' : 'Skate Parks', spots: PARK_SPOTS })}
+            className="px-5 py-2 rounded-full bg-white text-gray-400 text-sm font-bold border border-gray-100 whitespace-nowrap active:scale-95 transition-transform hover:bg-gray-50 hover:text-skate-black"
+          >
+            Park
+          </button>
       </div>
 
       {/* Main Grid */}

@@ -1,4 +1,5 @@
 
+
 declare var process: {
   env: {
     API_KEY: string;
@@ -6,7 +7,7 @@ declare var process: {
 };
 
 import { GoogleGenAI, Type, Schema } from "@google/genai";
-import { Trick, SessionSettings, Difficulty, TrickCategory, SessionResult, TrickTip, Language, AnalyticsInsight, VisionAnalysis, TrackingDataPoint } from "../types";
+import { Trick, SessionSettings, Difficulty, TrickCategory, SessionResult, TrickTip, Language, AnalyticsInsight, VisionAnalysis, TrackingDataPoint, Quest } from "../types";
 import { TRICK_TIPS_DB, BASE_TRICKS } from "../constants";
 
 const apiKey = process.env.API_KEY || '';
@@ -305,6 +306,100 @@ export const getAnalyticsInsight = async (
         return null;
     }
 };
+
+export const generatePersonalizedQuests = async (
+    userLandedTricks: string[],
+    userLevel: string, // "Beginner", "Amateur", "Pro"
+    language: Language
+): Promise<Quest[]> => {
+    if (!apiKey) {
+        // Fallback to empty (will use default logic in dbService)
+        return []; 
+    }
+
+    const ai = getAI();
+    const langInstruction = language === 'KR' ? "Outputs must be in Korean (Hangul)." : "Outputs must be in English.";
+    
+    // Provide full list of tricks for AI context
+    const allTrickNames = BASE_TRICKS.map(t => t.name).join(", ");
+
+    const prompt = `
+        You are a skateboard gamification engine. Generate 3 unique Daily Quests for a skater.
+        
+        User Profile:
+        - Level: ${userLevel}
+        - Tricks they have LANDED before: [${userLandedTricks.join(', ')}]
+        - All available tricks in database: [${allTrickNames}]
+        
+        Goal:
+        1. Login Quest (Always included, just label it creatively)
+        2. "First Steps" or "Challenge" Quest:
+           - If they have NEVER landed a basic trick (like Ollie, Shuvit, Nollie), suggest "First Steps: Try [Trick]".
+           - If they are advanced, suggest a hard variation or "Land 3 [Hard Trick]".
+           - Make it fun!
+        3. Consistency Quest: Suggest landing a trick they ALREADY know multiple times (e.g. "Land 10 Kickflips").
+        
+        ${langInstruction}
+        
+        Return JSON Array of 3 Quest Objects:
+        [{
+           "title": "String (Short, Fun Title, e.g. 'First Nollie Attempt' or 'Ollie Master')",
+           "xp": Integer (20-100),
+           "target": Integer (Amount to do, e.g. 1, 5, 10),
+           "type": String (Enum: 'login', 'session', 'practice', 'land_tricks', 'perfect_session')
+        }]
+    `;
+
+    const questSchema: Schema = {
+        type: Type.ARRAY,
+        items: {
+            type: Type.OBJECT,
+            properties: {
+                title: { type: Type.STRING },
+                xp: { type: Type.INTEGER },
+                target: { type: Type.INTEGER },
+                type: { type: Type.STRING, enum: ['login', 'session', 'practice', 'land_tricks', 'perfect_session'] }
+            },
+            required: ["title", "xp", "target", "type"]
+        }
+    };
+
+    try {
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: questSchema
+            }
+        });
+
+        if (response.text) {
+            try {
+                const cleaned = cleanJson(response.text);
+                const rawQuests = JSON.parse(cleaned);
+                
+                // Add IDs and progress fields
+                return rawQuests.map((q: any, idx: number) => ({
+                    id: `ai-quest-${Date.now()}-${idx}`,
+                    title: q.title,
+                    xp: q.xp,
+                    target: q.target,
+                    type: q.type,
+                    progress: 0,
+                    isCompleted: false
+                }));
+            } catch (e) {
+                console.error("Failed to parse AI Quests", e);
+                return [];
+            }
+        }
+        return [];
+    } catch (e) {
+        console.error("AI Quest Gen Error", e);
+        return [];
+    }
+}
 
 const fileToPart = (file: File): Promise<{ inlineData: { data: string; mimeType: string } }> => {
     return new Promise((resolve, reject) => {
