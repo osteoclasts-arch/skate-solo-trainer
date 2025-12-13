@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { TRANSLATIONS, BASE_TRICKS } from '../constants';
-import { Play, BookOpen, Eye, Zap, Calendar, ArrowUpRight, TrendingUp, Target, Shield, Star, X, MapPin, Instagram, ListVideo, Settings, Sparkles, ChevronRight, Check, Flame, Trophy, Bell, MoreHorizontal, User, Moon, Sun, Edit2, List, Map as MapIcon, Navigation } from 'lucide-react';
+import { Play, BookOpen, Eye, Zap, Calendar, ArrowUpRight, TrendingUp, Target, Shield, Star, X, MapPin, Instagram, ListVideo, Settings, Sparkles, ChevronRight, Check, Flame, Trophy, Bell, MoreHorizontal, User, Moon, Sun, Edit2, List, Map as MapIcon, Navigation, Locate, Loader2 } from 'lucide-react';
 import { SessionResult, Language, User as UserType, Quest, Trick } from '../types';
 import { dbService } from '../services/dbService';
 import CalendarModal from './CalendarModal';
@@ -152,6 +152,11 @@ const Dashboard: React.FC<Props> = ({
   const [spotListMode, setSpotListMode] = useState<'list' | 'map'>('list');
   const [activeMapSpot, setActiveMapSpot] = useState<string>("");
   
+  // Map Location State
+  const [userLocation, setUserLocation] = useState<{ lat: number, lng: number } | null>(null);
+  const [isLocating, setIsLocating] = useState(false);
+  const [mapMode, setMapMode] = useState<'SPOT' | 'NEARBY'>('SPOT');
+  
   // Daily Trick
   const [dailyTrick, setDailyTrick] = useState<Trick | null>(null);
 
@@ -241,7 +246,7 @@ const Dashboard: React.FC<Props> = ({
       }
   };
 
-  const getCurrentSpots = (filter?: string) => {
+  const getCurrentSpots = (filter?: string): string[] => {
       const tab = filter || selectedTab;
       if (tab === 'Street') return STREET_SPOTS;
       if (tab === 'Park') return PARK_SPOTS;
@@ -272,8 +277,8 @@ const Dashboard: React.FC<Props> = ({
 
       setSpotListMode(mode);
       if (mode === 'map') {
-          // Initialize map with first spot of current selection
           setActiveMapSpot(spots[0]);
+          setMapMode('SPOT'); // Reset to default view
       }
       setSpotListModal({
           title: selectedTab === 'All' ? 'All Spots' : `${selectedTab} Spots`,
@@ -281,9 +286,28 @@ const Dashboard: React.FC<Props> = ({
       });
   };
 
-  // Helper to change active spot map
-  const handleMapSpotChange = (spot: string) => {
-      setActiveMapSpot(spot);
+  const handleLocateMe = () => {
+      setIsLocating(true);
+      if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+              (position) => {
+                  setUserLocation({
+                      lat: position.coords.latitude,
+                      lng: position.coords.longitude
+                  });
+                  setMapMode('NEARBY');
+                  setIsLocating(false);
+              },
+              (error) => {
+                  console.error(error);
+                  alert("Could not access location. Please enable permissions.");
+                  setIsLocating(false);
+              }
+          );
+      } else {
+          alert("Geolocation is not supported by this browser.");
+          setIsLocating(false);
+      }
   };
 
   return (
@@ -535,15 +559,27 @@ const Dashboard: React.FC<Props> = ({
                  <div className="relative flex-1 flex flex-col overflow-hidden">
                      {/* Map Iframe Background */}
                      <div className="absolute inset-0 z-0 bg-gray-200 dark:bg-zinc-900">
-                         <iframe 
-                             width="100%" 
-                             height="100%" 
-                             frameBorder="0" 
-                             style={{ border: 0 }} 
-                             src={`https://maps.google.com/maps?q=${encodeURIComponent(getQueryName(activeMapSpot))}&t=&z=16&ie=UTF8&iwloc=&output=embed`}
-                             title={activeMapSpot}
-                             className="w-full h-full grayscale opacity-80"
-                         ></iframe>
+                         {mapMode === 'NEARBY' && userLocation ? (
+                            <iframe 
+                                width="100%" 
+                                height="100%" 
+                                frameBorder="0" 
+                                style={{ border: 0 }} 
+                                src={`https://maps.google.com/maps?q=Skateboard+Park&sll=${userLocation.lat},${userLocation.lng}&z=13&output=embed`}
+                                title="Nearby Spots"
+                                className="w-full h-full grayscale opacity-80"
+                            ></iframe>
+                         ) : (
+                            <iframe 
+                                width="100%" 
+                                height="100%" 
+                                frameBorder="0" 
+                                style={{ border: 0 }} 
+                                src={`https://maps.google.com/maps?q=${encodeURIComponent(getQueryName(activeMapSpot))}&t=&z=16&ie=UTF8&iwloc=&output=embed`}
+                                title={activeMapSpot}
+                                className="w-full h-full grayscale opacity-80"
+                            ></iframe>
+                         )}
                      </div>
 
                      {/* Top Bar Overlay */}
@@ -554,6 +590,7 @@ const Dashboard: React.FC<Props> = ({
                                      <button 
                                          key={tab}
                                          onClick={() => {
+                                             setMapMode('SPOT');
                                              setSelectedTab(tab as any);
                                              const newSpots = getCurrentSpots(tab);
                                              setActiveMapSpot(newSpots[0]);
@@ -576,6 +613,17 @@ const Dashboard: React.FC<Props> = ({
                              <X className="w-6 h-6" />
                          </button>
                      </div>
+                     
+                     {/* Floating GPS Button */}
+                     <button
+                        onClick={handleLocateMe}
+                        disabled={isLocating}
+                        className={`absolute right-4 bottom-48 z-20 p-4 rounded-full shadow-xl transition-all active:scale-95 ${
+                            mapMode === 'NEARBY' ? 'bg-skate-deep text-white' : 'bg-white text-skate-black'
+                        }`}
+                     >
+                         {isLocating ? <Loader2 className="w-6 h-6 animate-spin" /> : <Locate className="w-6 h-6" />}
+                     </button>
 
                      {/* Bottom Carousel Overlay */}
                      <div className="relative z-10 mt-auto p-4 pb-8 bg-gradient-to-t from-black/90 to-transparent">
@@ -583,21 +631,24 @@ const Dashboard: React.FC<Props> = ({
                              {getCurrentSpots().map((spot) => (
                                  <button
                                      key={spot}
-                                     onClick={() => setActiveMapSpot(spot)}
+                                     onClick={() => {
+                                         setMapMode('SPOT');
+                                         setActiveMapSpot(spot);
+                                     }}
                                      className={`snap-center flex-shrink-0 w-64 p-4 rounded-2xl border transition-all text-left flex items-center gap-3 ${
-                                         activeMapSpot === spot 
+                                         activeMapSpot === spot && mapMode === 'SPOT'
                                          ? 'bg-skate-yellow border-skate-yellow shadow-[0_0_20px_rgba(230,255,0,0.5)] scale-105' 
                                          : 'bg-white/10 backdrop-blur-md border-white/10 hover:bg-white/20'
                                      }`}
                                  >
-                                     <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${activeMapSpot === spot ? 'bg-skate-black text-skate-yellow' : 'bg-white/20 text-white'}`}>
-                                         <Navigation className={`w-4 h-4 ${activeMapSpot === spot ? 'fill-skate-yellow' : 'fill-white'}`} />
+                                     <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${activeMapSpot === spot && mapMode === 'SPOT' ? 'bg-skate-black text-skate-yellow' : 'bg-white/20 text-white'}`}>
+                                         <Navigation className={`w-4 h-4 ${activeMapSpot === spot && mapMode === 'SPOT' ? 'fill-skate-yellow' : 'fill-white'}`} />
                                      </div>
                                      <div>
-                                         <p className={`text-xs font-black uppercase tracking-wider mb-0.5 ${activeMapSpot === spot ? 'text-skate-black/60' : 'text-white/60'}`}>
+                                         <p className={`text-xs font-black uppercase tracking-wider mb-0.5 ${activeMapSpot === spot && mapMode === 'SPOT' ? 'text-skate-black/60' : 'text-white/60'}`}>
                                              {getRegion(spot)}
                                          </p>
-                                         <p className={`text-sm font-bold leading-tight ${activeMapSpot === spot ? 'text-skate-black' : 'text-white'}`}>
+                                         <p className={`text-sm font-bold leading-tight ${activeMapSpot === spot && mapMode === 'SPOT' ? 'text-skate-black' : 'text-white'}`}>
                                              {getQueryName(spot)}
                                          </p>
                                      </div>
